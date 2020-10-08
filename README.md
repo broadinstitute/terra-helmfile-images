@@ -1,2 +1,3 @@
 # terra-helmfile-images
-Container images used to work with the terra-helmfile repo
+
+This repo builds docker images for the terra-helmfile repo.

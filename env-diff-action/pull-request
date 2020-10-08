@@ -1,0 +1,279 @@
+#!/usr/bin/env python3
+
+import argparse
+import http.client
+import json
+import logging
+import requests
+import sys
+import os
+
+#
+# A script for interacting with GitHub PRs.
+# Try running with --help for usage info.
+#
+
+# Base class for GitHub api endpoints
+class GithubEndpoint:
+    BASE_URL = 'https://api.github.com'
+
+    def __init__(self, token, headers={}):
+        defaults = {
+            'Authorization': f"Bearer {token}",
+            'Content-Type':  "application/json",
+        }
+
+        self.token = token
+        self.session = requests.Session()
+        self.session.headers.update(defaults)
+        self.session.headers.update(headers)
+
+
+    # Send POST request with a relative path.
+    #
+    # Keyword args passed to requests.
+    #
+    # Eg.
+    #   post("issues/32/comment", json={'body': 'a comment'} )
+    def _post(self, path, **kwargs):
+        url = self._make_url(path)
+
+        response = self.session.post(url, **kwargs)
+        response.raise_for_status()
+        return response
+
+    # Send GET request with a relative path
+    def _get(self, path, **kwargs):
+        url = self._make_url(path)
+
+        response = self.session.get(url, **kwargs)
+        response.raise_for_status()
+        return response
+
+    # Helper for making a GitHub API repos url like
+    #   https://api.github.com/repos/broadinstitute/terra-helmfile/pulls/1
+    #
+    def _make_url(self, path):
+        return f"{self.BASE_URL}/{path}"
+
+
+# Subclass for any endpoints under /repos
+class RepoEndpoint(GithubEndpoint):
+    def __init__(self, token, owner, name, **kwargs):
+        GithubEndpoint.__init__(self, token, **kwargs)
+        self.repo_owner = owner
+        self.repo_name = name
+
+    # Helper for making a GitHub API repos url like
+    #   https://api.github.com/repos/broadinstitute/terra-helmfile/pulls/1
+    #
+    def _make_url(self, path):
+        return GithubEndpoint._make_url(self, f"repos/{self.repo_owner}/{self.repo_name}/{path}")
+
+
+class PullRequest(RepoEndpoint):
+
+    def __init__(self, token, event_path):
+        # Extract repo and pull request number from the Github Action event.json
+        # file
+        #
+        # https://help.github.com/en/actions/configuring-and-managing-workflows/using-environment-variables
+        #
+        with open(event_path) as f:
+            event = json.load(f)
+
+        self.repo_owner = event['repository']['owner']['login']
+        self.repo_name = event['repository']['name']
+
+        RepoEndpoint.__init__(self, token, self.repo_owner, self.repo_name)
+
+        self.number = event['pull_request']['number']
+        self.head_sha = event['pull_request']['head']['sha']
+
+
+    # Post a comment on a pull request
+    #
+    # https://developer.github.com/v3/issues/comments/#create-an-issue-comment
+    #
+    # POST /repos/:owner/:repo/issues/:issue_number/comments
+    def post_comment(self, content):
+        self._post(f"issues/{self.number}/comments", json={'body': content})
+
+
+    # Retrieve the list of reviews on this PR and count up the number with
+    # a state of APPROVED
+    #
+    # https://developer.github.com/v3/pulls/reviews/#list-reviews-for-a-pull-request
+    #
+    # GET /repos/:owner/:repo/pulls/:pull_number/reviews
+    def count_approvals(self):
+        response = self._get(f"pulls/{self.number}/reviews")
+        reviews = response.json()
+
+        approvals = sum(1 for r in reviews if r['state'] == 'APPROVED')
+        logging.info(f"PR {self.number} has {len(reviews)} reviews, {approvals} approvals")
+        return approvals
+
+
+    # Create a status for the head commit on this pull request
+    #
+    def create_status(self, context, state='success', target_url=None, description=None):
+        logging.info(f"Creating status for {self.head_sha}: {context}={state}")
+        status = Status(self.token, self.repo_owner, self.repo_name, self.head_sha)
+        status.create(context, state, target_url, description)
+
+
+# For interacting with commit status endpoint
+#
+# https://developer.github.com/v3/repos/statuses
+#
+class Status(RepoEndpoint):
+
+    def __init__(self, token, repo_owner, repo_name, sha):
+        RepoEndpoint.__init__(self, token, repo_owner, repo_name)
+
+        self.sha = sha
+
+
+    # https://developer.github.com/v3/repos/statuses/#create-a-commit-status
+    #
+    # Create a status for a commit
+    # POST /repos/:owner/:repo/statuses/:sha
+    # {
+    #   "state": "success", # error, failure, pending, or success
+    #   "target_url": "https://example.com/build/status",
+    #   "description": "The build succeeded!",
+    #   "context": "continuous-integration/jenkins"
+    # }
+    def create(self, context, state='success', target_url=None, description=None):
+        args = {
+            'context':     context,
+            'state':       state,
+            'target_url':  target_url,
+            'description': description
+        }
+        json = { k: v for k, v in args.items() if v } # Remove None args
+        response = self._post(f"statuses/{self.sha}", json=json)
+        return response
+
+
+#
+# CLI interface for this script
+#
+class CLI:
+    # The name of the approval status that the check-approvals
+    # subcommand creates
+    APPROVAL_CONTEXT = 'prod-changes-approved'
+
+    def run(self):
+        parser = self.build_parser()
+        args = parser.parse_args()
+        args.func(args)
+
+    def build_parser(self):
+        parser = argparse.ArgumentParser(
+            description='A utility for interacting with GitHub Pull Requests'
+        )
+
+        # Global arguments
+        parser.add_argument('--token', required=True, action=EnvDefault,
+                            envvar='GITHUB_TOKEN', metavar='TOKEN',
+                            help='GitHub token to use for API calls')
+
+        parser.add_argument('--event', required=True, action=EnvDefault,
+                            envvar='GITHUB_EVENT_PATH', metavar='FILE',
+                            help='Path to event.json')
+
+        parser.add_argument('--debug', action='store_true',
+                            help='Enable debug logging')
+
+        # Print usage and exit if no subcommand given
+        parser.set_defaults(func=lambda _ : parser.print_usage())
+
+        # Now add parsing for subcommands
+        subparsers = parser.add_subparsers(title='subcommands', metavar='', required=True)
+        self.add_post_comment_parser(subparsers)
+        self.add_check_approved_parser(subparsers)
+
+        return parser
+
+    # Add parser for the post-comment subcommand
+    def add_post_comment_parser(self, subparsers):
+        parser = subparsers.add_parser('post-comment', help='Post comment on a GitHub PR')
+        parser.add_argument('content', metavar='path/to/content.md', help='Path to file containing desired content')
+
+        parser.set_defaults(func=self.handle_post_comment)
+
+    # Add parser for check-approved subcommand
+    def add_check_approved_parser(self, subparsers):
+        parser = subparsers.add_parser('check-approved', help='Check GitHub PR for desired number of approving reviews')
+        parser.add_argument('--at-least', metavar='N', default=1, type=int, help='Number of required approvals')
+        parser.add_argument('--target-url', metavar='URL', help='Target URL for the GitHub status')
+
+        parser.set_defaults(func=self.handle_check_approved)
+
+    # Handler method for post-comment subcommand
+    def handle_post_comment(self, args):
+        pr = self.setup(args)
+        logging.debug(f"Loading comment content from {args.content}...")
+        with open(args.content, 'r') as f:
+            content = f.read()
+        pr.post_comment(content)
+
+    # Handler method for check-approved subcommand
+    #
+    # Post a Status on the head commit of the PR with state of "pending" if
+    # the PR does not have enough approvals, "success" if it does
+    def handle_check_approved(self, args):
+        pr = self.setup(args)
+        count = pr.count_approvals()
+
+        description = f"PR #{pr.number} has {count} approvals, " \
+                      f"{args.at_least} required"
+
+        url = args.target_url
+        state = 'pending'
+        if (count >= args.at_least):
+            state = 'success'
+
+        pr.create_status(self.APPROVAL_CONTEXT,
+                         state=state,
+                         target_url=args.target_url,
+                         description=description)
+
+    # Instantiate new PullRequest object and do any other argument parsing
+    # setup
+    def setup(self, args):
+        logging.basicConfig(level=logging.ERROR,
+                            format='[%(levelname)-5s] %(message)s')
+
+        if args.debug:
+            logging.getLogger().setLevel(logging.DEBUG)
+
+            # Enable debug logging for API requests
+            http.client.HTTPConnection.debuglevel = 1
+            requests_log = logging.getLogger("requests.packages.urllib3")
+            requests_log.setLevel(logging.DEBUG)
+            requests_log.propagate = True
+
+        return PullRequest(args.token, args.event)
+
+# This is a custom ArgumentParser action pulled from Stack Overflow
+#   https://stackoverflow.com/a/10551190
+#
+# It makes it easy to read options from command-line flags (--my-option=foo)
+# or environment variables (MY_OPTION=foo)
+class EnvDefault(argparse.Action):
+    def __init__(self, envvar, required=True, default=None, **kwargs):
+        if not default and envvar:
+            if envvar in os.environ:
+                default = os.environ[envvar]
+        if required and default:
+            required = False
+        super(EnvDefault, self).__init__(default=default, required=required,
+                                         **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, self.dest, values)
+
+CLI().run()

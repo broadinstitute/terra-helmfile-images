@@ -1,4 +1,3 @@
-# test
 steps:
 - name: 'gcr.io/cloud-builders/docker'
   args: [
@@ -15,7 +14,7 @@ steps:
     '${_REGISTRY_HOST}/$PROJECT_ID/$REPO_NAME/${_IMAGE}:${BRANCH_NAME}-${COMMIT_SHA}',
     '-t',
     '${_REGISTRY_HOST}/$PROJECT_ID/$REPO_NAME/${_IMAGE}:${BRANCH_NAME}',
-    'docker/${_IMAGE}'
+    './${_IMAGE}'
   ]
   timeout: 500s
 images:

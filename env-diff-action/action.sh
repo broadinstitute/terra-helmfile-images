@@ -2,6 +2,8 @@
 
 set -eo pipefail
 
+GITHUB_COMMENT_MAX_CHARS=65535
+
 if [[ $# -ne 2 ]]; then
   echo "Usage: $0 path/to/base/checkout path/to/head/checkout" >&2
   exit 1
@@ -51,7 +53,13 @@ env-differ --debug "${basedir}" "${headdir}" --output-dir=output
 # Post Markdown diff summary as comment on pull request
 # (only on pull request events, not pull_request_review events)
 if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
-  pull-request post-comment output/diff.md
+  # If the markdown is too big, log a warning and move on.
+  chars=$( wc -c output/diff.md | awk '{ print $1 }' )
+  if [[ "$chars" -gt "${GITHUB_COMMENT_MAX_CHARS}" ]]; then
+    echo "Warning: diff output too large to post (${chars} chars > ${GITHUB_COMMENT_MAX_CHARS} character limit)" >&2
+  else
+    pull-request post-comment output/diff.md
+  fi
 fi
 
 # If the prod environment was updated, ensure the PR has at least 1 approval

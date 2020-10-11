@@ -1,6 +1,6 @@
 # terra-helmfile-images
 
-This repo builds Docker images related to the terra-helmfile repo and Kubernetes deploy tools.
+This repo builds Docker images related to the [terra-helmfile repo](https://github.com/broadinstitute/terra-helmfile) and Kubernetes deploy tools.
 
 * env-diff-action: [Used by the env-diff action](https://github.com/broadinstitute/terra-helmfile/blob/master/.github/actions/env-diff/action.yml) in the terra-helmfile repo to render manifests and comment on PRs with a diff of environment changes
 * argocd-custom-image: [Used by ArgoCD](https://github.com/broadinstitute/terra-helm-definitions/search?q=argocd-custom) to render Kubernetes manifests during ArgoCD deploys

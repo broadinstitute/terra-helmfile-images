@@ -1,20 +1,19 @@
 #!/bin/bash
 
-# Wrapper for generating ArgoCD apps for a Terra environments
+#
+# Render ArgoCD manifests for all Terra apps/environments
+# This is run by the terra-app-generator ArgoCD app
+#
 
 set -eo pipefail
+set -x
 
-if [[ $# -ne 1 ]]; then
-  echo "Usage: $0 (init|generate)" >&2
+if [[ "$1" == 'init' ]]; then
+  : # Nothing to do
+elif [[ "$1" == 'generate' ]]; then
+  # Delegate to render script
+  ./bin/render --argocd
+else
+  echo "Usage: ${0} (init|generate)" >&2
   exit 1
 fi
-
-# Only render argocd resources
-export HELMFILE_SELECTOR="group=argocd"
-
-# Run the helmfile plugin multiple times, once per env
-for envfile in environments/*/*.yaml; do
-  env=$( basename $envfile .yaml )
-  export HELMFILE_ENV="${env}"
-  helmfile.sh "$@"
-done

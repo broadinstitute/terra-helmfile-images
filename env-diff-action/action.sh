@@ -55,10 +55,12 @@ render_all(){
 
   ls -l "${srcdir}/bin"
 
-  echo "file: ${render}"
-  file "${render}"
+  ls -l "${srcdir}"/bin/*
 
-  ls -l "${render}"
+  echo "file: ${srcdir}/bin/render"
+  file "${srcdir}"/bin/render
+
+  ls -l "${srcdir}"/bin/render
 
   mkdir -p "${tmpdir}" &&
     $render --output-dir="${outdir}" &&

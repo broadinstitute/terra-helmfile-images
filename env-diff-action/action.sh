@@ -51,11 +51,19 @@ render_all(){
   find "${srcdir}"
 
   echo "ls -l ${srcdir}"
-  ls -l "${srcdir}"
+  ls -al "${srcdir}"
 
-  ls -l "${srcdir}/bin"
+  echo "ls -al ${srcdir}/bin"
 
-  ls -l "${srcdir}"/bin/*
+  ls -al "${srcdir}/bin"
+
+  echo "ls -al ${srcdir}/bin/*"
+  ls -al "${srcdir}"/bin/*
+
+  echo "cd srcdir"
+  cd "${srcdir}"
+
+  ./bin/render --help
 
   echo "file: ${srcdir}/bin/render"
   file "${srcdir}"/bin/render

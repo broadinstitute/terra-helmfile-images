@@ -43,7 +43,7 @@ Renders Kubernetes resources for a repo containing a [helmfile](https://github.c
         - name: HELMFILE_SELECTOR  # passed to helmfile with `--selector`
           value: name=cromwell
 
-#### `helm-values`
+#### `helm-values` (**deprecated**)
 
 Makes it possible to configure an ArgoCD Application to monitor a Git repo containing values files and install a Helm chart from a Helm repo at the same time (for whatever reason ArgoCD's Helm support does not support this out of the box).
 
@@ -80,11 +80,11 @@ Used to deploy almost all Terra apps. Each of these environment variables correl
     plugin:
       name: terra-helmfile-app
       env:
-      - name: TERRA_APP # Terra app being deployed (-a); required
+      - name: TERRA_APP           # Terra app being deployed (-a); required
         value: cromwell
-      - name: TERRA_ENV # Terra env being deployed to (-e); required
+      - name: TERRA_ENV           # Terra env being deployed to (-e); required
         value: alpha
-      - name: TERRA_APP_VERSION # Override app version (--app-version); optional
+      - name: TERRA_APP_VERSION   # Override app version (--app-version); optional
         value: 53-f40ab98
       - name: TERRA_CHART_VERSION # Override chart version (--chart-version); optional
         value: 0.7.1

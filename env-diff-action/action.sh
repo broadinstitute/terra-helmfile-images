@@ -47,29 +47,6 @@ render_all(){
 
   local render="${srcdir}/bin/render"
 
-  echo "srcdir: ${srcdir}"
-  find "${srcdir}"
-
-  echo "ls -l ${srcdir}"
-  ls -al "${srcdir}"
-
-  echo "ls -al ${srcdir}/bin"
-
-  ls -al "${srcdir}/bin"
-
-  echo "ls -al ${srcdir}/bin/*"
-  ls -al "${srcdir}"/bin/*
-
-  echo "cd srcdir"
-  cd "${srcdir}"
-
-  ./bin/render --help
-
-  echo "file: ${srcdir}/bin/render"
-  file "${srcdir}"/bin/render
-
-  ls -l "${srcdir}"/bin/render
-
   mkdir -p "${tmpdir}" &&
     $render --output-dir="${outdir}" &&
     $render --output-dir="${tmpdir}" --argocd &&

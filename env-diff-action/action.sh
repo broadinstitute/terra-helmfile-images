@@ -63,6 +63,8 @@ BASESRC=$1
 # Directory containing checkout of this PR's head revision
 HEADSRC=$2
 
+find .
+
 # Render manifests
 mkdir -p manifests/{base,head}
 render_all "${BASESRC}" manifests/base /tmp/base

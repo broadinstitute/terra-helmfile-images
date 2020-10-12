@@ -45,14 +45,19 @@ render_all(){
   local outdir="$2"
   local tmpdir="$3/argocd"
 
-  local render=$( realpath "${srcdir}/bin/render" )
+  local render="${srcdir}/bin/render"
 
   echo "srcdir: ${srcdir}"
   find "${srcdir}"
 
+  echo "ls -l ${srcdir}"
+  ls -l "${srcdir}"
+
+  ls -l "${srcdir}/bin"
+
   echo "file: ${render}"
   file "${render}"
-  
+
   ls -l "${render}"
 
   mkdir -p "${tmpdir}" &&

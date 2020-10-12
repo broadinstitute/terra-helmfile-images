@@ -43,13 +43,13 @@ render_all(){
   fi
   local srcdir="$1"
   local outdir="$2"
-  local tmpdir="/tmp/argocd"
+  local tmpdir="$3/argocd"
 
-  mkdir -p $tmpdir &&
+  mkdir -p "${tmpdir}" &&
     "${srcdir}"/bin/render --output-dir="${outdir}" &&
     "${srcdir}"/bin/render --output-dir="${tmpdir}" --argocd &&
     rsync -a "${tmpdir}/" "${outdir}" &&
-    rm -rf $tmpdir
+    rm -rf "${tmpdir}"
 }
 
 set -ux
@@ -65,9 +65,8 @@ HEADSRC=$2
 
 # Render manifests
 mkdir -p manifests/{base,head}
-render_all "${BASESRC}" manifests/base
-render_all "${HEADSRC}" manifests/head
-
+render_all "${BASESRC}" manifests/base /tmp/base
+render_all "${HEADSRC}" manifests/head /tmp/head
 
 # Generate diffs
 mkdir -p output

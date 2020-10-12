@@ -45,9 +45,11 @@ render_all(){
   local outdir="$2"
   local tmpdir="$3/argocd"
 
+  local render=$( realpath "${srcdir}/bin/render" )
+
   mkdir -p "${tmpdir}" &&
-    "${srcdir}"/bin/render --output-dir="${outdir}" &&
-    "${srcdir}"/bin/render --output-dir="${tmpdir}" --argocd &&
+    $render --output-dir="${outdir}" &&
+    $render --output-dir="${tmpdir}" --argocd &&
     rsync -a "${tmpdir}/" "${outdir}" &&
     rm -rf "${tmpdir}"
 }
@@ -62,8 +64,6 @@ BASESRC=$1
 
 # Directory containing checkout of this PR's head revision
 HEADSRC=$2
-
-find .
 
 # Render manifests
 mkdir -p manifests/{base,head}

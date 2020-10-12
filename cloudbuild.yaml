@@ -30,7 +30,7 @@ tags: # These are CloudBuild tags, not docker image tags
 substitutions:
   _REGISTRY_HOST: us-central1-docker.pkg.dev # Artifact Registry host
   _IMAGE: __UNDEFINED__ # Overriden by trigger. eg "argocd-custom-image", "jenkins-gke-deploy"
-  _ARGOCD_VERSION: 1.5.4
+  _ARGOCD_VERSION: 1.7.7
   _HELM_VERSION: 3.2.4
   _HELMFILE_VERSION: 0.114.0
   _VAULT_VERSION: 1.1.0

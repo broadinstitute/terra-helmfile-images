@@ -47,6 +47,14 @@ render_all(){
 
   local render=$( realpath "${srcdir}/bin/render" )
 
+  echo "srcdir: ${srcdir}"
+  find "${srcdir}"
+
+  echo "file: ${render}"
+  file "${render}"
+  
+  ls -l "${render}"
+
   mkdir -p "${tmpdir}" &&
     $render --output-dir="${outdir}" &&
     $render --output-dir="${tmpdir}" --argocd &&

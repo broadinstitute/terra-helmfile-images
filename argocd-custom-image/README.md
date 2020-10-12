@@ -31,9 +31,9 @@ Example usage:
         # Any other environment variables specified here will also propagate down to configure.rb
 
 
-#### `helmfile`
+#### `helmfile` (**deprecated**)
 
-Renderes Kubernetes resources for a repo containing a [helmfile](https://github.com/roboll/helmfile).
+Renders Kubernetes resources for a repo containing a [helmfile](https://github.com/roboll/helmfile).
 
       plugin:
         name: helmfile
@@ -48,7 +48,7 @@ Renderes Kubernetes resources for a repo containing a [helmfile](https://github.
 Makes it possible to configure an ArgoCD Application to monitor a Git repo containing values files and install a Helm chart from a Helm repo at the same time (for whatever reason ArgoCD's Helm support does not support this out of the box).
 
     plugin:
-      name: helmfile
+      name: helm-values
       env:
       # If you don't set these values they default to our in-house terra-helm repo
       - name: HELM_REPO_NAME
@@ -65,7 +65,30 @@ Makes it possible to configure an ArgoCD Application to monitor a Git repo conta
       - name: HELM_CHART_RELEASE
         value: my-argocd-release
 
+#### `terra-helmfile-argocd`
+
+Used by the terra-app-generator ArgoCD Application to generate ArgoCD deployments for Terra apps.
+
+    plugin:
+      name: terra-helmfile-argocd
+      env: {} # No environment variables supported
+
+#### `terra-helmfile-app`
+
+Used to deploy almost all Terra apps. Each of these environment variables correlates to an option that is passed to terra-helmfile's `render` script.
+
+    plugin:
+      name: terra-helmfile-app
+      env:
+      - name: TERRA_APP # Terra app being deployed (-a); required
+        value: cromwell
+      - name: TERRA_ENV # Terra env being deployed to (-e); required
+        value: alpha
+      - name: TERRA_APP_VERSION # Override app version (--app-version); optional
+        value: 53-f40ab98
+      - name: TERRA_CHART_VERSION # Override chart version (--chart-version); optional
+        value: 0.7.1
+
 ## Building and publishing a new image
 
 Docker images are automatically built by a Cloud Build trigger in the [dsp-artifact-registry](https://console.cloud.google.com/cloud-build/triggers?project=dsp-artifact-registry) project.
-

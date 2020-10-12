@@ -13,122 +13,26 @@ import subprocess
 
 from collections import OrderedDict
 
-class Templates:
-    HELMFILE = 'helmfile.yaml'
+# Utility class for answering questions about a directory of rendered
+# manifests.
+class Manifests:
+    def __init__(self, dir):
+        self.dir = os.path.abspath(dir)
 
-    def __init__(self, checkout_dir, output_dir):
-        self.checkout_dir  = os.path.abspath(checkout_dir)
-        self.output_dir    = os.path.abspath(output_dir)
-        self.rendered      = False
-        self._environments = None
-
-        # Verify checkout_dir has a helmfile.yaml
-        path = os.path.join(self.checkout_dir, self.HELMFILE)
-        assert os.path.exists(path), f"Could not find {self.HELMFILE} in "\
-                                     f"{self.checkout_dir}, is it a valid "\
-                                     "clone of terra-helmfile?"
+        dirs = glob.glob(f"{self.dir}/*")
+        self._environments = set(map(lambda f : os.path.basename(f), dirs))
 
     #
-    # List all environments in a terra-helmfile clone, by globbing
-    # in the environments/ subdir
+    # List all environments in a directory of rendered manifests
     #
-    # Memoized
     def environments(self):
-        if self._environments == None:
-            files = glob.glob(f"{self.checkout_dir}/environments/*/*.yaml")
-            bases = map(lambda f : os.path.basename(f), files)
-            names = map(lambda f : f.replace('.yaml', ''), bases)
-            self._environments = set(names)
-
         return self._environments
 
-    #
-    # Render templates for all environments
-    #
-    # Memoized
-    def render(self):
-        if not self.rendered:
-            self.update_repos()
-            for environment in self.environments():
-                self.render_env(environment)
-            self.rendered = True
-
-    #
-    # Render templates for a single environment
-    #
-    def render_env(self, environment):
-        dir = os.path.abspath(os.path.join(self.output_dir, environment))
-
-        args = ['-e', environment, 'template', '--skip-deps', '--output-dir', dir]
-
-        if os.path.exists(dir):
-            logging.warning(f"Templates for {environment} already exist in " \
-                            f"{dir}, re-using")
-            return
-
-        self.helmfile(args)
-        self.cleanup(dir)
-
-    #
-    # Update helm repositories. This is done once before all templates
-    # are rendereded
-    #
-    def update_repos(self):
-        self.helmfile(['--allow-no-matching-release', 'repos'])
-
-    # `helmfile template` renders files into a directory with a hash based on
-    # the helmfile path.
-    #
-    # https://github.com/roboll/helmfile/issues/629#issuecomment-502614059
-    #
-    # This interferes with diff -r, so we rename any helmfile directories in
-    # the output dir to exclude the hash
-    #
-    # Eg.
-    # output/head/dev/helmfile-99577ea0-cromwell/cromwell/templates/deployments.yaml
-    #   ->
-    # output/head/dev/helmfile-cromwell/cromwell/templates/deployments.yaml
-    def cleanup(self, env_dir):
-        dirs = glob.glob(f"{env_dir}/helmfile-*")
-        for dir in dirs:
-            dirname = os.path.dirname(dir)
-            base    = os.path.basename(dir)
-            newbase = re.sub('helmfile\-[^-]+\-', 'helmfile-', base)
-            newdir  = os.path.join(dirname, newbase)
-
-            logging.debug(f"{dirname}: Rename {base} to {newbase}")
-            os.rename(dir, newdir)
-
-    #
-    # Run a helmfile command in the checkout directory.
-    # Checks status to make sure it succeeded, returns stdout as a string
-    #
-    def helmfile(self, args):
-        cmd = ['helmfile'] + args
-
-        logging.info(f"cmd: {cmd}")
-
-        prevdir = os.getcwd()
-
-        logging.debug(f"Changing into {self.checkout_dir}")
-        os.chdir(self.checkout_dir)
-        try:
-            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        finally:
-            os.chdir(prevdir)
-
-        stdout = result.stdout.decode('utf-8')
-        stderr = result.stderr.decode('utf-8')
-        logging.debug(f"cmd out:\n{stdout}")
-        logging.debug(f"cmd err:\n{stderr}")
-
-        assert result.returncode == 0, stderr
-        return stdout
 
 class Differ:
-    def __init__(self, templates1, templates2):
-        self.templates1 = templates1
-        self.templates2 = templates2
+    def __init__(self, manifests1, manifests2):
+        self.manifests1 = manifests1
+        self.manifests2 = manifests2
 
     #
     # Compare two directories of rendered templates and return
@@ -142,15 +46,12 @@ class Differ:
     # If there are no differences, the dict will be empty
     #
     def diff(self):
-        self.templates1.render()
-        self.templates2.render()
-
-        envs1 = self.templates1.environments()
-        envs2 = self.templates2.environments()
+        envs1 = self.manifests1.environments()
+        envs2 = self.manifests2.environments()
         envs_all = envs1.union(envs2)
 
-        dir1 = self.templates1.output_dir
-        dir2 = self.templates2.output_dir
+        dir1 = self.manifests1.dir
+        dir2 = self.manifests2.dir
 
         diffs = OrderedDict()
 
@@ -183,7 +84,7 @@ class Differ:
 
                 diffs[env] = {
                     'status': status,
-                    'diff': result.stdout.decode('utf-8')
+                    'diff': stdout
                 }
             else:
                 raise RuntimeError(f"Command exited {result.returncode}: {cmd}\n{result.stderr.decode('utf-8')}")
@@ -198,24 +99,21 @@ class CLI:
         self.diff(args.base, args.head, args.output_dir)
 
     def build_parser(self):
-        parser = argparse.ArgumentParser(description='A tool for comparing Kubernetes manifests across environments')
+        parser = argparse.ArgumentParser(description='A tool for generating diffs of Kubernetes manifests across environments')
 
         parser.add_argument('--debug', help='Enable debug logging', action='store_true')
-        parser.add_argument('base', metavar='BASE', help='Directory containing original helmfile repo')
-        parser.add_argument('head', metavar='HEAD', help='Directory containing updated helmfile repo')
+        parser.add_argument('base', metavar='BASE', help='Directory containing original manifests')
+        parser.add_argument('head', metavar='HEAD', help='Directory containing updated manifests')
         parser.add_argument('--output-dir', default='output', metavar='DIR', help='Directory where output will be stored')
 
         return parser
 
     # Generate diff
     def diff(self, base, head, output_dir):
-        baseout = os.path.join(output_dir, 'base', 'manifests')
-        headout = os.path.join(output_dir, 'head', 'manifests')
+        manifests1 = Manifests(base)
+        manifests2 = Manifests(head)
 
-        templates1 = Templates(base, baseout)
-        templates2 = Templates(head, headout)
-
-        diffs = Differ(templates1, templates2).diff()
+        diffs = Differ(manifests1, manifests2).diff()
 
         self.save_as_markdown(diffs, output_dir)
         self.save_as_json(diffs, output_dir)
@@ -234,6 +132,7 @@ class CLI:
         file = os.path.join(output_dir, filename)
 
         logging.info(f"Writing {desc} to {file}")
+        os.makedirs(output_dir, exist_ok=True)
         with open(file, 'w') as f:
             f.write(content)
 

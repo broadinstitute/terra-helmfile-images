@@ -34,21 +34,45 @@ if [[ -z "$GITHUB_RUN_ID" ]]; then
   exit 2
 fi
 
+# Render app manifests, and then ArgoCD manifests, and merge into
+# a single directory with rsync so they can be easily compared with diff -r
+render_all(){
+  if [[ $# -ne 3 ]]; then
+    echo "Error: render_all expects three arguments, got $#" >&2
+    return 1
+  fi
+  local srcdir="$1"
+  local outdir="$2"
+  local tmpdir="$3/argocd"
+
+  local render="${srcdir}/bin/render"
+
+  mkdir -p "${tmpdir}" &&
+    $render --output-dir="${outdir}" &&
+    $render --output-dir="${tmpdir}" --argocd &&
+    rsync -a "${tmpdir}/" "${outdir}" &&
+    rm -rf "${tmpdir}"
+}
+
 set -ux
 
 # Used to provide a click-through URL on approval status
 WORKFLOW_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
 # Directory containing checkout of this PR's base revision
-basedir=$1
+BASESRC=$1
 
 # Directory containing checkout of this PR's head revision
-headdir=$2
+HEADSRC=$2
 
-mkdir -p output
+# Render manifests
+mkdir -p manifests/{base,head}
+render_all "${BASESRC}" manifests/base /tmp/base
+render_all "${HEADSRC}" manifests/head /tmp/head
 
 # Generate diffs
-env-differ --debug "${basedir}" "${headdir}" --output-dir=output
+mkdir -p output
+env-differ --debug --output-dir=output manifests/base manifests/head
 
 # Post Markdown diff summary as comment on pull request
 # (only on pull request events, not pull_request_review events)

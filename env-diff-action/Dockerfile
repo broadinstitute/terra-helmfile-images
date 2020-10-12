@@ -9,7 +9,9 @@ ARG os=linux
 ARG arch=amd64
 
 # Add required OS packages
-RUN apk add jq
+# jq, rsync needed for action.sh
+# bash needed for `render` script
+RUN apk --update add --no-cache bash jq rsync
 
 # Create /tools directory
 RUN mkdir -p /tools/bin

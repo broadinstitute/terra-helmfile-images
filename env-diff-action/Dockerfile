@@ -9,7 +9,7 @@ ARG os=linux
 ARG arch=amd64
 
 # Add required OS packages
-RUN apk add jq
+RUN apk --update add --no-cache bash jq
 
 # Create /tools directory
 RUN mkdir -p /tools/bin

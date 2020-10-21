@@ -145,7 +145,7 @@ diff() {
 
     local errfile="${TMP_DIR}/diff-${tries}.err"
 
-    if argo_cli app diff "${app}z" --hard-refresh 2>"${errfile}"; then
+    if argo_cli app diff "${app}" --hard-refresh 2>"${errfile}"; then
       cat "${errfile}" >&2
 
       debug "No differences found for ${app}"

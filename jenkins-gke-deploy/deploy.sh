@@ -8,6 +8,7 @@ set -e
 set -o pipefail
 
 OUTPUT_DIR="${OUTPUT_DIR:-$( pwd )/output}"
+TMP_DIR="/tmp/deploy.sh-$$-tmp"
 
 ARGOCD_ADDR="${ARGOCD_ADDR:-ap-argocd.dsp-devops.broadinstitute.org:443}"
 
@@ -129,13 +130,43 @@ app_exists(){
 diff() {
   local app="$1"
 
-  if argo_cli app diff "${app}" --hard-refresh; then
-    debug "No differences found for ${app}"
-    return 0
-  else
-    debug "${app} is out of sync"
-    return 1
-  fi
+  # For some annoying reason, ArgoCD diff calls are sometimes flaky and fail
+  # with error messages like this:
+  #
+  # msg="rpc error: code = Unknown desc = POST https://ap-argocd.dsp-devops.broadinstitute.org:443/application.ApplicationService/Get failed with status code 502"
+  #
+  # `argocd` diff returns 1 if an error occurs, OR if there are differences, so we
+  # have implemented silly error checking / retry by sending errors to a file and checking
+  # if it includes the text "rpc error"
+  #
+  local tries=3
+  while [[ $tries -gt 0 ]]; do
+    tries=$(( $tries - 1 ));
+
+    local errfile="${TMP_DIR}/diff-${tries}.err"
+
+    if argo_cli app diff "${app}" --hard-refresh 2>"${errfile}"; then
+      cat "${errfile}" >&2
+
+      debug "No differences found for ${app}"
+
+      return 0
+    else
+      cat "${errfile}" >&2
+
+      if grep "rpc error" "${errfile}" >/dev/null; then
+        warn "Failed to pull a diff for ${app} from argocd, will retry ${tries} more times"
+
+      else
+        debug "${app} is out of sync"
+        return 1
+      fi
+    fi
+    sleep 5
+  done
+
+  error "Could not successfully pull a diff for ${app} from ArgoCD after multiple tries"
+  return 2
 }
 
 # Sync an app
@@ -239,9 +270,9 @@ generate_properties(){
     info "Checking if ${project} requires a sync in ${env}"
 
     if sync_required "${env}" "${project}"; then
-      info "Sync required, generating deploy properties ${file} for ${project} in ${env}"
+      local file="${OUTPUT_DIR}/${project}.properties"
 
-      file="${OUTPUT_DIR}/${project}.properties"
+      info "Sync required, generating deploy properties ${file} for ${project} in ${env}"
 
       cat <<EOF | tee "${file}"
 PROJECT=${project}
@@ -255,7 +286,8 @@ EOF
   done
 }
 
-
+mkdir -p "${TMP_DIR}"
+trap "rm -rf ${TMP_DIR}" EXIT
 
 if [[ $# -lt 2 ]]; then
   print_help

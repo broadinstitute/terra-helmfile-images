@@ -58,6 +58,7 @@ export RUN_CONTEXT
 export INPUT_DIR="${CHECKOUT_DIR}"
 export GKE_DEPLOY=true
 export USE_DOCKER_CONSUL_TEMPLATE=false
+export HOST_TAG="${APP_NAME}-${ENV}" # required for tcell
 
 for type in $INSTANCE_TYPES; do
   # Default - no instance type

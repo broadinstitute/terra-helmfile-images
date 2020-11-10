@@ -9,7 +9,7 @@ ARG vault_version
 
 ARG os=linux
 ARG arch=amd64
-ARG kustomize_version=3.5.4
+ARG kustomize_version=3.5.5
 ARG consul_template_version=0.20.0
 
 RUN echo "ArgoCD version: ${argocd_version}"

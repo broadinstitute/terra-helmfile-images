@@ -40,5 +40,7 @@ COPY env-differ   /tools/bin/env-differ
 COPY pull-request /tools/bin/pull-request
 COPY action.sh /action.sh
 
+COPY ../shared/test.txt /test.txt
+
 # Code file to execute when the docker container starts up (`entrypoint.sh`)
 ENTRYPOINT ["/action.sh"]

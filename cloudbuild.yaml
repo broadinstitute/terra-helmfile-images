@@ -1,4 +1,6 @@
 steps:
+- name: 'alpine'
+  args: ['ls', '-la']
 - name: 'gcr.io/cloud-builders/docker'
   args: [
     'build',

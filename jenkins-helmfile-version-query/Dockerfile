@@ -11,4 +11,4 @@ RUN apk add yq --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community
 
 COPY query.sh /query.sh
 
-ENTRYPOINT ["/query"]
+ENTRYPOINT ["/query.sh"]

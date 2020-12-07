@@ -14,7 +14,7 @@ The [gke-service-update](https://fc-jenkins.dsp-techops.broadinstitute.org/job/g
     # Set GITHUB_TOKEN to a valid GitHub personal access token w/ read access to terra-helmfile
     # Set APP to the name of an application, eg. "cromwell"
     #
-    IMAGE="us-central1-docker.pkg.dev/dsp-artifact-registry/terra-helmfile/jenkins-helmfile-version-query"
+    IMAGE="us-central1-docker.pkg.dev/dsp-artifact-registry/terra-helmfile-images/jenkins-helmfile-version-query:main"
     docker pull "$IMAGE"
     docker run --rm -it \
       -e GITHUB_TOKEN=$GITHUB_TOKEN \

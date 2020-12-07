@@ -1,5 +1,5 @@
 steps:
-- name: 'alpine' # Copy shared directory into build context. Not every Dockerfile actually uses these
+- name: 'alpine' # Copy shared directory into build context. (Not every Dockerfile actually uses these)
   args: ['cp', '-r', 'shared', '${_IMAGE}/shared']
 - name: 'gcr.io/cloud-builders/docker'
   args: [

@@ -9,6 +9,6 @@ RUN apk add curl jq
 # https://github.com/mikefarah/yq/issues/190
 RUN apk add yq --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community
 
-COPY get-helmfile-version.sh /get-helmfile-version.sh
+COPY query.sh /query.sh
 
-ENTRYPOINT ["/get-helmfile-version.sh"]
+ENTRYPOINT ["/query"]

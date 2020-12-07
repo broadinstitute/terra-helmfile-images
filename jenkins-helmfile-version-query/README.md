@@ -1,4 +1,4 @@
-# jenkins-get-helmfile-version
+# jenkins-helmfile-version-query
 
 
 A Docker image for querying the current version of an application in terra-helmfile.
@@ -14,7 +14,7 @@ The [gke-service-update](https://fc-jenkins.dsp-techops.broadinstitute.org/job/g
     # Set GITHUB_TOKEN to a valid GitHub personal access token w/ read access to terra-helmfile
     # Set APP to the name of an application, eg. "cromwell"
     #
-    IMAGE="us-central1-docker.pkg.dev/dsp-artifact-registry/terra-helmfile/jenkins-get-helmfile-version"
+    IMAGE="us-central1-docker.pkg.dev/dsp-artifact-registry/terra-helmfile/jenkins-helmfile-version-query"
     docker pull "$IMAGE"
     docker run --rm -it \
       -e GITHUB_TOKEN=$GITHUB_TOKEN \

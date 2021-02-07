@@ -14,6 +14,8 @@ ARGOCD_ADDR="${ARGOCD_ADDR:-ap-argocd.dsp-devops.broadinstitute.org:443}"
 
 ARGOCD_SYNC_TIMEOUT="${ARGOCD_SYNC_TIMEOUT:-180}"
 
+ARGOCD_WAIT_TIMEOUT="${ARGOCD_WAIT_TIMEOUT:-300}"
+
 COLORIZE=${COLORIZE:-true}
 
 export VAULT_ADDR=${VAULT_ADDR:-https://clotho.broadinstitute.org:8200}
@@ -176,6 +178,9 @@ sync() {
   info "Preparing to sync ArgoCD app: ${app}"
 
   argo_cli app sync "${app}" --prune --timeout "${ARGOCD_SYNC_TIMEOUT}"
+
+  # Wait for app to become healthy
+  argo_cli app wait "${app}" --timeout="${ARGOCD_WAIT_TIMEOUT}"
 }
 
 # Restart all deployments in an ArgoCD Application

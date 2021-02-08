@@ -179,7 +179,8 @@ sync() {
 
   argo_cli app sync "${app}" --prune --timeout "${ARGOCD_SYNC_TIMEOUT}"
 
-  # Wait for app to become healthy
+  info "Waiting up to ${ARGOCD_WAIT_TIMEOUT}s for ${app} to become healthy"
+
   argo_cli app wait "${app}" --timeout="${ARGOCD_WAIT_TIMEOUT}"
 }
 

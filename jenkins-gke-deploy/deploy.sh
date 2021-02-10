@@ -247,11 +247,11 @@ sync_project(){
 
   if [[ "${has_legacy_configs}" == "true" ]]; then
     diff "${legacy_configs_app}" || true # Print diff
-    sync "${legacy_configs_app}"
+    sync "${legacy_configs_app}" || return 1
   fi
 
   diff "${app}" || true # Print diff
-  sync "${app}"
+  sync "${app}" || return 1
 
   if [[ "${has_legacy_configs}" == "true" ]]; then
     restart "${app}"

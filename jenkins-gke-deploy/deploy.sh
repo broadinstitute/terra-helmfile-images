@@ -14,7 +14,7 @@ ARGOCD_ADDR="${ARGOCD_ADDR:-ap-argocd.dsp-devops.broadinstitute.org:443}"
 
 ARGOCD_SYNC_TIMEOUT="${ARGOCD_SYNC_TIMEOUT:-180}"
 
-ARGOCD_WAIT_TIMEOUT="${ARGOCD_WAIT_TIMEOUT:-300}"
+ARGOCD_WAIT_TIMEOUT="${ARGOCD_WAIT_TIMEOUT:-600}"
 
 COLORIZE=${COLORIZE:-true}
 
@@ -177,7 +177,7 @@ sync() {
 
   info "Preparing to sync ArgoCD app: ${app}"
 
-  argo_cli app sync "${app}" --prune --timeout "${ARGOCD_SYNC_TIMEOUT}"
+  argo_cli app sync "${app}" --prune --timeout "${ARGOCD_SYNC_TIMEOUT}" || return 1
 
   info "Waiting up to ${ARGOCD_WAIT_TIMEOUT}s for ${app} to become healthy"
 

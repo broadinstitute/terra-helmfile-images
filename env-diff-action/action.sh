@@ -37,21 +37,16 @@ fi
 # Render app manifests, and then ArgoCD manifests, and merge into
 # a single directory with rsync so they can be easily compared with diff -r
 render_all(){
-  if [[ $# -ne 3 ]]; then
-    echo "Error: render_all expects three arguments, got $#" >&2
+  if [[ $# -ne 2 ]]; then
+    echo "Error: render_all expects two arguments, got $#" >&2
     return 1
   fi
-  local srcdir="$1"
-  local outdir="$2"
-  local tmpdir="$3/argocd"
+  local outdir="$1"
+  local tmpdir="$2/argocd"
 
-  local render="${srcdir}/bin/render"
 
-  mkdir -p "${tmpdir}" &&
-    $render --output-dir="${outdir}" &&
-    $render --output-dir="${tmpdir}" --argocd &&
-    rsync -a "${tmpdir}/" "${outdir}" &&
-    rm -rf "${tmpdir}"
+  rsync -a "${tmpdir}/" "${outdir}" &&
+  rm -rf "${tmpdir}"
 }
 
 set -ux

@@ -32,5 +32,5 @@ substitutions:
   _IMAGE: __UNDEFINED__ # Overriden by trigger. eg "argocd-custom-image", "jenkins-gke-deploy"
   _ARGOCD_VERSION: 1.7.7
   _HELM_VERSION: 3.2.4
-  _HELMFILE_VERSION: 0.114.0
+  _HELMFILE_VERSION: 0.139.6
   _VAULT_VERSION: 1.1.0

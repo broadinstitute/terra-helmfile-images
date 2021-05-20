@@ -10,12 +10,16 @@ if [[ $# -lt 1 ]]; then
   return 1
 fi
 
+argomode=
 
 srcdir="$1"
 outdir="$2"
 
+if [[ "$3" == "true" ]]; then
+  argomode="--argocd"
+fi
 mkdir -p "$outdir"
 render="${srcdir}/bin/render"
 
 
-$render --output-dir="${outdir}"
+$render --output-dir="${outdir}" $argomode

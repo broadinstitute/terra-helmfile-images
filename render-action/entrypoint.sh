@@ -14,5 +14,4 @@ local outdir="$2"
 
 local render="${srcdir}/bin/render"
 
-
 $render --output-dir="${outdir}"

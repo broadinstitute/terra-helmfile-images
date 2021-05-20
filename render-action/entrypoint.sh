@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 set -eo pipefail
 
@@ -9,9 +9,9 @@ if [[ $# -lt 1 ]]; then
   echo "Error: render_all expects 1 argument, got $#" >&2
   return 1
 fi
-local srcdir="$1"
-local outdir="$2"
+srcdir="$1"
+outdir="$2"
+render="${srcdir}/bin/render"
 
-local render="${srcdir}/bin/render"
 
 $render --output-dir="${outdir}"

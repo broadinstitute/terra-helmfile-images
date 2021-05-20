@@ -9,8 +9,12 @@ if [[ $# -lt 1 ]]; then
   echo "Error: render_all expects 1 argument, got $#" >&2
   return 1
 fi
+
+
 srcdir="$1"
 outdir="$2"
+
+mkdir -p "$outdir"
 render="${srcdir}/bin/render"
 
 

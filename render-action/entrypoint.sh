@@ -21,5 +21,5 @@ fi
 mkdir -p "$outdir"
 render="${srcdir}/bin/render"
 
-
-$render --output-dir="${outdir}" $argomode
+#TODO REMOVE ENVIRONMENT AND SERVICE
+$render -e dev -a leonardo --output-dir="${outdir}" $argomode

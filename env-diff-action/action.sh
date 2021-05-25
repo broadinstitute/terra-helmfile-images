@@ -34,40 +34,43 @@ if [[ -z "$GITHUB_RUN_ID" ]]; then
   exit 2
 fi
 
-# Render app manifests, and then ArgoCD manifests, and merge into
-# a single directory with rsync so they can be easily compared with diff -r
-render_all(){
-  if [[ $# -ne 2 ]]; then
-    echo "Error: render_all expects two arguments, got $#" >&2
-    return 1
-  fi
-  local outdir="$1"
-  local tmpdir="$2/argocd"
-
-
-  rsync -a "${tmpdir}/" "${outdir}" &&
-  rm -rf "${tmpdir}"
-}
-
 set -ux
 
 # Used to provide a click-through URL on approval status
 WORKFLOW_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
 # Directory containing checkout of this PR's base revision
-BASESRC=$1
+MASTER_SRC=$1
 
 # Directory containing checkout of this PR's head revision
-HEADSRC=$2
+PR_SRC=$2
+
+
+# Merge into merge manifets into a single directory
+# with rsync so they can be easily compared with diff -r
+# Generate diffs
+merge_manifest(){
+  if [[ $# -ne 2 ]]; then
+  echo "Error: render_all expects two arguments, got $#" >&2
+  return 1
+  fi
+
+  local outdir="$1"
+  local argo_manifest_dir="$1/argo_manifest"
+
+  # Rsync argo CD manifests
+  rsync -a "${argo_manifest_dir}/" "${outdir}" &&
+  rm -rf "${tmpdir}"
+}
 
 # Render manifests
 mkdir -p manifests/{base,head}
-render_all "${BASESRC}" manifests/base /tmp/base
-render_all "${HEADSRC}" manifests/head /tmp/head
 
-# Generate diffs
+merge_manifest "${MASTER_SRC}"
+merge_manifest "${PR_SRC}"
+
 mkdir -p output
-env-differ --debug --output-dir=output manifests/base manifests/head
+env-differ --debug --output-dir=output "${MASTER_SRC}" "${PR_SRC}"
 
 # Post Markdown diff summary as comment on pull request
 # (only on pull request events, not pull_request_review events)

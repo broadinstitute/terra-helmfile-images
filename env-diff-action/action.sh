@@ -50,8 +50,8 @@ PR_SRC=$2
 # with rsync so they can be easily compared with diff -r
 # Generate diffs
 merge_manifest(){
-  if [[ $# -ne 2 ]]; then
-  echo "Error: render_all expects two arguments, got $#" >&2
+  if [[ $# -ne 1 ]]; then
+  echo "Error: render_all expects one arguments, got $#" >&2
   return 1
   fi
 

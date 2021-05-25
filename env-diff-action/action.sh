@@ -60,7 +60,7 @@ merge_manifest(){
 
   # Rsync argo CD manifests
   rsync -a "${argo_manifest_dir}/" "${outdir}" &&
-  rm -rf "${tmpdir}"
+  rm -rf "${argo_manifest_dir}"
 }
 
 # Render manifests

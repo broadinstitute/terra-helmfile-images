@@ -15,6 +15,7 @@ env=
 srcdir="$1"
 outdir="$2"
 
+# Render ArgoCD manifests 
 if [[ "$3" == "true" ]]; then
   argomode="--argocd"
 fi

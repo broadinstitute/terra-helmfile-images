@@ -34,45 +34,51 @@ if [[ -z "$GITHUB_RUN_ID" ]]; then
   exit 2
 fi
 
-# Render app manifests, and then ArgoCD manifests, and merge into
-# a single directory with rsync so they can be easily compared with diff -r
-render_all(){
-  if [[ $# -ne 3 ]]; then
-    echo "Error: render_all expects three arguments, got $#" >&2
-    return 1
-  fi
-  local srcdir="$1"
-  local outdir="$2"
-  local tmpdir="$3/argocd"
-
-  local render="${srcdir}/bin/render"
-
-  mkdir -p "${tmpdir}" &&
-    $render --output-dir="${outdir}" &&
-    $render --output-dir="${tmpdir}" --argocd &&
-    rsync -a "${tmpdir}/" "${outdir}" &&
-    rm -rf "${tmpdir}"
-}
-
 set -ux
 
 # Used to provide a click-through URL on approval status
 WORKFLOW_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
 # Directory containing checkout of this PR's base revision
-BASESRC=$1
+MASTER_SRC=$1
 
 # Directory containing checkout of this PR's head revision
-HEADSRC=$2
+PR_SRC=$2
+
+
+# Merge separate manifests directories into a single directory
+#   argo_manifests/{dev,alpha,staging,...}
+#   app_manaifests/{dev,alpha,staging,...}
+#   ->
+#   combined/{dev,alpha,staging,...}
+#
+# (This is for backwards compatibility with the env-diff script)
+merge_manifests(){
+  if [[ $# -ne 2 ]]; then
+    echo "Error: merge_manifests expects two arguments, got $#" >&2
+    return 1
+  fi
+
+  local srcdir="$1"
+  local outdir="$2"
+
+  local argo_manifest_dir="${srcdir}/argo_manifest"
+  local app_manifest_dir="${srcdir}/app_manifest"
+
+  # Rsync argo CD manifests
+  rsync -a "${argo_manifest_dir}/" "${outdir}" &&
+    rsync -a "${app_manifest_dir}/" "${outdir}" &&
+    rm -rf "${argo_manifest_dir}"
+}
 
 # Render manifests
-mkdir -p manifests/{base,head}
-render_all "${BASESRC}" manifests/base /tmp/base
-render_all "${HEADSRC}" manifests/head /tmp/head
+mkdir -p merged/{master,pr}
 
-# Generate diffs
+merge_manifests "${MASTER_SRC}" "merged/master"
+merge_manifests "${PR_SRC}" "merged/pr"
+
 mkdir -p output
-env-differ --debug --output-dir=output manifests/base manifests/head
+env-differ --debug --output-dir=output "merged/master" "merged/pr"
 
 # Post Markdown diff summary as comment on pull request
 # (only on pull request events, not pull_request_review events)

@@ -46,31 +46,39 @@ MASTER_SRC=$1
 PR_SRC=$2
 
 
-# Merge into merge manifets into a single directory
-# with rsync so they can be easily compared with diff -r
-# Generate diffs
-merge_manifest(){
-  if [[ $# -ne 1 ]]; then
-  echo "Error: render_all expects one arguments, got $#" >&2
-  return 1
+# Merge separate manifests directories into a single directory
+#   argo_manifests/{dev,alpha,staging,...}
+#   app_manaifests/{dev,alpha,staging,...}
+#   ->
+#   combined/{dev,alpha,staging,...}
+#
+# (This is for backwards compatibility with the env-diff script)
+merge_manifests(){
+  if [[ $# -ne 2 ]]; then
+    echo "Error: merge_manifests expects two arguments, got $#" >&2
+    return 1
   fi
 
-  local outdir="$1"
-  local argo_manifest_dir="$1/argo_manifest"
+  local srcdir="$1"
+  local outdir="$2"
+
+  local argo_manifest_dir="${srcdir}/argo_manifest"
+  local app_manifest_dir="${srcdir}/app_manifest"
 
   # Rsync argo CD manifests
   rsync -a "${argo_manifest_dir}/" "${outdir}" &&
-  rm -rf "${argo_manifest_dir}"
+    rsync -a "${app_manifest_dir}/" "${outdir}" &&
+    rm -rf "${argo_manifest_dir}"
 }
 
 # Render manifests
-mkdir -p manifests/{base,head}
+mkdir -p merged/{master,pr}
 
-merge_manifest "${MASTER_SRC}"
-merge_manifest "${PR_SRC}"
+merge_manifests "${MASTER_SRC}" "merged/master"
+merge_manifests "${PR_SRC}" "merged/pr"
 
 mkdir -p output
-env-differ --debug --output-dir=output "${MASTER_SRC}" "${PR_SRC}"
+env-differ --debug --output-dir=output "merged/master" "merged/pr"
 
 # Post Markdown diff summary as comment on pull request
 # (only on pull request events, not pull_request_review events)

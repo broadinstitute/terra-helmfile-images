@@ -2,8 +2,7 @@
 
 set -eo pipefail
 
-# Render app manifests, and then ArgoCD manifests, and merge into
-# a single directory with rsync so they can be easily compared with diff -r
+# Render manifests
 
 if [[ $# -lt 1 ]]; then
   echo "Error: render_all expects 1 argument, got $#" >&2
@@ -15,6 +14,7 @@ argomode=
 srcdir="$1"
 outdir="$2"
 
+# Render ArgoCD manifests 
 if [[ "$3" == "true" ]]; then
   argomode="--argocd"
 fi

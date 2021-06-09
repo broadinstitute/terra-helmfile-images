@@ -10,15 +10,19 @@ if [[ $# -lt 1 ]]; then
 fi
 
 argomode=
+env=
 
 srcdir="$1"
 outdir="$2"
 
-# Render ArgoCD manifests 
+# Render ArgoCD manifests
 if [[ "$3" == "true" ]]; then
   argomode="--argocd"
+fi
+if [[ -n "$4" ]]; then
+  env="-e ${4}"
 fi
 mkdir -p "$outdir"
 render="${srcdir}/bin/render"
 
-$render --output-dir="${outdir}" $argomode
+$render $env --output-dir="${outdir}" $argomode

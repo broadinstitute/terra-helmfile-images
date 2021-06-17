@@ -19,6 +19,6 @@ if [[ "$3" == "true" ]]; then
   argomode="--argocd"
 fi
 mkdir -p "$outdir"
-render="${srcdir}/bin/render"
+render="${srcdir}/bin/render.sh"
 
 $render --output-dir="${outdir}" $argomode

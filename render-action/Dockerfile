@@ -32,5 +32,7 @@ RUN wget --timeout=15 -q -O helmfile "https://github.com/roboll/helmfile/release
     mv helmfile /tools/bin && \
     helmfile --version
 
+COPY entrypoint.sh /entrypoint.sh
+
 # Code file to execute when the docker container starts up (`entrypoint.sh`)
 ENTRYPOINT ["/entrypoint.sh"]

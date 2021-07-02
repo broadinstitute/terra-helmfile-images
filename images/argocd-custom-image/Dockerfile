@@ -31,6 +31,9 @@ RUN apt-get update && \
 # Create tools directory
 RUN mkdir -p /custom-tools/bin && chown -R argocd:argocd /custom-tools
 
+# Copy compiled Go tools into /custom-tools/bin directory
+COPY --from=tools-local /tools/bin /custom-tools/bin
+
 ENV PATH="/custom-tools/bin:${PATH}"
 
 # Switch back to non-root user

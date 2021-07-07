@@ -1,7 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"terra-helmfile-tools/internal/render/cmd"
+)
 
 func main() {
-	fmt.Print("hello world\n")
+	cmd.Execute()
 }

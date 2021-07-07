@@ -13,7 +13,7 @@ COPY . .
 RUN go test ./... && go build -o /tools/bin/ ./cmd/...
 
 #
-# Runtime dependencies: Helm, Helmfile
+# Download runtime dependencies (Helm, Helmfile) and install to /tools/bin
 #
 FROM alpine:${ALPINE_VERSION} as runtime-deps
 

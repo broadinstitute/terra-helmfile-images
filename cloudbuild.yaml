@@ -9,7 +9,7 @@ steps:
     'tools-local',
     '.'
   ]
-# Build images
+# Build target image
 - name: 'gcr.io/cloud-builders/docker'
   args: [
     'build',

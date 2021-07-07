@@ -1,6 +1,6 @@
 module terra-helmfile-tools
 
-go 1.15
+go 1.16
 
 require (
 	github.com/rs/zerolog v1.23.0

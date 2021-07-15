@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"terra-helmfile-tools/internal/render"
 	"testing"
 )
 
@@ -9,7 +10,7 @@ func TestExecute(t *testing.T) {
 	var tests = []struct {
 		description string
 		args []string
-		expectedOpts Options
+		expectedOpts render.Options
 		expectedErr string
 	}{
 		{},

@@ -1,9 +1,9 @@
 package main
 
 import (
-	"terra-helmfile-tools/internal/render/cmd"
+	"terra-helmfile-tools/internal/render"
 )
 
 func main() {
-	cmd.Execute()
+	render.Execute()
 }

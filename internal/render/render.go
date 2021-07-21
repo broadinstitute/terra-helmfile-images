@@ -4,18 +4,21 @@ import (
 	"fmt"
 	"github.com/rs/zerolog/log"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 )
 
-const HelmfileCommand = "helmfile"
+/* Name of the `helmfile` binary */
+const helmfileCommand = "helmfile"
 
-/* Default strings for options */
-const OptionUnset = ""
-const OptionAll = "all"
+/* Unset CLI options default to empty string */
+const optionUnset = ""
+
+/* Subdirectory to search for environment config files */
+const envSubdir = "environments"
 
 /* Struct encapsulating options for a render */
 type Options struct {
@@ -40,6 +43,14 @@ type Render struct {
 	options *Options /* CLI options */
 	environments map[string]Environment /* Collection of environments defined in the config repo, keyed by env name */
 	helmfileLogLevel string /* --log-level argument to pass to `helmfile` command */
+}
+
+/* ShellRunner object used to execute commands. Replaced with a mock in tests */
+var shellRunner ShellRunner = &RealRunner{}
+
+/* Short-hand helper function indicating whether a string option was set by the user */
+func IsSet(optionValue string) bool {
+	return optionValue != optionUnset
 }
 
 func NewRender(options *Options) (*Render, error) {
@@ -95,18 +106,16 @@ func (r *Render) RenderAll() error {
 		}
 	}
 
-	normalizeRenderDirectories(r.options.OutputDir)
-
-	return nil
+	return normalizeRenderDirectories(r.options.OutputDir)
 }
 
 /* Scan through environments/ subdirectory and build a slice of defined environments */
 func loadEnvironments(configRepoPath string) (map[string]Environment, error) {
 	environments := make(map[string]Environment)
 
-	envDir := path.Join(configRepoPath, "environments")
+	envDir := path.Join(configRepoPath, envSubdir)
 	if _, err := os.Stat(envDir); err != nil {
-		return nil, fmt.Errorf("environments subdirectory does not exist in %s, is it a terra-helmfile clone?", configRepoPath)
+		return nil, fmt.Errorf("environments subdirectory %s does not exist in %s, is it a %s clone?", envSubdir, configRepoPath, ConfigRepoName)
 	}
 
 	matches, err := filepath.Glob(path.Join(envDir, "*", "*.yaml"))
@@ -115,7 +124,7 @@ func loadEnvironments(configRepoPath string) (map[string]Environment, error) {
 	}
 
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("no environments found in %s, is it a terra-helmfile clone?", configRepoPath)
+		return nil, fmt.Errorf("no environments found in %s, is it a %s clone?", configRepoPath, ConfigRepoName)
 	}
 
 	for _, filename := range matches {
@@ -129,21 +138,25 @@ func loadEnvironments(configRepoPath string) (map[string]Environment, error) {
 }
 
 func (r *Render) getTargetEnvs() ([]Environment, error) {
-	if r.options.Env == OptionAll {
-		// User wants to render for _all_ environments
-		var envs []Environment
-		for _, env := range r.environments {
-			envs = append(envs, env)
+	if IsSet(r.options.Env) {
+		// User wants to render for a specific environment
+		env, ok := r.environments[r.options.Env]
+		if !ok {
+			return nil, fmt.Errorf("unknown environment: %s", r.options.Env)
 		}
-		return envs, nil
+		return []Environment{ env }, nil
 	}
 
-	// User wants to render for a specific environment
-	env, ok := r.environments[r.options.Env]
-	if !ok {
-		return nil, fmt.Errorf("Unknown environment: %s", r.options.Env)
+	// No environment specified; render for _all_ environments
+	var envs []Environment
+	for _, env := range r.environments {
+		envs = append(envs, env)
 	}
-	return []Environment{ env }, nil
+
+	// Sort environments so they are rendered in a predictable order
+	sortEnvironments(envs)
+
+	return envs, nil
 }
 
 func (r *Render) renderSingleEnvironment(env Environment) error {
@@ -168,7 +181,7 @@ func (r *Render) renderSingleEnvironment(env Environment) error {
 	args = append(args, "template")
 
 	// Append arguments specific to template subcommand
-	if r.options.ChartDir == OptionUnset {
+	if r.options.ChartDir == optionUnset {
 		/* Skip dependencies unless we're rendering a local chart, to save time */
 		args = append(args, "--skip-deps")
 	}
@@ -186,36 +199,27 @@ func (r *Render) runHelmfile(args ...string) error {
 	}
 	args =  append(extraArgs, args...)
 
-	cmd := exec.Command(HelmfileCommand, args...)
+	cmd := Command{}
+	cmd.Prog = helmfileCommand
+	cmd.Args = args
 	cmd.Dir = r.options.ConfigRepoPath
 
-	// TODO - would be nice to capture out/err and stream to debug log, to cut down on noise
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	log.Info().Msgf("Executing: %v", cmd)
-	err := cmd.Run()
-	if err != nil {
-		log.Error().Msgf("Command failed: %v", err)
-		return err
-	}
-
-	return nil
+	return shellRunner.Run(cmd)
 }
 
 /* Return map of state values that should be set on the command-line, given user-supplied options */
 func (r *Render) getStateValues() map[string]string {
 	stateValues := make(map[string]string)
 
-	if r.options.ChartDir != OptionUnset {
+	if IsSet(r.options.ChartDir) {
 		key := fmt.Sprintf("releases.%s.repo", r.options.App)
 		stateValues[key] = r.options.ChartDir
-	} else if r.options.ChartVersion != OptionUnset {
+	} else if IsSet(r.options.ChartVersion) {
 		key := fmt.Sprintf("releases.%s.chartVersion", r.options.App)
 		stateValues[key] = r.options.ChartVersion
 	}
 
-	if r.options.AppVersion != OptionUnset {
+	if IsSet(r.options.AppVersion) {
 		key := fmt.Sprintf("releases.%s.appVersion", r.options.App)
 		stateValues[key] = r.options.AppVersion
 	}
@@ -232,23 +236,12 @@ func (r *Render) getSelectors() map[string]string {
 		selectors["group"] = "argocd"
 	}
 
-	if r.options.App != OptionAll {
+	if IsSet(r.options.App) {
 		// Render manifests for the given app only
 		selectors["app"] = r.options.App
 	}
 
 	return selectors
-}
-
-/* Join map[string]string to comma-separated key-value pairs.
-Eg. { "a": "b", "c": "d" } -> "a=b,c=d"
-*/
-func joinKeyValuePairs(pairs map[string]string) string {
-	var tokens []string
-	for k, v := range pairs {
-		tokens = append(tokens, fmt.Sprintf("%s=%s", k, v))
-	}
-	return strings.Join(tokens, ",")
 }
 
 /*
@@ -282,4 +275,34 @@ func normalizeRenderDirectories(outputDir string) error {
 	}
 
 	return nil
+}
+
+/*
+Sort environments lexicographically by base, and then by name
+ */
+func sortEnvironments(envs []Environment) {
+	sort.Slice(envs, func(i int, j int) bool {
+		if envs[i].base == envs[j].base {
+			return envs[i].name < envs[j].name
+		} else {
+			return envs[i].base < envs[j].base
+		}
+	})
+}
+
+
+/*
+Join map[string]string to string containing comma-separated key-value pairs.
+Eg. { "a": "b", "c": "d" } -> "a=b,c=d"
+*/
+func joinKeyValuePairs(pairs map[string]string) string {
+	var tokens []string
+	for k, v := range pairs {
+		tokens = append(tokens, fmt.Sprintf("%s=%s", k, v))
+	}
+
+    // Sort tokens so they are always supplied in predictable order
+	sort.Strings(tokens)
+
+	return strings.Join(tokens, ",")
 }

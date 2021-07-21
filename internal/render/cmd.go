@@ -25,7 +25,7 @@ const DefaultOutputDirName = "output"
 
 /* Struct bundling Cobra command and Options it populates */
 type CLI struct {
-	options *Options
+	options      *Options
 	cobraCommand *cobra.Command
 }
 
@@ -122,7 +122,7 @@ func newCLI() *CLI {
 	cobraCommand.Flags().StringVarP(&options.App, "app", "a", optionUnset, "Render manifests for a specific Terra application only")
 	cobraCommand.Flags().StringVarP(&options.Env, "env", "e", optionUnset, "Render manifests for a specific Terra environment only")
 	cobraCommand.Flags().StringVar(&options.ChartVersion, "chart-version", optionUnset, "Override chart version")
-	cobraCommand.Flags().StringVar(&options.ChartDir,"chart-dir", optionUnset, "Render from local chart directory instead of official release")
+	cobraCommand.Flags().StringVar(&options.ChartDir, "chart-dir", optionUnset, "Render from local chart directory instead of official release")
 	cobraCommand.Flags().StringVar(&options.AppVersion, "app-version", optionUnset, "Override application version")
 	cobraCommand.Flags().StringVarP(&options.OutputDir, "output-dir", "d", optionUnset, "Render manifests to custom output directory")
 	cobraCommand.Flags().BoolVar(&options.Stdout, "stdout", false, "Render manifests to stdout instead of output directory")

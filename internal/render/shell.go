@@ -18,10 +18,10 @@ type ShellRunner interface {
 type Command struct {
 	Prog string
 	Args []string
-	Dir string
+	Dir  string
 }
 
-type RealRunner struct {}
+type RealRunner struct{}
 
 func (r *RealRunner) Run(cmd Command) error {
 	execCmd := exec.Command(cmd.Prog, cmd.Args...)

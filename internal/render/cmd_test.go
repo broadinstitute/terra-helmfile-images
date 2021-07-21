@@ -13,19 +13,19 @@ import (
 )
 
 var fakeEnvironments = []Environment{
-	{name: "dev",   base: "live"},
+	{name: "dev", base: "live"},
 	{name: "alpha", base: "live"},
-	{name: "jdoe",  base: "personal"},
+	{name: "jdoe", base: "personal"},
 }
 
 /* Struct for tracking global state that is mocked when a test executes and restored/cleaned up after */
-type TestState struct{
-	originalRunner *ShellRunner
-	mockRunner *MockRunner
+type TestState struct {
+	originalRunner         *ShellRunner
+	mockRunner             *MockRunner
 	originalConfigRepoPath string
-	mockConfigRepoPath string
-	mockChartDir string
-	tmpDir string
+	mockConfigRepoPath     string
+	mockChartDir           string
+	tmpDir                 string
 }
 
 /* Used in MockRunner to verify expected commands have been called */
@@ -35,7 +35,7 @@ type ExpectedCommand struct {
 }
 
 /* MockRunner stores an ordered list (slice) of expected commands */
-type MockRunner struct{
+type MockRunner struct {
 	commands []ExpectedCommand // Ordered list of expected commands
 }
 
@@ -83,10 +83,10 @@ func TestExecute(t *testing.T) {
 	})
 
 	var tests = []struct {
-		description string                  // Testcase description
-		arguments []string                  // Fake user-supplied CLI arguments to pass to `render`
-		expectedCommands []ExpectedCommand  // Ordered list of CLI commands we expect `render` to run
-		expectedError *regexp.Regexp        // Optional error we expect to be raised
+		description      string            // Testcase description
+		arguments        []string          // Fake user-supplied CLI arguments to pass to `render`
+		expectedCommands []ExpectedCommand // Ordered list of CLI commands we expect `render` to run
+		expectedError    *regexp.Regexp    // Optional error we expect to be raised
 	}{
 		{
 			description:   "invalid argument",
@@ -139,8 +139,8 @@ func TestExecute(t *testing.T) {
 			expectedError: regexp.MustCompile("--argocd cannot be used with --chart-dir, --chart-version, or --app-version"),
 		},
 		{
-			description:   "incorrect environment should return error",
-			arguments:     args("-e foo"),
+			description: "incorrect environment should return error",
+			arguments:   args("-e foo"),
 			expectedCommands: []ExpectedCommand{
 				testState.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
 			},
@@ -151,8 +151,8 @@ func TestExecute(t *testing.T) {
 			expectedCommands: []ExpectedCommand{
 				testState.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
 				testState.cmd("helmfile --log-level=info -e alpha --selector=group=terra template --skip-deps --output-dir=%s/output/alpha", testState.mockConfigRepoPath),
-				testState.cmd("helmfile --log-level=info -e dev   --selector=group=terra template --skip-deps --output-dir=%s/output/dev",   testState.mockConfigRepoPath),
-				testState.cmd("helmfile --log-level=info -e jdoe  --selector=group=terra template --skip-deps --output-dir=%s/output/jdoe",  testState.mockConfigRepoPath),
+				testState.cmd("helmfile --log-level=info -e dev   --selector=group=terra template --skip-deps --output-dir=%s/output/dev", testState.mockConfigRepoPath),
+				testState.cmd("helmfile --log-level=info -e jdoe  --selector=group=terra template --skip-deps --output-dir=%s/output/jdoe", testState.mockConfigRepoPath),
 			},
 		},
 		{
@@ -178,7 +178,7 @@ func TestExecute(t *testing.T) {
 			mockRunner := testState.mockRunner
 			mockRunner.commands = test.expectedCommands
 
-			err := ExecuteWithCallback(func (cobraCmd *cobra.Command) {
+			err := ExecuteWithCallback(func(cobraCmd *cobra.Command) {
 				cobraCmd.SetArgs(test.arguments)
 			})
 
@@ -207,8 +207,8 @@ func TestExecute(t *testing.T) {
 Convenience function to generate tokenized argument list from format string w/ args
 
 Eg. args("-e   %s", "dev") -> []string{"-e", "dev"}
- */
-func args(format string, a... interface{}) []string {
+*/
+func args(format string, a ...interface{}) []string {
 	formatted := fmt.Sprintf(format, a...)
 	return strings.Fields(formatted)
 }
@@ -220,14 +220,14 @@ a format string for the command.
 Eg. cmd("helmfile -e %s template", "alpha")
 
 */
-func (ts *TestState) cmd(format string, a... interface{}) ExpectedCommand {
+func (ts *TestState) cmd(format string, a ...interface{}) ExpectedCommand {
 	tokens := args(format, a...)
 
 	return ExpectedCommand{
 		Command: Command{
 			Prog: tokens[0],
 			Args: tokens[1:],
-			Dir: ts.mockConfigRepoPath,
+			Dir:  ts.mockConfigRepoPath,
 		},
 	}
 }
@@ -274,12 +274,12 @@ func setup() (*TestState, error) {
 	}
 
 	return &TestState{
-		originalRunner: &originalRunner,
-		mockRunner: mockRunner,
+		originalRunner:         &originalRunner,
+		mockRunner:             mockRunner,
 		originalConfigRepoPath: originalConfigRepoPath,
-		mockConfigRepoPath: mockConfigRepoPath,
-		mockChartDir: mockChartDir,
-		tmpDir: tmpDir,
+		mockConfigRepoPath:     mockConfigRepoPath,
+		mockChartDir:           mockChartDir,
+		tmpDir:                 tmpDir,
 	}, nil
 }
 
@@ -289,9 +289,9 @@ func cleanup(state *TestState) error {
 
 	// Restore original config repo path
 	// When Golang 1.17 is released we can use t.Setenv() instead https://github.com/golang/go/issues/41260
-    err := os.Setenv(ConfigRepoPathEnvVar, state.originalConfigRepoPath)
-    if err != nil {
-    	return err
+	err := os.Setenv(ConfigRepoPathEnvVar, state.originalConfigRepoPath)
+	if err != nil {
+		return err
 	}
 
 	// Clean up temp dir

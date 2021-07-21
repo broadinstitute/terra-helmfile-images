@@ -40,9 +40,9 @@ type Environment struct {
 }
 
 type Render struct {
-	options *Options /* CLI options */
-	environments map[string]Environment /* Collection of environments defined in the config repo, keyed by env name */
-	helmfileLogLevel string /* --log-level argument to pass to `helmfile` command */
+	options          *Options               /* CLI options */
+	environments     map[string]Environment /* Collection of environments defined in the config repo, keyed by env name */
+	helmfileLogLevel string                 /* --log-level argument to pass to `helmfile` command */
 }
 
 /* ShellRunner object used to execute commands. Replaced with a mock in tests */
@@ -144,7 +144,7 @@ func (r *Render) getTargetEnvs() ([]Environment, error) {
 		if !ok {
 			return nil, fmt.Errorf("unknown environment: %s", r.options.Env)
 		}
-		return []Environment{ env }, nil
+		return []Environment{env}, nil
 	}
 
 	// No environment specified; render for _all_ environments
@@ -197,7 +197,7 @@ func (r *Render) runHelmfile(args ...string) error {
 	extraArgs := []string{
 		fmt.Sprintf("--log-level=%s", r.helmfileLogLevel),
 	}
-	args =  append(extraArgs, args...)
+	args = append(extraArgs, args...)
 
 	cmd := Command{}
 	cmd.Prog = helmfileCommand
@@ -279,7 +279,7 @@ func normalizeRenderDirectories(outputDir string) error {
 
 /*
 Sort environments lexicographically by base, and then by name
- */
+*/
 func sortEnvironments(envs []Environment) {
 	sort.Slice(envs, func(i int, j int) bool {
 		if envs[i].base == envs[j].base {
@@ -289,7 +289,6 @@ func sortEnvironments(envs []Environment) {
 		}
 	})
 }
-
 
 /*
 Join map[string]string to string containing comma-separated key-value pairs.
@@ -301,7 +300,7 @@ func joinKeyValuePairs(pairs map[string]string) string {
 		tokens = append(tokens, fmt.Sprintf("%s=%s", k, v))
 	}
 
-    // Sort tokens so they are always supplied in predictable order
+	// Sort tokens so they are always supplied in predictable order
 	sort.Strings(tokens)
 
 	return strings.Join(tokens, ",")

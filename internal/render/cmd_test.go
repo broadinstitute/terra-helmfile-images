@@ -1,6 +1,7 @@
 package render
 
 import (
+	"errors"
 	"fmt"
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/cobra"
@@ -68,15 +69,15 @@ https://gianarb.it/blog/golang-mockmania-cli-command-with-cobra
 */
 func TestExecute(t *testing.T) {
 	// Set up mocked global state before tests run
-	testState, err := setup()
+	ts, err := setup()
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	// Add cleanup hook to restore correct global state after test completes
+	// Add cleanup hook to restore global state after tests complete
 	t.Cleanup(func() {
-		err := cleanup(testState)
+		err := cleanup(ts)
 		if err != nil {
 			t.Error(err)
 		}
@@ -110,12 +111,12 @@ func TestExecute(t *testing.T) {
 		},
 		{
 			description:   "--chart-dir should require -a",
-			arguments:     args("--chart-dir %s", testState.mockChartDir),
+			arguments:     args("--chart-dir %s", ts.mockChartDir),
 			expectedError: regexp.MustCompile("--chart-dir requires an app be specified with -a"),
 		},
 		{
 			description:   "--chart-dir and --chart-version incompatible",
-			arguments:     args("-e dev -a leonardo --chart-dir %s --chart-version 1.0.0", testState.mockChartDir),
+			arguments:     args("-e dev -a leonardo --chart-dir %s --chart-version 1.0.0", ts.mockChartDir),
 			expectedError: regexp.MustCompile("only one of --chart-dir or --chart-version may be specified"),
 		},
 		{
@@ -135,47 +136,56 @@ func TestExecute(t *testing.T) {
 		},
 		{
 			description:   "--argocd and --chart-dir incompatible",
-			arguments:     args("-e dev -a leonardo --chart-dir=%s --argocd", testState.mockChartDir),
+			arguments:     args("-e dev -a leonardo --chart-dir=%s --argocd", ts.mockChartDir),
 			expectedError: regexp.MustCompile("--argocd cannot be used with --chart-dir, --chart-version, or --app-version"),
 		},
 		{
 			description: "incorrect environment should return error",
 			arguments:   args("-e foo"),
 			expectedCommands: []ExpectedCommand{
-				testState.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
+				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
 			},
 			expectedError: regexp.MustCompile("unknown environment: foo"),
 		},
 		{
 			description: "no arguments should render for all environments",
 			expectedCommands: []ExpectedCommand{
-				testState.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
-				testState.cmd("helmfile --log-level=info -e alpha --selector=group=terra template --skip-deps --output-dir=%s/output/alpha", testState.mockConfigRepoPath),
-				testState.cmd("helmfile --log-level=info -e dev   --selector=group=terra template --skip-deps --output-dir=%s/output/dev", testState.mockConfigRepoPath),
-				testState.cmd("helmfile --log-level=info -e jdoe  --selector=group=terra template --skip-deps --output-dir=%s/output/jdoe", testState.mockConfigRepoPath),
+				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
+				ts.cmd("helmfile --log-level=info -e alpha --selector=group=terra template --skip-deps --output-dir=%s/output/alpha", ts.mockConfigRepoPath),
+				ts.cmd("helmfile --log-level=info -e dev   --selector=group=terra template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
+				ts.cmd("helmfile --log-level=info -e jdoe  --selector=group=terra template --skip-deps --output-dir=%s/output/jdoe", ts.mockConfigRepoPath),
 			},
 		},
 		{
 			description: "-e should render for specific environment",
 			arguments:   args("-e dev"),
 			expectedCommands: []ExpectedCommand{
-				testState.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
-				testState.cmd("helmfile --log-level=info -e dev --selector=group=terra template --skip-deps --output-dir=%s/output/dev", testState.mockConfigRepoPath),
+				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
+				ts.cmd("helmfile --log-level=info -e dev --selector=group=terra template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
 			},
 		},
 		{
 			description: "-a should render for specific service",
 			arguments:   args("-e dev -a leonardo"),
 			expectedCommands: []ExpectedCommand{
-				testState.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
-				testState.cmd("helmfile --log-level=info -e dev --selector=app=leonardo,group=terra template --skip-deps --output-dir=%s/output/dev", testState.mockConfigRepoPath),
+				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
+				ts.cmd("helmfile --log-level=info -e dev --selector=app=leonardo,group=terra template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
+			},
+		},
+		{
+			description: "render should fail if repo update fails",
+			expectedCommands: []ExpectedCommand{
+				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
+				ts.cmd("helmfile --log-level=info -e alpha --selector=group=terra template --skip-deps --output-dir=%s/output/alpha", ts.mockConfigRepoPath),
+				ts.cmd("helmfile --log-level=info -e dev   --selector=group=terra template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
+				ts.cmd("helmfile --log-level=info -e jdoe  --selector=group=terra template --skip-deps --output-dir=%s/output/jdoe", ts.mockConfigRepoPath),
 			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			mockRunner := testState.mockRunner
+			mockRunner := ts.mockRunner
 			mockRunner.commands = test.expectedCommands
 
 			err := ExecuteWithCallback(func(cobraCmd *cobra.Command) {
@@ -214,8 +224,8 @@ func args(format string, a ...interface{}) []string {
 }
 
 /*
-Convenience function to create a successful/non-erroring expected command, given
-a format string for the command.
+Convenience function to create a successful/non-erroring ExpectedCommand, given
+a format string _for_ the command.
 
 Eg. cmd("helmfile -e %s template", "alpha")
 
@@ -230,6 +240,19 @@ func (ts *TestState) cmd(format string, a ...interface{}) ExpectedCommand {
 			Dir:  ts.mockConfigRepoPath,
 		},
 	}
+}
+
+/*
+Convenience function to create a failing ExpectedCommand with an error
+a format string _for_ the command.
+
+Eg. cmd("helmfile -e %s template", "alpha")
+
+*/
+func (ts *TestState) failCmd(err string, format string, a ...interface{}) ExpectedCommand {
+	expectedCommand := ts.cmd(format, a...)
+	expectedCommand.MockError = errors.New(err)
+	return expectedCommand
 }
 
 /* Set up a TestExecute test case */

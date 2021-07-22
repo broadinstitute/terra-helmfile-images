@@ -1,4 +1,4 @@
-# terra-helmfile-tools
+# terra-helmfile-images
 
 This repository contains accessory tooling for the [terra-helmfile repo](https://github.com/broadinstitute/terra-helmfile). It includes:
 * Golang source code for various utilities for rendering manifests and publishing charts

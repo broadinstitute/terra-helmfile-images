@@ -14,9 +14,6 @@ import (
 /* Name of the `helmfile` binary */
 const helmfileCommand = "helmfile"
 
-/* Unset CLI options default to empty string */
-const optionUnset = ""
-
 /* Subdirectory to search for environment config files */
 const envSubdir = "environments"
 
@@ -47,11 +44,6 @@ type Render struct {
 
 /* ShellRunner object used to execute commands. Replaced with a mock in tests */
 var shellRunner ShellRunner = &RealRunner{}
-
-/* Short-hand helper function indicating whether a string option was set by the user */
-func IsSet(optionValue string) bool {
-	return optionValue != optionUnset
-}
 
 func NewRender(options *Options) (*Render, error) {
 	render := new(Render)
@@ -138,7 +130,7 @@ func loadEnvironments(configRepoPath string) (map[string]Environment, error) {
 }
 
 func (r *Render) getTargetEnvs() ([]Environment, error) {
-	if IsSet(r.options.Env) {
+	if isSet(r.options.Env) {
 		// User wants to render for a specific environment
 		env, ok := r.environments[r.options.Env]
 		if !ok {
@@ -211,15 +203,15 @@ func (r *Render) runHelmfile(args ...string) error {
 func (r *Render) getStateValues() map[string]string {
 	stateValues := make(map[string]string)
 
-	if IsSet(r.options.ChartDir) {
+	if isSet(r.options.ChartDir) {
 		key := fmt.Sprintf("releases.%s.repo", r.options.App)
 		stateValues[key] = r.options.ChartDir
-	} else if IsSet(r.options.ChartVersion) {
+	} else if isSet(r.options.ChartVersion) {
 		key := fmt.Sprintf("releases.%s.chartVersion", r.options.App)
 		stateValues[key] = r.options.ChartVersion
 	}
 
-	if IsSet(r.options.AppVersion) {
+	if isSet(r.options.AppVersion) {
 		key := fmt.Sprintf("releases.%s.appVersion", r.options.App)
 		stateValues[key] = r.options.AppVersion
 	}
@@ -236,7 +228,7 @@ func (r *Render) getSelectors() map[string]string {
 		selectors["group"] = "argocd"
 	}
 
-	if IsSet(r.options.App) {
+	if isSet(r.options.App) {
 		// Render manifests for the given app only
 		selectors["app"] = r.options.App
 	}

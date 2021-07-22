@@ -13,6 +13,7 @@ import (
 	"testing"
 )
 
+/* This file contains an integration test for the render utility */
 var fakeEnvironments = []Environment{
 	{name: "dev", base: "live"},
 	{name: "alpha", base: "live"},
@@ -61,13 +62,15 @@ func (m *MockRunner) Run(cmd Command) error {
 }
 
 /*
-Table-driven integration test. Given a list of CLI arguments to the render command,
-verifies that the correct underlying `helmfile` command(s) are run.
+A table-driven integration test for the render tool.
+
+Given a list of CLI arguments to the render command, the test verifies
+that the correct underlying `helmfile` command(s) are run.
 
 Reference:
 https://gianarb.it/blog/golang-mockmania-cli-command-with-cobra
 */
-func TestExecute(t *testing.T) {
+func TestRender(t *testing.T) {
 	// Set up mocked global state before tests run
 	ts, err := setup()
 	if err != nil {
@@ -157,11 +160,29 @@ func TestExecute(t *testing.T) {
 			},
 		},
 		{
+			description: "--argocd without -e or -a should render Argo manifests for all environments",
+			arguments:   args("--argocd"),
+			expectedCommands: []ExpectedCommand{
+				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
+				ts.cmd("helmfile --log-level=info -e alpha --selector=group=argocd template --skip-deps --output-dir=%s/output/alpha", ts.mockConfigRepoPath),
+				ts.cmd("helmfile --log-level=info -e dev   --selector=group=argocd template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
+				ts.cmd("helmfile --log-level=info -e jdoe  --selector=group=argocd template --skip-deps --output-dir=%s/output/jdoe", ts.mockConfigRepoPath),
+			},
+		},
+		{
 			description: "-e should render for specific environment",
 			arguments:   args("-e dev"),
 			expectedCommands: []ExpectedCommand{
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
 				ts.cmd("helmfile --log-level=info -e dev --selector=group=terra template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
+			},
+		},
+		{
+			description: "-e with --argocd should render ArgoCD manifests for specific environment",
+			arguments:   args("-e dev --argocd"),
+			expectedCommands: []ExpectedCommand{
+				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
+				ts.cmd("helmfile --log-level=info -e dev --selector=group=argocd template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
 			},
 		},
 		{
@@ -173,12 +194,75 @@ func TestExecute(t *testing.T) {
 			},
 		},
 		{
-			description: "render should fail if repo update fails",
+			description: "-a with --argocd should render ArgoCD manifests for specific service",
+			arguments:   args("--argocd -e dev -a leonardo"),
 			expectedCommands: []ExpectedCommand{
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
-				ts.cmd("helmfile --log-level=info -e alpha --selector=group=terra template --skip-deps --output-dir=%s/output/alpha", ts.mockConfigRepoPath),
-				ts.cmd("helmfile --log-level=info -e dev   --selector=group=terra template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
-				ts.cmd("helmfile --log-level=info -e jdoe  --selector=group=terra template --skip-deps --output-dir=%s/output/jdoe", ts.mockConfigRepoPath),
+				ts.cmd("helmfile --log-level=info -e dev --selector=app=leonardo,group=argocd template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
+			},
+		},
+		{
+			description: "-a with --app-version should set app version",
+			arguments:   args("-e dev -a leonardo --app-version 1.2.3"),
+			expectedCommands: []ExpectedCommand{
+				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
+				ts.cmd("helmfile --log-level=info -e dev --selector=app=leonardo,group=terra --state-values-set=releases.leonardo.appVersion=1.2.3 template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
+			},
+		},
+		{
+			description: "-a with --chart-dir should set chart dir and not include --skip-deps",
+			arguments:   args("-e dev -a leonardo --chart-dir=%s", ts.mockChartDir),
+			expectedCommands: []ExpectedCommand{
+				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
+				ts.cmd("helmfile --log-level=info -e dev --selector=app=leonardo,group=terra --state-values-set=releases.leonardo.repo=%s template --output-dir=%s/output/dev", ts.mockChartDir, ts.mockConfigRepoPath),
+			},
+		},
+		{
+			description: "-a with --app-version and --chart-version should set both",
+			arguments:   args(" -e dev -a leonardo --app-version 1.2.3 --chart-version 4.5.6"),
+			expectedCommands: []ExpectedCommand{
+				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
+				ts.cmd("helmfile --log-level=info -e dev --selector=app=leonardo,group=terra --state-values-set=releases.leonardo.appVersion=1.2.3,releases.leonardo.chartVersion=4.5.6 template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
+			},
+		},
+		{
+			description: "should fail if repo update fails",
+			expectedCommands: []ExpectedCommand{
+				ts.failCmd("dieee", "helmfile --log-level=info --allow-no-matching-release repos"),
+			},
+			expectedError: regexp.MustCompile("dieee"),
+		},
+		{
+			description: "should fail if helmfile template fails",
+			arguments:   args("-e dev"),
+			expectedCommands: []ExpectedCommand{
+				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
+				ts.failCmd("dieee", "helmfile --log-level=info -e dev --selector=group=terra template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
+			},
+			expectedError: regexp.MustCompile("dieee"),
+		},
+		{
+			description: "should run helmfile with --log-level=debug if run with -v -v",
+			arguments:   args("-e dev -v -v"),
+			expectedCommands: []ExpectedCommand{
+				ts.cmd("helmfile --log-level=debug --allow-no-matching-release repos"),
+				ts.cmd("helmfile --log-level=debug -e dev --selector=group=terra template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
+			},
+		},
+		{
+			description: "--stdout should not render to output directory",
+			arguments: args("--env=alpha --stdout"),
+			expectedCommands: []ExpectedCommand{
+				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
+				ts.cmd("helmfile --log-level=info -e alpha --selector=group=terra template --skip-deps"),
+			},
+		},
+		{
+			description: "-d should render to custom output directory",
+			arguments: args("-e jdoe -d path/to/nowhere"),
+			expectedCommands: []ExpectedCommand{
+				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
+				ts.cmd("helmfile --log-level=info -e jdoe --selector=group=terra template --skip-deps --output-dir=path/to/nowhere/jdoe"),
 			},
 		},
 	}
@@ -197,7 +281,7 @@ func TestExecute(t *testing.T) {
 				return
 			}
 			if err != nil && test.expectedError == nil {
-				t.Errorf("Unexpected error calling ExecuteWithCallback(): %v", err)
+				t.Error(err)
 				return
 			}
 			if err != nil && !test.expectedError.MatchString(err.Error()) {
@@ -211,6 +295,55 @@ func TestExecute(t *testing.T) {
 			}
 		})
 	}
+}
+
+/* Integration test does not exercise normalizeRenderDirectories(), so add a unit test here */
+func TestNormalizeRenderDirectories(t *testing.T) {
+	t.Run("test directories are normalized", func(t *testing.T) {
+		// Create tmpdir
+		tmpDir, err := ioutil.TempDir(os.TempDir(), "render-test")
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		// Create some fake helmfile output directories
+		paths := []string{
+			path.Join(tmpDir, "dev", "helmfile-b47efc70-leonardo"),
+			path.Join(tmpDir, "perf", "helmfile-b47efc70-leonardo"),
+			path.Join(tmpDir, "alpha", "helmfile-b47efc70-cromwell"),
+			path.Join(tmpDir, "alpha", "this-should-not-match"),
+		}
+
+		for _, path := range paths {
+			if err = os.MkdirAll(path, 0755); err != nil {
+				t.Error(err)
+				return
+			}
+		}
+
+		err = normalizeRenderDirectories(tmpDir)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+
+		// Paths above should have been renamed
+		updatedPaths := []string{
+			path.Join(tmpDir, "dev", "leonardo"),
+			path.Join(tmpDir, "perf", "leonardo"),
+			path.Join(tmpDir, "alpha", "cromwell"),
+			path.Join(tmpDir, "alpha", "this-should-not-match"),
+		}
+
+		for _, path := range updatedPaths {
+			if _, err := os.Stat(path); err != nil {
+				t.Errorf("Expected path %s to exist: %v", path, err)
+				return
+			}
+		}
+	})
 }
 
 /*

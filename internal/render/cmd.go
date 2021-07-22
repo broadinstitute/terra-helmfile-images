@@ -23,6 +23,9 @@ const ConfigRepoPathEnvVar = "TERRA_HELMFILE_PATH"
 /* Name of default output directory */
 const DefaultOutputDirName = "output"
 
+/* Default value for string CLI options */
+const optionUnset = ""
+
 /* Struct bundling Cobra command and Options it populates */
 type CLI struct {
 	options      *Options
@@ -140,17 +143,17 @@ func init() {
 
 /* Check Options for incompatible flags */
 func checkIncompatibleFlags(options *Options) error {
-	if IsSet(options.App) && !IsSet(options.Env) {
+	if isSet(options.App) && !isSet(options.Env) {
 		/* Not all environments include all apps, so require users to specify -e with -a */
 		return fmt.Errorf("an environment must be specified with -e when an app is specified with -a")
 	}
 
-	if IsSet(options.ChartDir) {
-		if IsSet(options.ChartVersion) {
+	if isSet(options.ChartDir) {
+		if isSet(options.ChartVersion) {
 			return fmt.Errorf("only one of --chart-dir or --chart-version may be specified")
 		}
 
-		if !IsSet(options.App) {
+		if !isSet(options.App) {
 			return fmt.Errorf("--chart-dir requires an app be specified with -a")
 		}
 
@@ -159,16 +162,16 @@ func checkIncompatibleFlags(options *Options) error {
 		}
 	}
 
-	if IsSet(options.ChartVersion) && !IsSet(options.App) {
+	if isSet(options.ChartVersion) && !isSet(options.App) {
 		return fmt.Errorf("--chart-version requires an app be specified with -a")
 	}
 
-	if IsSet(options.AppVersion) && !IsSet(options.App) {
+	if isSet(options.AppVersion) && !isSet(options.App) {
 		return fmt.Errorf("--app-version requires an app be specified with -a")
 	}
 
 	if options.ArgocdMode {
-		if IsSet(options.ChartDir) || IsSet(options.ChartVersion) || IsSet(options.AppVersion) {
+		if isSet(options.ChartDir) || isSet(options.ChartVersion) || isSet(options.AppVersion) {
 			return fmt.Errorf("--argocd cannot be used with --chart-dir, --chart-version, or --app-version")
 		}
 	}
@@ -186,7 +189,7 @@ func setConfigRepoPath(options *Options) error {
 	options.ConfigRepoPath = configRepoPath
 
 	// If an explicit output dir was not set, default to $CONFIG_REPO_PATH/output
-	if options.OutputDir == optionUnset {
+	if !isSet(options.OutputDir) {
 		options.OutputDir = path.Join(configRepoPath, DefaultOutputDirName)
 		log.Debug().Msgf("Using default output dir %s", options.OutputDir)
 	}
@@ -201,4 +204,9 @@ func adjustLoggingVerbosity(verbosity int) {
 	} else if verbosity > 0 {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
+}
+
+/* Short-hand helper function indicating whether a string option was set by the user */
+func isSet(optionValue string) bool {
+	return optionValue != optionUnset
 }

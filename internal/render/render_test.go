@@ -251,7 +251,7 @@ func TestRender(t *testing.T) {
 		},
 		{
 			description: "--stdout should not render to output directory",
-			arguments: args("--env=alpha --stdout"),
+			arguments:   args("--env=alpha --stdout"),
 			expectedCommands: []ExpectedCommand{
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
 				ts.cmd("helmfile --log-level=info -e alpha --selector=group=terra template --skip-deps"),
@@ -259,7 +259,7 @@ func TestRender(t *testing.T) {
 		},
 		{
 			description: "-d should render to custom output directory",
-			arguments: args("-e jdoe -d path/to/nowhere"),
+			arguments:   args("-e jdoe -d path/to/nowhere"),
 			expectedCommands: []ExpectedCommand{
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
 				ts.cmd("helmfile --log-level=info -e jdoe --selector=group=terra template --skip-deps --output-dir=path/to/nowhere/jdoe"),
@@ -327,7 +327,6 @@ func TestNormalizeRenderDirectories(t *testing.T) {
 			t.Error(err)
 			return
 		}
-
 
 		// Paths above should have been renamed
 		updatedPaths := []string{

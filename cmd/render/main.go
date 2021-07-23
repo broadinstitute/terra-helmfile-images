@@ -1,7 +1,7 @@
 package main
 
 import (
-	"terra-helmfile-tools/internal/render"
+	"github.com/broadinstitute/terra-helmfile-images/internal/render"
 )
 
 func main() {

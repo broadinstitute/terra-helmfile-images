@@ -38,7 +38,7 @@ type ExpectedCommand struct {
 
 /* MockRunner stores an ordered list (slice) of expected commands */
 type MockRunner struct {
-	commands []ExpectedCommand // Ordered list of expected commands
+	expectedCommands []ExpectedCommand // Ordered list of expected commands
 }
 
 /*
@@ -47,12 +47,12 @@ Mock implementation of ShellCommand#Run
 Instead of executing the command, compare it to the runner's list of expected commands, throwing an error on mismatch
 */
 func (m *MockRunner) Run(cmd Command) error {
-	if len(m.commands) == 0 {
+	if len(m.expectedCommands) == 0 {
 		return fmt.Errorf("MockRunner: Received unexpected command %v", cmd)
 	}
 
 	var expected ExpectedCommand
-	expected, m.commands = m.commands[0], m.commands[1:]
+	expected, m.expectedCommands = m.expectedCommands[0], m.expectedCommands[1:]
 
 	if diff := cmp.Diff(cmd, expected.Command); diff != "" {
 		return fmt.Errorf("MockRunner: %T differ (-got, +want): %s", expected.Command, diff)
@@ -270,7 +270,7 @@ func TestRender(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			mockRunner := ts.mockRunner
-			mockRunner.commands = test.expectedCommands
+			mockRunner.expectedCommands = test.expectedCommands
 
 			err := ExecuteWithCallback(func(cobraCmd *cobra.Command) {
 				cobraCmd.SetArgs(test.arguments)
@@ -289,8 +289,8 @@ func TestRender(t *testing.T) {
 				return
 			}
 
-			if len(mockRunner.commands) != 0 {
-				t.Errorf("MockRunner: Unmatched commands %v", mockRunner.commands)
+			if len(mockRunner.expectedCommands) != 0 {
+				t.Errorf("MockRunner: Unmatched expectedCommands %v", mockRunner.expectedCommands)
 				return
 			}
 		})

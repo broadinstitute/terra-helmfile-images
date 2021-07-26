@@ -1,4 +1,3 @@
-# noop test
 steps:
 # Build Go tools in a local image without publishing.
 # Downstream images pull in these tools using an external image stage.

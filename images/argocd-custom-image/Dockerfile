@@ -4,7 +4,6 @@ ARG argocd_version
 FROM argoproj/argocd:v${argocd_version}
 
 ARG argocd_version
-ARG helmfile_version
 ARG vault_version
 
 ARG os=linux
@@ -39,6 +38,9 @@ ENV PATH="/custom-tools/bin:${PATH}"
 # Switch back to non-root user
 USER argocd
 
+## Copy Go tools such as `render`, `helm`, and `helmfie` into the /custom-tools/bin directory
+COPY --from=tools-local /tools/bin /custom-tools/bin
+
 ## Install dependencies for the `legacy-configs` plugin
 # (aka the firecloud-develop ctmpl rendering process)
 
@@ -66,12 +68,6 @@ RUN wget -O- "https://releases.hashicorp.com/consul-template/${consul_template_v
 # Cloud SDK (configure.rb depends on `gsutil`)
 RUN curl https://sdk.cloud.google.com | bash
 ENV PATH="/home/argocd/google-cloud-sdk/bin/:${PATH}"
-
-## Install dependencies for the `helmfile` plugin
-# helmfile
-RUN wget -O /custom-tools/bin/helmfile https://github.com/roboll/helmfile/releases/download/v${helmfile_version}/helmfile_${os}_${arch} && \
-    chmod +x /custom-tools/bin/helmfile && \
-    helmfile -version
 
 ## `legacy-configs` plugin
 COPY legacy-configs /custom-tools/legacy-configs

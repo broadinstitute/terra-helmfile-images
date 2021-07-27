@@ -1,10 +1,10 @@
 # terra-helmfile-images
 
 This repository contains accessory tooling for the [terra-helmfile repo](https://github.com/broadinstitute/terra-helmfile). It includes:
-* Golang source code for various utilities for rendering manifests and publishing charts
-* Dockerfiles for images that interact with terra-helmfile
+* Golang source code for various utilities for rendering manifests and publishing charts (see `tools/` subdirectory)
+* Dockerfiles for images that interact with terra-helmfile (see `images/` subdirectory).
 
-### Utilities
+### Tools
 
 * **`render`**: A convenience wrapper around Helmfile, used for rendering manifests
 

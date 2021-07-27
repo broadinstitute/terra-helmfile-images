@@ -7,7 +7,7 @@ steps:
     'build',
     '-t',
     'tools-local',
-    '.'
+    './tools'
   ]
 # Build target image
 - name: 'gcr.io/cloud-builders/docker'

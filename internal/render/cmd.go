@@ -26,101 +26,88 @@ const DefaultOutputDirName = "output"
 /* Default value for string CLI options */
 const optionUnset = ""
 
-/* Struct bundling Cobra command and Options it populates */
-type CLI struct {
-	options      *Options
-	cobraCommand *cobra.Command
-}
-
 /* Main method/entrypoint for the render tool. */
 func Execute() {
-	if err := ExecuteWithCallback(nil); err != nil {
-		log.Fatal().Err(err)
+	cobraCommand := newCobraCommand()
+
+	if err := cobraCommand.Execute(); err != nil {
+		log.Error().Msgf("%v", err)
 		os.Exit(1)
 	}
 }
 
-/* Execute cobra command with given arguments */
-func ExecuteWithCallback(cobraCallback func(*cobra.Command)) error {
-	c := newCLI()
-	options, cobraCommand := c.options, c.cobraCommand
-
-	if cobraCallback != nil {
-		// Make it possible for unit tests to supply fake arguments by calling `SetArgs` on the cobra command
-		cobraCallback(cobraCommand)
-	}
-
-	// Parse CLI flags
-	if err := cobraCommand.Execute(); err != nil {
-		return err
-	}
-
-	// Extra verification and processing, now that CLI flags have been parsed
-	if err := setConfigRepoPath(options); err != nil {
-		return err
-	}
-
-	if err := checkIncompatibleFlags(options); err != nil {
-		return err
-	}
-
-	adjustLoggingVerbosity(options.Verbose)
-
-	// Prepare to render manifests
-	render, err := NewRender(options)
-	if err != nil {
-		return err
-	}
-
-	if err = render.CleanOutputDirectory(); err != nil {
-		return err
-	}
-
-	if err = render.HelmUpdate(); err != nil {
-		return err
-	}
-
-	if err = render.RenderAll(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func newCLI() *CLI {
+/* Construct new Cobra command */
+func newCobraCommand() *cobra.Command {
 	options := &Options{}
 	cobraCommand := &cobra.Command{
 		Use:   "render",
 		Short: "Renders Terra Kubernetes manifests",
 		Long: `Renders Terra Kubernetes manifests
 
-	Examples:
+Examples:
 
-		# Render all manifests for all Terra services in all environments
-		$0
+# Render all manifests for all Terra services in all environments
+$0
 
-		# Render manifests for all Terra services in the dev environment
-		$0 -e dev
+# Render manifests for all Terra services in the dev environment
+$0 -e dev
 
-		# Render manifests for the cromwell service in the alpha environment
-		$0 -e alpha -a cromwell
+# Render manifests for the cromwell service in the alpha environment
+$0 -e alpha -a cromwell
 
-		# Render manifests for the cromwell service in the alpha environment,
-		# overriding app and chart version
-		$0 -e alpha -a cromwell --chart-version="~> 0.8" --app-version="53-9b11416"
+# Render manifests for the cromwell service in the alpha environment,
+# overriding app and chart version
+$0 -e alpha -a cromwell --chart-version="~> 0.8" --app-version="53-9b11416"
 
-		# Render manifests from a local copy of a chart
-		$0 -e alpha -a cromwell --chart-dir=../terra-helm/charts
+# Render manifests from a local copy of a chart
+$0 -e alpha -a cromwell --chart-dir=../terra-helm/charts
 
-		# Render all manifests to a directory called my-manifests
-		$0 --output-dir=/tmp/my-manifests
+# Render all manifests to a directory called my-manifests
+$0 --output-dir=/tmp/my-manifests
 
-		# Render ArgoCD manifests for all Terra services in all environments
-		$0 --argocd
+# Render ArgoCD manifests for all Terra services in all environments
+$0 --argocd
 
-		# Render ArgoCD manifests for the Cromwell service in the alpha environment
-		$0 -e alpha -a cromwell --argocd
-	`}
+# Render ArgoCD manifests for the Cromwell service in the alpha environment
+$0 -e alpha -a cromwell --argocd
+`,
+		// Only print out usage error when user supplies -h/--help
+	    SilenceUsage: true,
+
+	    // Don't print errors, we do it ourselves using a logging library
+		SilenceErrors: true,
+
+	    // Main body of the command
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) != 0 {
+				return fmt.Errorf("expected no positional arguments, got %v", args)
+			}
+
+			if err := setConfigRepoPath(options); err != nil {
+				return err
+			}
+			if err := checkIncompatibleFlags(options); err != nil {
+				return err
+			}
+			adjustLoggingVerbosity(options.Verbose)
+
+			render, err := NewRender(options)
+			if err != nil {
+				return err
+			}
+			if err = render.CleanOutputDirectory(); err != nil {
+				return err
+			}
+			if err = render.HelmUpdate(); err != nil {
+				return err
+			}
+			if err = render.RenderAll(); err != nil {
+				return err
+			}
+
+			return nil
+		},
+	}
 
 	cobraCommand.Flags().StringVarP(&options.App, "app", "a", optionUnset, "Render manifests for a specific Terra application only")
 	cobraCommand.Flags().StringVarP(&options.Env, "env", "e", optionUnset, "Render manifests for a specific Terra environment only")
@@ -132,7 +119,7 @@ func newCLI() *CLI {
 	cobraCommand.Flags().BoolVar(&options.ArgocdMode, "argocd", false, "Render ArgoCD manifests instead of application manifests")
 	cobraCommand.Flags().CountVarP(&options.Verbose, "verbose", "v", "Verbose logging. Can be specified multiple times")
 
-	return &CLI{options, cobraCommand}
+	return cobraCommand
 }
 
 func init() {

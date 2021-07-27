@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/go-cmp/cmp"
-	"github.com/spf13/cobra"
 	"io/ioutil"
 	"os"
 	"path"
@@ -272,9 +271,9 @@ func TestRender(t *testing.T) {
 			mockRunner := ts.mockRunner
 			mockRunner.expectedCommands = test.expectedCommands
 
-			err := ExecuteWithCallback(func(cobraCmd *cobra.Command) {
-				cobraCmd.SetArgs(test.arguments)
-			})
+			cobraCmd := newCobraCommand()
+			cobraCmd.SetArgs(test.arguments)
+			err := cobraCmd.Execute()
 
 			if err == nil && test.expectedError != nil {
 				t.Errorf("Did not receive an error matching %v", test.expectedError)
@@ -308,15 +307,15 @@ func TestNormalizeRenderDirectories(t *testing.T) {
 		}
 
 		// Create some fake helmfile output directories
-		paths := []string{
+		manifestDirs := []string{
 			path.Join(tmpDir, "dev", "helmfile-b47efc70-leonardo"),
 			path.Join(tmpDir, "perf", "helmfile-b47efc70-leonardo"),
 			path.Join(tmpDir, "alpha", "helmfile-b47efc70-cromwell"),
 			path.Join(tmpDir, "alpha", "this-should-not-match"),
 		}
 
-		for _, path := range paths {
-			if err = os.MkdirAll(path, 0755); err != nil {
+		for _, dir := range manifestDirs {
+			if err = os.MkdirAll(dir, 0755); err != nil {
 				t.Error(err)
 				return
 			}
@@ -329,16 +328,16 @@ func TestNormalizeRenderDirectories(t *testing.T) {
 		}
 
 		// Paths above should have been renamed
-		updatedPaths := []string{
+		renamedDirs := []string{
 			path.Join(tmpDir, "dev", "leonardo"),
 			path.Join(tmpDir, "perf", "leonardo"),
 			path.Join(tmpDir, "alpha", "cromwell"),
 			path.Join(tmpDir, "alpha", "this-should-not-match"),
 		}
 
-		for _, path := range updatedPaths {
-			if _, err := os.Stat(path); err != nil {
-				t.Errorf("Expected path %s to exist: %v", path, err)
+		for _, dir := range renamedDirs {
+			if _, err := os.Stat(dir); err != nil {
+				t.Errorf("Expected path %s to exist: %v", dir, err)
 				return
 			}
 		}

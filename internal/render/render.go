@@ -70,20 +70,18 @@ func (r *Render) CleanOutputDirectory() error {
 		return nil
 	}
 
-	log.Info().Msgf("Cleaning output directory: %s", r.options.OutputDir)
+	log.Debug().Msgf("Cleaning output directory: %s", r.options.OutputDir)
 	return os.RemoveAll(r.options.OutputDir)
 }
 
 /* Update Helm repos */
 func (r *Render) HelmUpdate() error {
-	log.Info().Msg("Updating Helm repos...")
+	log.Debug().Msg("Updating Helm repos...")
 	return r.runHelmfile("--allow-no-matching-release", "repos")
 }
 
 /* Render manifests */
 func (r *Render) RenderAll() error {
-	log.Info().Msg("Rendering manifests...")
-
 	targetEnvs, err := r.getTargetEnvs()
 	if err != nil {
 		return err

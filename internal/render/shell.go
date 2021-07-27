@@ -1,9 +1,11 @@
 package render
 
 import (
+	"fmt"
 	"github.com/rs/zerolog/log"
 	"os"
 	"os/exec"
+	"strings"
 )
 
 /*
@@ -15,10 +17,39 @@ type ShellRunner interface {
 	Run(cmd Command) error
 }
 
+type ShellError struct {
+	Command Command
+	Err error
+}
+
+func (e *ShellError) Error() string {
+	cmd := e.Command.PrettyFormat()
+	if exitErr, ok := e.Err.(*exec.ExitError); ok {
+		// Command exited non-zero
+		return fmt.Sprintf("Command exited with status %d: %q", exitErr.ExitCode(), cmd)
+	} else {
+		// Command failed to start for some reason
+		return fmt.Sprintf("Command %q failed to start: %v", cmd, e.Err)
+	}
+}
+
 type Command struct {
 	Prog string
 	Args []string
 	Dir  string
+}
+
+/* Convert command into simple string for easy inspection. Eg.
+&Command{
+  Prog: []string{"echo"},
+  Args: []string{"foo", "bar", "baz"},
+  Dir:  "/tmp",
+}
+->
+"echo foo bar baz"
+*/
+func (c *Command) PrettyFormat() string {
+	return strings.Join(append([]string{c.Prog}, c.Args...), " ")
 }
 
 type RealRunner struct{}
@@ -35,7 +66,7 @@ func (r *RealRunner) Run(cmd Command) error {
 	err := execCmd.Run()
 	if err != nil {
 		log.Error().Msgf("Command failed: %v", err)
-		return err
+		return &ShellError{Command: cmd, Err: err}
 	}
 
 	return nil

@@ -16,7 +16,7 @@ RUN mkdir -p /tools/bin
 ENV PATH="/tools/bin:${PATH}"
 
 # Copy compiled Go tools into /tools/bin directory
-COPY --from=${tools_image} /tools/bin /tools/bin
+COPY --from="${tools_image}" /tools/bin /tools/bin
 
 COPY entrypoint.sh /entrypoint.sh
 

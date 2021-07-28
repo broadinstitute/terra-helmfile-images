@@ -33,7 +33,7 @@ RUN apt-get update && \
 RUN mkdir -p /custom-tools/bin && chown -R argocd:argocd /custom-tools
 
 ## Copy Go tools such as `render`, `helm`, and `helmfile` into the /custom-tools/bin directory
-COPY --from=${tools_image} /tools/bin /custom-tools/bin
+COPY --from="${tools_image}" /tools/bin /custom-tools/bin
 
 ENV PATH="/custom-tools/bin:${PATH}"
 

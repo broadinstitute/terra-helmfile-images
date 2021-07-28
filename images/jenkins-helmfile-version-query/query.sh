@@ -28,4 +28,4 @@ curl --fail -L -sS \
   "https://api.github.com/repos/${REPO}/contents/${VERSIONS_FILE}" |\
   jq -r '.content' |\
   base64 -d |\
-  yq read - "releases.${APP}.appVersion" --exitStatus 1
+  yq --exit-status=1 e "releases.${APP}.appVersion" -

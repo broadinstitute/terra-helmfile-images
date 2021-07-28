@@ -140,10 +140,6 @@ jobs:
         run:  |
           set -eo pipefail
 
-          set -x
-          echo "NEEDS: ${{ needs.tools.outputs.test }}"
-          echo "NEEDS OUT: ${{ needs.tools.outputs }}"
-
           NAME="${{ needs.tools.outputs.image-base-url }}/${{ matrix.image-name }}"
           echo "::set-output name=name::${NAME}"
 

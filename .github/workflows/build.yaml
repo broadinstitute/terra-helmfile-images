@@ -74,7 +74,9 @@ jobs:
 
           NAME="${{ steps.vars.outputs.image-base-url }}/${IMAGE_NAME}"
           echo "::set-output name=name::${NAME}"
-          echo "::set-output name=tagged::${ NAME }:${{ steps.tags.outputs.long }}"
+
+          # Fully qualified image name + sha.
+          echo "::set-output name=tagged::${NAME}:${{ steps.tags.outputs.long }}"
 
       - name: Auth to GCP
         uses: google-github-actions/setup-gcloud@master

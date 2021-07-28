@@ -163,7 +163,7 @@ jobs:
             --build-arg argocd_version="${ARGOCD_VERSION}" \
             --build-arg vault_version="${VAULT_VERSION}" \
             -t "${{ steps.image-name.outputs.tagged }}" \
-            tools/
+            "./images/${{ matrix.image-name }}"
 
       - name: Run Trivy vulnerability scanner
         # From https://github.com/broadinstitute/dsp-appsec-trivy-action

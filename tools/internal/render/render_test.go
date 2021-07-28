@@ -142,6 +142,11 @@ func TestRender(t *testing.T) {
 			expectedError: regexp.MustCompile("--argocd cannot be used with --chart-dir, --chart-version, or --app-version"),
 		},
 		{
+			description:   "--stdout and --output-dir incompatible",
+			arguments:     args("-e dev -a leonardo -d /tmp/output --stdout"),
+			expectedError: regexp.MustCompile("--stdout cannot be used with -d/--output-dir"),
+		},
+		{
 			description: "incorrect environment should return error",
 			arguments:   args("-e foo"),
 			expectedCommands: []ExpectedCommand{

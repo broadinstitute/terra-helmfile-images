@@ -175,6 +175,11 @@ func setConfigRepoPath(options *Options) error {
 	}
 	options.ConfigRepoPath = configRepoPath
 
+	// Check --stdout was not used with --output-dir before setting default output dir
+	if options.Stdout && isSet(options.OutputDir) {
+		return fmt.Errorf("--stdout cannot be used with -d/--output-dir")
+	}
+
 	// If an explicit output dir was not set, default to $CONFIG_REPO_PATH/output
 	if !isSet(options.OutputDir) {
 		options.OutputDir = path.Join(configRepoPath, DefaultOutputDirName)

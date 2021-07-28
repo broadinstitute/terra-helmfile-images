@@ -118,6 +118,7 @@ jobs:
             "${{ steps.image-name.outputs.tagged }}" \
             "${{ steps.image-name.outputs.name }}:${{ steps.tags.outputs.branch }}"
   images:
+    runs-on: ubuntu-latest
     needs: tools # These images use compiled code from the tools image
     strategy:
       matrix:
@@ -127,12 +128,9 @@ jobs:
           - "jenkins-gke-deploy"
           - "jenkins-helmfile-version-query"
           - "render-action"
-    runs-on: ubuntu-latest
     env:
       ARGOCD_VERSION: "1.7.7"
       VAULT_VERSION: "1.1.0"
-    outputs:
-      image: ${{ steps.image-name.outputs.tagged }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v2

@@ -25,8 +25,7 @@ jobs:
         working-directory: ./tools
       - name: upload coverage
         uses: codecov/codecov-action@v1
-        working-directory: ./tools
         with:
-          files: ./cover.out
+          files: ./tools/cover.out
           flags: unittests
           fail_ci_if_error: true

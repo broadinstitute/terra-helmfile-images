@@ -71,11 +71,13 @@ func (r *Render) CleanOutputDirectory() error {
 		return nil
 	}
 
+	if _, err := os.Stat(r.options.OutputDir); os.IsNotExist(err) {
+		// Output dir does not exist, nothing to clean up
+		return nil
+	}
+
+	// Delete any files that exist inside the output directory.
 	log.Debug().Msgf("Cleaning output directory: %s", r.options.OutputDir)
-
-	os.MkdirAll(r.options.OutputDir, 0755)
-
-	// Call os.RemoveAll() on all the files inside the output directory.
 
 	// This code would be simpler if we could just call os.RemoveAll() on the
 	// output directory itself, but in some cases the output directory is a volume

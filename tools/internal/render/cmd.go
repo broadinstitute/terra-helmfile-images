@@ -144,6 +144,7 @@ func checkIncompatibleFlags(options *Options) error {
 			return fmt.Errorf("--chart-dir requires an app be specified with -a")
 		}
 
+		fmt.Sprintf("UHHHHHH WTF: %s", options.ChartDir)
 		if _, err := os.Stat(options.ChartDir); os.IsNotExist(err) {
 			return fmt.Errorf("chart directory does not exist: %s", options.ChartDir)
 		}

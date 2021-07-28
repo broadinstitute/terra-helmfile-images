@@ -141,14 +141,14 @@ jobs:
           set -eo pipefail
 
           set -x
-          echo "NEEDS: ${{ needs.jobs.tools.outputs.test }}"
-          echo "NEEDS OUT: ${{ needs.jobs.tools.outputs }}"
+          echo "NEEDS: ${{ needs.tools.outputs.test }}"
+          echo "NEEDS OUT: ${{ needs.tools.outputs }}"
 
-          NAME="${{ needs.jobs.tools.outputs.image-base-url }}/${{ matrix.image-name }}"
+          NAME="${{ needs.tools.outputs.image-base-url }}/${{ matrix.image-name }}"
           echo "::set-output name=name::${NAME}"
 
           # Fully qualified image name + sha.
-          echo "::set-output name=tagged::${NAME}:${{ needs.jobs.tools.outputs.tag-long }}"
+          echo "::set-output name=tagged::${NAME}:${{ needs.tools.outputs.tag-long }}"
 
       - name: Auth to GCP
         uses: google-github-actions/setup-gcloud@master
@@ -163,7 +163,7 @@ jobs:
       - name: Build image
         run: |
           docker build \
-            --build-arg tools_image="${{ needs.jobs.tools.outputs.image }}" \
+            --build-arg tools_image="${{ needs.tools.outputs.image }}" \
             --build-arg argocd_version="${ARGOCD_VERSION}" \
             --build-arg vault_version="${VAULT_VERSION}" \
             -t "${{ steps.image-name.outputs.tagged }}" \
@@ -184,9 +184,9 @@ jobs:
           # Add short-sha tag. Eg. "my-pr-branch-294fa23"
           gcloud artifacts docker tags add \
             "${{ steps.image-name.outputs.tagged }}" \
-            "${{ steps.image-name.outputs.name }}:${{ needs.jobs.tools.outputs.tag-short }}"
+            "${{ steps.image-name.outputs.name }}:${{ needs.tools.outputs.tag-short }}"
 
           # Add branch tag. Eg. "my-pr-branch"
           gcloud artifacts docker tags add \
             "${{ steps.image-name.outputs.tagged }}" \
-            "${{ steps.image-name.outputs.name }}:${{ needs.jobs.tools.outputs.tag-branch }}"
+            "${{ steps.image-name.outputs.name }}:${{ needs.tools.outputs.tag-branch }}"

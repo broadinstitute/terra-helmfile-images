@@ -97,8 +97,7 @@ jobs:
         # From https://github.com/broadinstitute/dsp-appsec-trivy-action
         uses: broadinstitute/dsp-appsec-trivy-action@v1
         with:
-          image: ""${{ steps.image-name.outputs.tagged }}""
-
+          image: "${{ steps.image-name.outputs.tagged }}"
 
       - name: Push image
         run: |

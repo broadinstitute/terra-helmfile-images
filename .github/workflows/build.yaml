@@ -46,7 +46,7 @@ jobs:
           BRANCH_NAME=
           if [[ $GITHUB_EVENT_NAME == "pull_request" ]]; then
             BRANCH_NAME=$GITHUB_HEAD_REF
-          elif [[ -n "${GITHUB_REF}" ]]
+          elif [[ -n "${GITHUB_REF}" ]]; then
             BRANCH_NAME=${GITHUB_REF#refs/heads/}
           else
             echo "Could not identify branch name!" >&2

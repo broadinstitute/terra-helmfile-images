@@ -31,7 +31,7 @@ jobs:
       tag-short:      ${{ steps.tags.outputs.short }}
       tag-long:       ${{ steps.tags.outputs.long }}
       image-base-url: ${{ steps.vars.outputs.image-base-url }}
-      image-url:      ${{ steps.image-url.outputs.image-url }}
+      image-name:      ${{ steps.image-name.outputs.name }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -41,13 +41,19 @@ jobs:
         run:  |
           set -eo pipefail
 
-          set -x
-          echo $GITHUB_REF
-          git status
-          git branch
-          git rev-parse --abbrev-ref HEAD
+          # Identify Git branch
+          # https://docs.github.com/en/actions/reference/environment-variables#default-environment-variables
+          BRANCH_NAME=
+          if [[ $GITHUB_EVENT_NAME == "pull_request" ]]; then
+            BRANCH_NAME=$GITHUB_HEAD_REF
+          elif [[ -n "${GITHUB_REF}" ]]
+            BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          else
+            echo "Could not identify branch name!" >&2
+            exit 1
+          fi
 
-          echo "::set-output name=branch::$( git rev-parse --abbrev-ref HEAD )"
+          echo "::set-output name=branch::${BRANCH_NAME}"
           echo "::set-output name=long-sha::$( git rev-parse HEAD )"
           echo "::set-output name=short-sha::$( git rev-parse --short HEAD )"
           echo "::set-output name=image-base-url::${GOOGLE_DOCKER_REPOSITORY}/${GOOGLE_PROJECT}/${IMAGE_REPOSITORY_NAME}"
@@ -66,9 +72,7 @@ jobs:
         run:  |
           set -eo pipefail
 
-          echo "::set-output name=name::${{ steps.vars.outputs.image-base-url }}/${IMAGE_NAME}:${{ steps.tags.outputs.long }}"
-          echo "::set-output name=alias-branch::${{ steps.vars.outputs.image-base-url }}/${IMAGE_NAME}:${{ steps.tags.outputs.branch }}"
-          echo "::set-output name=alias-short::${{ steps.vars.outputs.image-base-url }}/${IMAGE_NAME}:${{ steps.tags.outputs.short }}"
+          echo "::set-output name=name::${{ steps.vars.outputs.image-base-url }}/${IMAGE_NAME}"
 
       - name: Auth to GCP
         uses: google-github-actions/setup-gcloud@master
@@ -84,8 +88,9 @@ jobs:
         run: |
           docker build \
             -t ${{ steps.image-name.outputs.name }} \
-            -t ${{ steps.image-name.outputs.alias-short }} \
-            -t ${{ steps.image-name.outputs.alias-branch }} \
+            -t ${{ steps.image-name.outputs.name }}/${{ steps.tags.outputs.long }} \
+            -t ${{ steps.image-name.outputs.name }}/${{ steps.tags.outputs.short }} \
+            -t ${{ steps.image-name.outputs.name }}/${{ steps.tags.outputs.branch }} \
             tools/
 
       - name: Run Trivy vulnerability scanner

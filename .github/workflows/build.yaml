@@ -27,6 +27,7 @@ jobs:
     env:
       IMAGE_NAME: tools
     outputs:
+      test: foo
       tag-branch:     ${{ steps.tags.outputs.branch }}
       tag-short:      ${{ steps.tags.outputs.short }}
       tag-long:       ${{ steps.tags.outputs.long }}
@@ -140,6 +141,10 @@ jobs:
         id:   image-name
         run:  |
           set -eo pipefail
+
+          set -x
+          echo "NEEDS: ${{ needs.jobs.tools.outputs.test }}"
+          echo "NEEDS OUT: ${{ needs.jobs.tools.outputs }}"
 
           NAME="${{ needs.jobs.tools.outputs.image-base-url }}/${{ matrix.image-name }}"
           echo "::set-output name=name::${NAME}"

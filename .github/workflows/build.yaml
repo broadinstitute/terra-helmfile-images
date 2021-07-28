@@ -87,11 +87,17 @@ jobs:
       - name: Build image
         run: |
           docker build \
-            -t ${{ steps.image-name.outputs.name }} \
-            -t ${{ steps.image-name.outputs.name }}/${{ steps.tags.outputs.long }} \
-            -t ${{ steps.image-name.outputs.name }}/${{ steps.tags.outputs.short }} \
-            -t ${{ steps.image-name.outputs.name }}/${{ steps.tags.outputs.branch }} \
+            -t "${{ steps.image-name.outputs.name }}" \
             tools/
+
+          docker tag "${{ steps.image-name.outputs.name }}" \
+            "${{ steps.image-name.outputs.name }}/${{ steps.tags.outputs.long }}"
+
+          docker tag "${{ steps.image-name.outputs.name }}" \
+            "${{ steps.image-name.outputs.name }}/${{ steps.tags.outputs.short }}"
+
+          docker tag "${{ steps.image-name.outputs.name }}" \
+            "${{ steps.image-name.outputs.name }}/${{ steps.tags.outputs.branch }}"
 
       - name: Run Trivy vulnerability scanner
         # From https://github.com/broadinstitute/dsp-appsec-trivy-action

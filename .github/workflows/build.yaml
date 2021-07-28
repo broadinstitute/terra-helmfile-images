@@ -31,7 +31,7 @@ jobs:
       tag-short:      ${{ steps.tags.outputs.short }}
       tag-long:       ${{ steps.tags.outputs.long }}
       image-base-url: ${{ steps.vars.outputs.image-base-url }}
-      image-name:      ${{ steps.image-name.outputs.name }}
+      image:          ${{ steps.image-name.outputs.tagged }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -72,7 +72,9 @@ jobs:
         run:  |
           set -eo pipefail
 
-          echo "::set-output name=name::${{ steps.vars.outputs.image-base-url }}/${IMAGE_NAME}"
+          NAME=${{ steps.vars.outputs.image-base-url }}/${IMAGE_NAME}
+          echo "::set-output name=name::${NAME}"
+          echo "::set-output name=tagged::${{ NAME }}:${steps.tags.outputs.long}"
 
       - name: Auth to GCP
         uses: google-github-actions/setup-gcloud@master
@@ -87,23 +89,29 @@ jobs:
       - name: Build image
         run: |
           docker build \
-            -t "${{ steps.image-name.outputs.name }}" \
+            -t "${{ steps.image-name.outputs.tagged }}" \
             tools/
 
-          docker tag "${{ steps.image-name.outputs.name }}" \
-            "${{ steps.image-name.outputs.name }}/${{ steps.tags.outputs.long }}"
-
-          docker tag "${{ steps.image-name.outputs.name }}" \
-            "${{ steps.image-name.outputs.name }}/${{ steps.tags.outputs.short }}"
-
-          docker tag "${{ steps.image-name.outputs.name }}" \
-            "${{ steps.image-name.outputs.name }}/${{ steps.tags.outputs.branch }}"
 
       - name: Run Trivy vulnerability scanner
         # From https://github.com/broadinstitute/dsp-appsec-trivy-action
         uses: broadinstitute/dsp-appsec-trivy-action@v1
         with:
-          image: ${{ steps.image-name.outputs.name  }}
+          image: ""${{ steps.image-name.outputs.tagged }}""
+
 
       - name: Push image
-        run: "docker push --all-tags ${{ steps.image-name.outputs.name }}"
+        run: |
+          set -eo pipefail
+
+          docker push "${{ steps.image-name.outputs.tagged }}"
+
+          # Add short-sha tag. Eg. "my-pr-branch-294fa23"
+          gcloud artifacts docker tags add \
+            "${{ steps.image-name.outputs.tagged }}" \
+            "${{ steps.image-name.outputs.name }}:${{ steps.tags.outputs.short }}"
+
+          # Add branch tag. Eg. "my-pr-branch"
+          gcloud artifacts docker tags add \
+            "${{ steps.image-name.outputs.tagged }}" \
+            "${{ steps.image-name.outputs.name }}:${{ steps.tags.outputs.long }}"

@@ -25,5 +25,5 @@ fi
 mkdir -p "$outdir"
 render="/tools/bin/render"
 
-TERRA_HELMFILE_PATH="${srcdir}"
-$render $env --output-dir="${outdir}" $argomode
+export TERRA_HELMFILE_PATH="${srcdir}"
+/tools/bin/render $env --output-dir="${outdir}" $argomode

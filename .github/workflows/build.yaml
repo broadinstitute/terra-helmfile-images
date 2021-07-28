@@ -39,8 +39,8 @@ jobs:
       - name: Set variables
         id:   vars
         run:  |
-          echo "::set-output name=branch::$(echo ${GITHUB_REF#refs/heads/})"
-          echo "::set-output name=long-sha::${github_sha}"
+          echo "::set-output name=branch::${GITHUB_REF#refs/*/}"
+          echo "::set-output name=long-sha::${github.sha}"
           echo "::set-output name=short-sha::$(git rev-parse --short HEAD)"
           echo "::set-output name=image-base-url::${GOOGLE_DOCKER_REPOSITORY}/${GOOGLE_PROJECT}/${IMAGE_REPOSITORY_NAME}"
 

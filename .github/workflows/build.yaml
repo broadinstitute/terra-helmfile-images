@@ -72,9 +72,9 @@ jobs:
         run:  |
           set -eo pipefail
 
-          NAME=${{ steps.vars.outputs.image-base-url }}/${IMAGE_NAME}
+          NAME="${{ steps.vars.outputs.image-base-url }}/${IMAGE_NAME}"
           echo "::set-output name=name::${NAME}"
-          echo "::set-output name=tagged::${{ NAME }}:${steps.tags.outputs.long}"
+          echo "::set-output name=tagged::${ NAME }:${{ steps.tags.outputs.long }}"
 
       - name: Auth to GCP
         uses: google-github-actions/setup-gcloud@master
@@ -113,4 +113,4 @@ jobs:
           # Add branch tag. Eg. "my-pr-branch"
           gcloud artifacts docker tags add \
             "${{ steps.image-name.outputs.tagged }}" \
-            "${{ steps.image-name.outputs.name }}:${{ steps.tags.outputs.long }}"
+            "${{ steps.image-name.outputs.name }}:${{ steps.tags.outputs.branch }}"

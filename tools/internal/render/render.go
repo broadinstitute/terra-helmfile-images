@@ -3,6 +3,7 @@ package render
 import (
 	"fmt"
 	"github.com/rs/zerolog/log"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -71,7 +72,30 @@ func (r *Render) CleanOutputDirectory() error {
 	}
 
 	log.Debug().Msgf("Cleaning output directory: %s", r.options.OutputDir)
-	return os.RemoveAll(r.options.OutputDir)
+
+	os.MkdirAll(r.options.OutputDir, 0755)
+
+	// Call os.RemoveAll() on all the files inside the output directory.
+
+	// This code would be simpler if we could just call os.RemoveAll() on the
+	// output directory itself, but in some cases the output directory is a volume
+	// mount, and trying to remove it throws an error.
+	dir, err := ioutil.ReadDir(r.options.OutputDir)
+	if err != nil {
+		return err
+	}
+
+	for _, file := range dir {
+		filePath := path.Join([]string{ r.options.OutputDir, file.Name() }...)
+		log.Debug().Msgf("Deleting %s", filePath)
+
+		err = os.RemoveAll(filePath)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 /* Update Helm repos */

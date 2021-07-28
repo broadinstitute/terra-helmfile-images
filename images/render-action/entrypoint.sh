@@ -4,8 +4,8 @@ set -eo pipefail
 
 # Render manifests
 
-if [[ $# -lt 1 ]]; then
-  echo "Error: render_all expects 1 argument, got $#" >&2
+if [[ $# -lt 2 ]]; then
+  echo "Error: render expects 2+ arguments, got $#" >&2
   return 1
 fi
 
@@ -15,7 +15,7 @@ env=
 srcdir="$1"
 outdir="$2"
 
-# Render ArgoCD manifests 
+# Render ArgoCD manifests
 if [[ "$3" == "true" ]]; then
   argomode="--argocd"
 fi
@@ -23,6 +23,6 @@ if [[ -n "$4" ]]; then
   env="-e ${4}"
 fi
 mkdir -p "$outdir"
-render="${srcdir}/bin/render"
+render="/tools/bin/render"
 
 $render $env --output-dir="${outdir}" $argomode

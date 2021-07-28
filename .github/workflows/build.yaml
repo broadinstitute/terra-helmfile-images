@@ -1,22 +1,10 @@
-name: Build Publish Docker Images
+name: Build and Publish Docker Images
 # The purpose of the workflow is to build docker images and publish to GCR.
 #
 # Docker image builds are assigned the following image tags:
 # - ${BRANCH}               # Eg. "main"
 # - ${BRANCH}-${SHORT_SHA}  # Eg. "main-92735c1"
 # - ${BRANCH}-${LONG_SHA}   # Eg. "main-92735c1ccef29bfb659fd848bd3e0f084831a2de"
-
-#
-# When run on merge to main, it tags and bumps the patch version by default. You can
-# bump other parts of the version by putting #major, #minor, or #patch in your commit
-# message.
-#
-# When run on a PR, it simulates bumping the tag and appends a hash to the pushed image.
-#
-# The workflow relies on github secrets:
-# - GCP_PUBLISH_EMAIL - SA email for publishing to dsp-artifact-registry
-# - GCP_PUBLISH_KEY_B64 - SA key (Base64-encoded JSON string) for publishing to dsp-artifact-registry
-# - BROADBOT_TOKEN - the broadbot token, so we can avoid two reviewer rule on GHA operations
 on:
   pull_request:
     paths-ignore:

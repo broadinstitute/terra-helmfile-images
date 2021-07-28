@@ -1,9 +1,8 @@
 # Container image that runs your code
 FROM alpine:3
 
-# These are specified in cloudbuild.yaml
-ARG helmfile_version
-ARG helm_version
+# Specified in .github/workflows/build.yaml
+ARG tools_image
 
 # Add required OS packages
 # needed for entrypoint.sh
@@ -17,7 +16,7 @@ RUN mkdir -p /tools/bin
 ENV PATH="/tools/bin:${PATH}"
 
 # Copy compiled Go tools into /tools/bin directory
-COPY --from=tools-local /tools/bin /tools/bin
+COPY --from=${tools_image} /tools/bin /tools/bin
 
 COPY entrypoint.sh /entrypoint.sh
 

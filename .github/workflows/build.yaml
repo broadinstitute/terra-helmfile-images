@@ -116,3 +116,74 @@ jobs:
           gcloud artifacts docker tags add \
             "${{ steps.image-name.outputs.tagged }}" \
             "${{ steps.image-name.outputs.name }}:${{ steps.tags.outputs.branch }}"
+  images:
+    needs: tools # These images use compiled code from the tools image
+    strategy:
+      matrix:
+        image-name:
+          - "argocd-custom-image"
+          - "env-diff-action"
+          - "jenkins-gke-deploy"
+          - "jenkins-helmfile-version-query"
+          - "render-action"
+    runs-on: ubuntu-latest
+    env:
+      ARGOCD_VERSION: "1.7.7"
+      VAULT_VERSION: "1.1.0"
+    outputs:
+      image: ${{ steps.image-name.outputs.tagged }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set image name
+        id:   image-name
+        run:  |
+          set -eo pipefail
+
+          NAME="${{ jobs.tools.outputs.image-base-url }}/${{ matrix.image-name }}"
+          echo "::set-output name=name::${NAME}"
+
+          # Fully qualified image name + sha.
+          echo "::set-output name=tagged::${NAME}:${{ jobs.tools.outputs.tag-long }}"
+
+      - name: Auth to GCP
+        uses: google-github-actions/setup-gcloud@master
+        with:
+          version: '345.0.0'
+          service_account_email: ${{ secrets.GCP_PUBLISH_EMAIL }}
+          service_account_key:   ${{ secrets.GCP_PUBLISH_KEY_B64 }}
+
+      - name: Explicitly auth Docker for Artifact Registry
+        run: gcloud auth configure-docker $GOOGLE_DOCKER_REPOSITORY --quiet
+
+      - name: Build image
+        run: |
+          docker build \
+            --build-arg tools_image="${{ jobs.tools.outputs.image }}" \
+            --build-arg argocd_version="${ARGOCD_VERSION}" \
+            --build-arg vault_version="${VAULT_VERSION}" \
+            -t "${{ steps.image-name.outputs.tagged }}" \
+            tools/
+
+      - name: Run Trivy vulnerability scanner
+        # From https://github.com/broadinstitute/dsp-appsec-trivy-action
+        uses: broadinstitute/dsp-appsec-trivy-action@v1
+        with:
+          image: "${{ steps.image-name.outputs.tagged }}"
+
+      - name: Push image
+        run: |
+          set -eo pipefail
+
+          docker push "${{ steps.image-name.outputs.tagged }}"
+
+          # Add short-sha tag. Eg. "my-pr-branch-294fa23"
+          gcloud artifacts docker tags add \
+            "${{ steps.image-name.outputs.tagged }}" \
+            "${{ steps.image-name.outputs.name }}:${{ jobs.tools.outputs.tag-short }}"
+
+          # Add branch tag. Eg. "my-pr-branch"
+          gcloud artifacts docker tags add \
+            "${{ steps.image-name.outputs.tagged }}" \
+            "${{ steps.image-name.outputs.name }}:${{ jobs.tools.outputs.tag-branch }}"

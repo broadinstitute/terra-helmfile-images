@@ -1,6 +1,6 @@
 FROM alpine:3.11.5
 
-# These are specified in cloudbuild.yaml
+# Specified in .github/workflows/build.yaml
 ARG argocd_version
 ARG vault_version
 ARG os=linux

@@ -3,6 +3,8 @@ ARG argocd_version
 
 FROM argoproj/argocd:v${argocd_version}
 
+# Specified in .github/workflows/build.yaml
+ARG tools_image
 ARG argocd_version
 ARG vault_version
 
@@ -30,16 +32,13 @@ RUN apt-get update && \
 # Create tools directory
 RUN mkdir -p /custom-tools/bin && chown -R argocd:argocd /custom-tools
 
-# Copy compiled Go tools into /custom-tools/bin directory
-COPY --from=tools-local /tools/bin /custom-tools/bin
+## Copy Go tools such as `render`, `helm`, and `helmfile` into the /custom-tools/bin directory
+COPY --from=${tools_image} /tools/bin /custom-tools/bin
 
 ENV PATH="/custom-tools/bin:${PATH}"
 
 # Switch back to non-root user
 USER argocd
-
-## Copy Go tools such as `render`, `helm`, and `helmfie` into the /custom-tools/bin directory
-COPY --from=tools-local /tools/bin /custom-tools/bin
 
 ## Install dependencies for the `legacy-configs` plugin
 # (aka the firecloud-develop ctmpl rendering process)

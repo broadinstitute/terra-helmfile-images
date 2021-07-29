@@ -13,9 +13,9 @@ if [[ -z "${OUTPUT_DIR}" ]]; then
   exit 1
 fi
 
-argomode=
-if [[ -n "${ARGOCD_MODE}" ]]; then
-  argomode="--argocd"
+argocd=
+if [[ "${ARGOCD_MODE}" == "true" ]]; then
+  argocd="--argocd"
 fi
 
 env=
@@ -24,4 +24,4 @@ if [[ -n "${TERRA_ENV}" ]]; then
 fi
 
 set -x
-/tools/bin/render --output-dir="${OUTPUT_DIR}" $env $argomode
+/tools/bin/render --output-dir="${OUTPUT_DIR}" $env $argocd

@@ -2,28 +2,26 @@
 
 set -eo pipefail
 
-# Render manifests
+# This variable is expected by the render tool
+if [[ -z "${TERRA_HELMFILE_PATH}" ]]; then
+  echo "${TERRA_HELMFILE_PATH} is required" >&2
+  exit 1
+fi
 
-if [[ $# -lt 2 ]]; then
-  echo "Error: render expects 2+ arguments, got $#" >&2
-  return 1
+if [[ -z "${OUTPUT_DIR}" ]]; then
+  echo "${OUTPUT_DIR} is required" >&2
+  exit 1
 fi
 
 argomode=
-env=
-
-srcdir="$1"
-outdir="$2"
-
-# Render ArgoCD manifests
-if [[ "$3" == "true" ]]; then
+if [[ -n "${ARGOCD_MODE}" ]]; then
   argomode="--argocd"
 fi
-if [[ -n "$4" ]]; then
-  env="-e ${4}"
-fi
-mkdir -p "$outdir"
-render="/tools/bin/render"
 
-export TERRA_HELMFILE_PATH="${srcdir}"
-/tools/bin/render $env --output-dir="${outdir}" $argomode
+env=
+if [[ -n "${TERRA_ENV}" ]]; then
+  env="-e ${TERRA_ENV}"
+fi
+
+
+/tools/bin/render --output-dir="${RENDER_OUTPUT_DIR}" $env $argomode

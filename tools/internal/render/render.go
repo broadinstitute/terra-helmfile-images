@@ -203,6 +203,9 @@ func (r *Render) renderSingleEnvironment(env Environment) error {
 	}
 
 	if !r.options.Stdout {
+		// Expand output dir to absolute path, because Helmfile assumes paths
+		// are relative to helmfile.yaml and we want to be relative to CWD
+		// filepath.Abs()
 		args = append(args, fmt.Sprintf("--output-dir=%s/%s", r.options.OutputDir, env.name))
 	}
 

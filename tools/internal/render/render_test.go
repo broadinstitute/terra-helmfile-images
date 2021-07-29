@@ -124,7 +124,7 @@ func TestRender(t *testing.T) {
 		{
 			description:   "--chart-dir must exist",
 			arguments:     args("-e dev -a leonardo --chart-dir path/to/nowhere"),
-			expectedError: regexp.MustCompile("chart directory does not exist: path/to/nowhere"),
+			expectedError: regexp.MustCompile("chart directory does not exist: .*/path/to/nowhere"),
 		},
 		{
 			description:   "--argocd and --app-version incompatible",
@@ -266,7 +266,7 @@ func TestRender(t *testing.T) {
 			arguments:   args("-e jdoe -d path/to/nowhere"),
 			expectedCommands: []ExpectedCommand{
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
-				ts.cmd("helmfile --log-level=info -e jdoe --selector=group=terra template --skip-deps --output-dir=path/to/nowhere/jdoe"),
+				ts.cmd("helmfile --log-level=info -e jdoe --selector=group=terra template --skip-deps --output-dir=%s/path/to/nowhere/jdoe", cwd()),
 			},
 		},
 	}
@@ -357,6 +357,17 @@ Eg. args("-e   %s", "dev") -> []string{"-e", "dev"}
 func args(format string, a ...interface{}) []string {
 	formatted := fmt.Sprintf(format, a...)
 	return strings.Fields(formatted)
+}
+
+/*
+Convenience function to return current working directory
+ */
+func cwd() string {
+	dir, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+	return dir
 }
 
 /*

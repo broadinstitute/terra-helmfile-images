@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"os"
 	"path"
+	"path/filepath"
 )
 
 /*
@@ -83,7 +84,7 @@ $0 -e alpha -a cromwell --argocd
 				return fmt.Errorf("expected no positional arguments, got %v", args)
 			}
 
-			if err := setConfigRepoPath(options); err != nil {
+			if err := normalizePaths(options); err != nil {
 				return err
 			}
 			if err := checkIncompatibleFlags(options); err != nil {
@@ -143,10 +144,6 @@ func checkIncompatibleFlags(options *Options) error {
 		if !isSet(options.App) {
 			return fmt.Errorf("--chart-dir requires an app be specified with -a")
 		}
-
-		if _, err := os.Stat(options.ChartDir); os.IsNotExist(err) {
-			return fmt.Errorf("chart directory does not exist: %s", options.ChartDir)
-		}
 	}
 
 	if isSet(options.ChartVersion) && !isSet(options.App) {
@@ -166,8 +163,8 @@ func checkIncompatibleFlags(options *Options) error {
 	return nil
 }
 
-/* Populate options.ConfigRepoPath and options.OutputDir from environment variable */
-func setConfigRepoPath(options *Options) error {
+/* Normalize and validate path arguments */
+func normalizePaths(options *Options) error {
 	// We require configRepoPath to be set via environment variable
 	configRepoPath, defined := os.LookupEnv(ConfigRepoPathEnvVar)
 	if !defined {
@@ -175,15 +172,37 @@ func setConfigRepoPath(options *Options) error {
 	}
 	options.ConfigRepoPath = configRepoPath
 
-	// Check --stdout was not used with --output-dir before setting default output dir
-	if options.Stdout && isSet(options.OutputDir) {
-		return fmt.Errorf("--stdout cannot be used with -d/--output-dir")
+	// Expand relative path arguments to absolute paths.
+	// This is because Helmfile assumes paths are relative to helmfile.yaml
+	// and we want them to be relative to CWD.
+	var err error
+
+	if isSet(options.ChartDir) {
+		if options.ChartDir, err = filepath.Abs(options.ChartDir); err != nil {
+			return err
+		}
+		if _, err = os.Stat(options.ChartDir); os.IsNotExist(err) {
+			return fmt.Errorf("chart directory does not exist: %s", options.ChartDir)
+		}
 	}
 
-	// If an explicit output dir was not set, default to $CONFIG_REPO_PATH/output
+	if options.Stdout {
+		if isSet(options.OutputDir) {
+			return fmt.Errorf("--stdout cannot be used with -d/--output-dir")
+		} else {
+			return nil
+		}
+	}
+
+	// --stdout is not set, so set default output directory $CONFIG_REPO_PATH/output
+	// if a custom output dir was not specified on the command-line
 	if !isSet(options.OutputDir) {
 		options.OutputDir = path.Join(configRepoPath, DefaultOutputDirName)
 		log.Debug().Msgf("Using default output dir %s", options.OutputDir)
+	}
+
+	if options.OutputDir, err = filepath.Abs(options.OutputDir); err != nil {
+		return err
 	}
 
 	return nil

@@ -71,7 +71,6 @@ merge_manifests(){
     rm -rf "${argo_manifest_dir}"
 }
 
-# Render manifests
 mkdir -p merged/{master,pr}
 
 merge_manifests "${MASTER_SRC}" "merged/master"

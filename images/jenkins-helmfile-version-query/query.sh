@@ -22,10 +22,11 @@ if [[ -z "${GITHUB_TOKEN}" ]]; then
   exit 1
 fi
 
+set -x
 curl --fail -L -sS \
   -H "Accept: application/vnd.github.v3+json" \
   -H "Authorization: token ${GITHUB_TOKEN}" \
   "https://api.github.com/repos/${REPO}/contents/${VERSIONS_FILE}" |\
   jq -r '.content' |\
-  base64 -d |\
-  yq read - "releases.${APP}.appVersion" --exitStatus 1
+  base64 -d  |\
+  yq --exit-status=1 e ".releases.${APP}.appVersion" -

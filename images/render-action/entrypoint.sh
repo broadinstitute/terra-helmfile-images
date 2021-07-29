@@ -24,4 +24,4 @@ if [[ -n "${TERRA_ENV}" ]]; then
 fi
 
 set -x
-/tools/bin/render --output-dir="${RENDER_OUTPUT_DIR}" $env $argomode
+/tools/bin/render --output-dir="${OUTPUT_DIR}" $env $argomode

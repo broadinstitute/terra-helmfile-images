@@ -23,5 +23,5 @@ if [[ -n "${TERRA_ENV}" ]]; then
   env="-e ${TERRA_ENV}"
 fi
 
-
+set -x
 /tools/bin/render --output-dir="${RENDER_OUTPUT_DIR}" $env $argomode

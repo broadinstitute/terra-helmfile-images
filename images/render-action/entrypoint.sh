@@ -24,4 +24,5 @@ if [[ -n "${TERRA_ENV}" ]]; then
 fi
 
 set -x
+echo "Running render in $( pwd )"
 /tools/bin/render --output-dir="${OUTPUT_DIR}" $env $argocd

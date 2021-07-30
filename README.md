@@ -1,7 +1,7 @@
 # terra-helmfile-images
 
 [![codecov](https://codecov.io/gh/broadinstitute/terra-helmfile-images/branch/main/graph/badge.svg?token=QYQHL6UE6Y)](https://codecov.io/gh/broadinstitute/terra-helmfile-images)
-[![Go Report Card](https://goreportcard.com/badge/broadinstitute/terra-helmfile-images/tools](https://goreportcard.com/report/broadinstitute/terra-helmfile-images/tools)
+[![Go Report Card](https://goreportcard.com/badge/github.com/broadinstitute/terra-helmfile-images/tools](https://goreportcard.com/report/github.com/broadinstitute/terra-helmfile-images/tools)
 
 This repository contains accessory tooling for the [terra-helmfile repo](https://github.com/broadinstitute/terra-helmfile). It includes:
 * Golang source code for various utilities for rendering manifests and publishing charts (see `tools/` subdirectory)

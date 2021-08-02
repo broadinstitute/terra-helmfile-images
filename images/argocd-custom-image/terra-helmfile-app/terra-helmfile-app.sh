@@ -32,7 +32,8 @@ elif [[ "$1" == 'generate' ]]; then
     args+=( --chart-version "${TERRA_CHART_VERSION}" )
   fi
 
-  render -e "${TERRA_ENV}" -a "${TERRA_APP}" "${args[@]}"
+  export TERRA_HELMFILE_PATH=$( pwd )
+  render --stdout -e "${TERRA_ENV}" -a "${TERRA_APP}" "${args[@]}"
 else
   echo "Usage: ${0} (init|generate)" >&2
   exit 1

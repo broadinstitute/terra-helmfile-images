@@ -33,7 +33,7 @@ elif [[ "$1" == 'generate' ]]; then
   fi
 
   export TERRA_HELMFILE_PATH=$( pwd )
-  render -e "${TERRA_ENV}" -a "${TERRA_APP}" "${args[@]}"
+  render --stdout -e "${TERRA_ENV}" -a "${TERRA_APP}" "${args[@]}"
 else
   echo "Usage: ${0} (init|generate)" >&2
   exit 1

@@ -63,6 +63,9 @@ $0 -e alpha -a cromwell --chart-version="~> 0.8" --app-version="53-9b11416"
 # Render manifests from a local copy of a chart
 $0 -e alpha -a cromwell --chart-dir=../terra-helm/charts
 
+# Render manifests, overriding chart values with a local file
+$0 -e alpha -a cromwell --values-file=path/to/my-values.yaml
+
 # Render all manifests to a directory called my-manifests
 $0 --output-dir=/tmp/my-manifests
 
@@ -73,21 +76,21 @@ $0 --argocd
 $0 -e alpha -a cromwell --argocd
 `,
 		// Only print out usage error when user supplies -h/--help
-	    SilenceUsage: true,
+		SilenceUsage: true,
 
-	    // Don't print errors, we do it ourselves using a logging library
+		// Don't print errors, we do it ourselves using a logging library
 		SilenceErrors: true,
 
-	    // Main body of the command
+		// Main body of the command
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 0 {
 				return fmt.Errorf("expected no positional arguments, got %v", args)
 			}
 
-			if err := normalizePaths(options); err != nil {
+			if err := checkIncompatibleFlags(options); err != nil {
 				return err
 			}
-			if err := checkIncompatibleFlags(options); err != nil {
+			if err := normalizePaths(options); err != nil {
 				return err
 			}
 			adjustLoggingVerbosity(options.Verbose)
@@ -110,14 +113,15 @@ $0 -e alpha -a cromwell --argocd
 		},
 	}
 
-	cobraCommand.Flags().StringVarP(&options.App, "app", "a", optionUnset, "Render manifests for a specific Terra application only")
 	cobraCommand.Flags().StringVarP(&options.Env, "env", "e", optionUnset, "Render manifests for a specific Terra environment only")
+	cobraCommand.Flags().StringVarP(&options.App, "app", "a", optionUnset, "Render manifests for a specific Terra application only")
 	cobraCommand.Flags().StringVar(&options.ChartVersion, "chart-version", optionUnset, "Override chart version")
 	cobraCommand.Flags().StringVar(&options.ChartDir, "chart-dir", optionUnset, "Render from local chart directory instead of official release")
 	cobraCommand.Flags().StringVar(&options.AppVersion, "app-version", optionUnset, "Override application version")
+	cobraCommand.Flags().StringSliceVar(&options.ValuesFiles, "values-file", []string{}, "Path to chart values file. Can be specified multiple times with ascending precedence (last wins)")
+	cobraCommand.Flags().BoolVar(&options.ArgocdMode, "argocd", false, "Render ArgoCD manifests instead of application manifests")
 	cobraCommand.Flags().StringVarP(&options.OutputDir, "output-dir", "d", optionUnset, "Render manifests to custom output directory")
 	cobraCommand.Flags().BoolVar(&options.Stdout, "stdout", false, "Render manifests to stdout instead of output directory")
-	cobraCommand.Flags().BoolVar(&options.ArgocdMode, "argocd", false, "Render ArgoCD manifests instead of application manifests")
 	cobraCommand.Flags().CountVarP(&options.Verbose, "verbose", "v", "Verbose logging. Can be specified multiple times")
 
 	return cobraCommand
@@ -154,58 +158,40 @@ func checkIncompatibleFlags(options *Options) error {
 		return fmt.Errorf("--app-version requires an app be specified with -a")
 	}
 
+	if len(options.ValuesFiles) > 0 && !isSet(options.App) {
+		return fmt.Errorf("--values-file requires an app be specified with -a")
+	}
+
 	if options.ArgocdMode {
-		if isSet(options.ChartDir) || isSet(options.ChartVersion) || isSet(options.AppVersion) {
-			return fmt.Errorf("--argocd cannot be used with --chart-dir, --chart-version, or --app-version")
+		if isSet(options.ChartDir) || isSet(options.ChartVersion) || isSet(options.AppVersion) || len(options.ValuesFiles) != 0 {
+			return fmt.Errorf("--argocd cannot be used with --chart-dir, --chart-version, --app-version, or --values-file")
 		}
 	}
 
 	return nil
 }
 
-/* Normalize and validate path arguments */
+/*
+Normalize and validate path arguments.
+*/
 func normalizePaths(options *Options) error {
-	// We require configRepoPath to be set via environment variable
-	configRepoPath, defined := os.LookupEnv(ConfigRepoPathEnvVar)
-	if !defined {
-		return fmt.Errorf("please specify path to %s clone via the environment variable %s", ConfigRepoName, ConfigRepoPathEnvVar)
-	}
-	options.ConfigRepoPath = configRepoPath
-
-	// Expand relative path arguments to absolute paths.
-	// This is because Helmfile assumes paths are relative to helmfile.yaml
-	// and we want them to be relative to CWD.
-	var err error
-
-	if isSet(options.ChartDir) {
-		if options.ChartDir, err = filepath.Abs(options.ChartDir); err != nil {
-			return err
-		}
-		if _, err = os.Stat(options.ChartDir); os.IsNotExist(err) {
-			return fmt.Errorf("chart directory does not exist: %s", options.ChartDir)
-		}
-	}
-
-	if options.Stdout {
-		if isSet(options.OutputDir) {
-			return fmt.Errorf("--stdout cannot be used with -d/--output-dir")
-		} else {
-			return nil
-		}
-	}
-
-	// --stdout is not set, so set default output directory $CONFIG_REPO_PATH/output
-	// if a custom output dir was not specified on the command-line
-	if !isSet(options.OutputDir) {
-		options.OutputDir = path.Join(configRepoPath, DefaultOutputDirName)
-		log.Debug().Msgf("Using default output dir %s", options.OutputDir)
-	}
-
-	if options.OutputDir, err = filepath.Abs(options.OutputDir); err != nil {
+	if err := normalizeConfigRepoPath(options); err != nil {
 		return err
 	}
 
-	return nil
+	if isSet(options.ChartDir) {
+		if err := normalizeChartDir(options); err != nil {
+			return err
+		}
+	}
+
+	if len(options.ValuesFiles) > 0 {
+		if err := normalizeValuesFiles(options); err != nil {
+			return err
+		}
+	}
+
+	return normalizeOutputDir(options)
 }
 
 /* Adjust logging verbosity based on CLI options */
@@ -220,4 +206,97 @@ func adjustLoggingVerbosity(verbosity int) {
 /* Short-hand helper function indicating whether a string option was set by the user */
 func isSet(optionValue string) bool {
 	return optionValue != optionUnset
+}
+
+/* Validate config repo path and add to Options */
+func normalizeConfigRepoPath(options *Options) error {
+	// We require configRepoPath to be set via environment variable
+	configRepoPath, defined := os.LookupEnv(ConfigRepoPathEnvVar)
+	if !defined {
+		return fmt.Errorf("please specify path to %s clone via the environment variable %s", ConfigRepoName, ConfigRepoPathEnvVar)
+	}
+	options.ConfigRepoPath = configRepoPath
+	return nil
+}
+
+/* Validate chart dir, expand it, and add to Options */
+func normalizeChartDir(options *Options) error {
+	expanded, err := expandAndVerifyExists(options.ChartDir, "chart directory")
+	if err != nil {
+		return err
+	}
+	options.ChartDir = *expanded
+	return nil
+}
+
+/*
+For every --values-file arguments, expand to full path and verify it exists
+Then update Options to use the normalized paths
+*/
+func normalizeValuesFiles(options *Options) error {
+	var expandedValuesFiles []string
+
+	for _, valuesFile := range options.ValuesFiles {
+		expanded, err := expandAndVerifyExists(valuesFile, "values file")
+		if err != nil {
+			return err
+		}
+		expandedValuesFiles = append(expandedValuesFiles, *expanded)
+	}
+	options.ValuesFiles = expandedValuesFiles
+
+	return nil
+}
+
+/*
+If an output dir was given, validate it. Else update Options with the default
+output directory, $CONFIG_REPO_PATH/output
+
+Note: This MUST be called after normalizeConfigRepoPath()
+*/
+func normalizeOutputDir(options *Options) error {
+	if options.Stdout {
+		if isSet(options.OutputDir) {
+			return fmt.Errorf("--stdout cannot be used with -d/--output-dir")
+		} else {
+			// We're rendering to stdout, so no need to set up default output dir
+			return nil
+		}
+	}
+
+	// No output directory was given on the command-line, so set to default output
+	// directory $CONFIG_REPO_PATH/output
+	if !isSet(options.OutputDir) {
+		options.OutputDir = path.Join(options.ConfigRepoPath, DefaultOutputDirName)
+		log.Debug().Msgf("Using default output dir %s", options.OutputDir)
+	}
+
+	// Normalize path to output dir, whether it's the default or user-supplied
+	dir, err := filepath.Abs(options.OutputDir)
+	if err != nil {
+		return err
+	}
+	options.OutputDir = dir
+
+	return nil
+}
+
+/*
+Expand relative path to absolute.
+This is necessary for many arguments because Helmfile assumes paths
+are relative to helmfile.yaml and we want them to be relative to CWD.
+*/
+func expandAndVerifyExists(filePath string, description string) (*string, error) {
+	expanded, err := filepath.Abs(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := os.Stat(expanded); os.IsNotExist(err) {
+		return nil, fmt.Errorf("%s does not exist: %s", description, expanded)
+	} else if err != nil {
+		return nil, fmt.Errorf("error reading %s %s: %v", description, expanded, err)
+	}
+
+	return &expanded, nil
 }

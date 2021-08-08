@@ -18,15 +18,16 @@ const helmfileCommand = "helmfile"
 /* Subdirectory to search for environment config files */
 const envSubdir = "environments"
 
-/* Struct encapsulating options for a render */
+/* Options: Struct encapsulating options for a render */
 type Options struct {
-	App            string
 	Env            string
+	App            string
 	ChartVersion   string
 	AppVersion     string
 	ChartDir       string
-	OutputDir      string
+	ValuesFiles    []string
 	ArgocdMode     bool
+	OutputDir      string
 	Stdout         bool
 	Verbose        int
 	ConfigRepoPath string
@@ -88,7 +89,7 @@ func (r *Render) CleanOutputDirectory() error {
 	}
 
 	for _, file := range dir {
-		filePath := path.Join([]string{ r.options.OutputDir, file.Name() }...)
+		filePath := path.Join([]string{r.options.OutputDir, file.Name()}...)
 		log.Debug().Msgf("Deleting %s", filePath)
 
 		err = os.RemoveAll(filePath)
@@ -198,8 +199,12 @@ func (r *Render) renderSingleEnvironment(env Environment) error {
 
 	// Append arguments specific to template subcommand
 	if r.options.ChartDir == optionUnset {
-		/* Skip dependencies unless we're rendering a local chart, to save time */
+		// Skip dependencies unless we're rendering a local chart, to save time
 		args = append(args, "--skip-deps")
+	}
+
+	if len(r.options.ValuesFiles) > 0 {
+		args = append(args, fmt.Sprintf("--values=%s", strings.Join(r.options.ValuesFiles, ",")))
 	}
 
 	if !r.options.Stdout {

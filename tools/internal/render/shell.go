@@ -19,7 +19,7 @@ type ShellRunner interface {
 
 type ShellError struct {
 	Command Command
-	Err error
+	Err     error
 }
 
 func (e *ShellError) Error() string {

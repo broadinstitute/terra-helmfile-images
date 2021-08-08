@@ -13,6 +13,8 @@ import (
 )
 
 /* This file contains an integration test for the render utility */
+
+/* Fake environments, mocked for integration testing */
 var fakeEnvironments = []Environment{
 	{name: "dev", base: "live"},
 	{name: "alpha", base: "live"},
@@ -21,12 +23,21 @@ var fakeEnvironments = []Environment{
 
 /* Struct for tracking global state that is mocked when a test executes and restored/cleaned up after */
 type TestState struct {
-	originalRunner         *ShellRunner
-	mockRunner             *MockRunner
-	originalConfigRepoPath string
-	mockConfigRepoPath     string
-	mockChartDir           string
-	tmpDir                 string
+	mockRunner             *MockRunner  // mock ShellRunner, reset before every test case
+	mockConfigRepoPath     string       // mock terra-helmfile, created once before all test cases
+	mockChartDir           string       // mock chart directory, created once before all test cases
+	scratchDir             string       // scratch directory, cleaned out before each test case
+	rootDir                string       // root/parent directory for all test files
+	originalRunner         *ShellRunner // real ShellRunner, saved before tests start and restored after they finish
+	originalConfigRepoPath string       // real config repo path, saved before tests start and restored after they finish
+}
+
+type TestCase struct {
+	description      string            // Testcase description
+	arguments        []string          // Fake user-supplied CLI arguments to pass to `render`
+	expectedCommands []ExpectedCommand // Ordered list of CLI commands we expect `render` to run
+	expectedError    *regexp.Regexp    // Optional error we expect to be raised
+	setup            func() error      // Optional hook for extra setup
 }
 
 /* Used in MockRunner to verify expected commands have been called */
@@ -85,12 +96,7 @@ func TestRender(t *testing.T) {
 		}
 	})
 
-	var tests = []struct {
-		description      string            // Testcase description
-		arguments        []string          // Fake user-supplied CLI arguments to pass to `render`
-		expectedCommands []ExpectedCommand // Ordered list of CLI commands we expect `render` to run
-		expectedError    *regexp.Regexp    // Optional error we expect to be raised
-	}{
+	var tests = []TestCase{
 		{
 			description:   "invalid argument",
 			arguments:     args("--foo"),
@@ -117,6 +123,16 @@ func TestRender(t *testing.T) {
 			expectedError: regexp.MustCompile("--chart-dir requires an app be specified with -a"),
 		},
 		{
+			description:   "--values-file should require -a",
+			arguments:     args("--values-file %s", path.Join(ts.rootDir, "missing.yaml")),
+			expectedError: regexp.MustCompile("--values-file requires an app be specified with -a"),
+		},
+		{
+			description:   "--values-file must exist",
+			arguments:     args("-e dev -a leonardo --values-file %s", path.Join(ts.rootDir, "missing.yaml")),
+			expectedError: regexp.MustCompile("values file does not exist: .*/missing.yaml"),
+		},
+		{
 			description:   "--chart-dir and --chart-version incompatible",
 			arguments:     args("-e dev -a leonardo --chart-dir %s --chart-version 1.0.0", ts.mockChartDir),
 			expectedError: regexp.MustCompile("only one of --chart-dir or --chart-version may be specified"),
@@ -129,17 +145,22 @@ func TestRender(t *testing.T) {
 		{
 			description:   "--argocd and --app-version incompatible",
 			arguments:     args("-e dev -a leonardo --app-version 1.0.0 --argocd"),
-			expectedError: regexp.MustCompile("--argocd cannot be used with --chart-dir, --chart-version, or --app-version"),
+			expectedError: regexp.MustCompile("--argocd cannot be used with.*--app-version"),
 		},
 		{
 			description:   "--argocd and --chart-version incompatible",
 			arguments:     args("-e dev -a leonardo --chart-version 1.0.0 --argocd"),
-			expectedError: regexp.MustCompile("--argocd cannot be used with --chart-dir, --chart-version, or --app-version"),
+			expectedError: regexp.MustCompile("--argocd cannot be used with.*--chart-version"),
 		},
 		{
 			description:   "--argocd and --chart-dir incompatible",
 			arguments:     args("-e dev -a leonardo --chart-dir=%s --argocd", ts.mockChartDir),
-			expectedError: regexp.MustCompile("--argocd cannot be used with --chart-dir, --chart-version, or --app-version"),
+			expectedError: regexp.MustCompile("--argocd cannot be used with.*--chart-dir"),
+		},
+		{
+			description:   "--argocd and --values-file incompatible",
+			arguments:     args("-e dev -a leonardo --values-file=%s --argocd", "missing.yaml"),
+			expectedError: regexp.MustCompile("--argocd cannot be used with.*--values-file"),
 		},
 		{
 			description:   "--stdout and --output-dir incompatible",
@@ -230,6 +251,28 @@ func TestRender(t *testing.T) {
 			},
 		},
 		{
+			description: "-a with --values-file should set values file",
+			arguments:   args(" -e dev -a leonardo --values-file %s/v.yaml", ts.scratchDir),
+			setup: func() error {
+				return ts.createScratchFile("v.yaml", "# fake values file")
+			},
+			expectedCommands: []ExpectedCommand{
+				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
+				ts.cmd("helmfile --log-level=info -e dev --selector=app=leonardo,group=terra template --skip-deps --values=%s/v.yaml --output-dir=%s/output/dev", ts.scratchDir, ts.mockConfigRepoPath),
+			},
+		},
+		{
+			description: "-a with multiple --values-file should set values files in order",
+			arguments:   args(" -e dev -a leonardo --values-file %s/v1.yaml --values-file %s/v2.yaml --values-file %s/v3.yaml", ts.scratchDir, ts.scratchDir, ts.scratchDir),
+			setup: func() error {
+				return ts.createScratchFiles("# fake values file", "v1.yaml", "v2.yaml", "v3.yaml")
+			},
+			expectedCommands: []ExpectedCommand{
+				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
+				ts.cmd("helmfile --log-level=info -e dev --selector=app=leonardo,group=terra template --skip-deps --values=%s/v1.yaml,%s/v2.yaml,%s/v3.yaml --output-dir=%s/output/dev", ts.scratchDir, ts.scratchDir, ts.scratchDir, ts.mockConfigRepoPath),
+			},
+		},
+		{
 			description: "should fail if repo update fails",
 			expectedCommands: []ExpectedCommand{
 				ts.failCmd("dieee", "helmfile --log-level=info --allow-no-matching-release repos"),
@@ -273,8 +316,10 @@ func TestRender(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			mockRunner := ts.mockRunner
-			mockRunner.expectedCommands = test.expectedCommands
+			if err := ts.setupTestCase(test); err != nil {
+				t.Error(err)
+				return
+			}
 
 			cobraCmd := newCobraCommand()
 			cobraCmd.SetArgs(test.arguments)
@@ -293,8 +338,8 @@ func TestRender(t *testing.T) {
 				return
 			}
 
-			if len(mockRunner.expectedCommands) != 0 {
-				t.Errorf("MockRunner: Unmatched expectedCommands %v", mockRunner.expectedCommands)
+			if len(ts.mockRunner.expectedCommands) != 0 {
+				t.Errorf("MockRunner: Unmatched expectedCommands %v", ts.mockRunner.expectedCommands)
 				return
 			}
 		})
@@ -361,7 +406,7 @@ func args(format string, a ...interface{}) []string {
 
 /*
 Convenience function to return current working directory
- */
+*/
 func cwd() string {
 	dir, err := os.Getwd()
 	if err != nil {
@@ -402,7 +447,30 @@ func (ts *TestState) failCmd(err string, format string, a ...interface{}) Expect
 	return expectedCommand
 }
 
-/* Set up a TestExecute test case */
+/* Per-test case setup */
+func (ts *TestState) setupTestCase(tc TestCase) error {
+	// Delete and re-create scratch directory
+	if err := os.RemoveAll(ts.scratchDir); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(ts.scratchDir, 0755); err != nil {
+		return err
+	}
+
+	// Execute setup callback function if one was given
+	if tc.setup != nil {
+		if err := tc.setup(); err != nil {
+			return fmt.Errorf("setup error: %v", err)
+		}
+	}
+
+	// Set expectedCommands to the test-case's expected commands
+	ts.mockRunner.expectedCommands = tc.expectedCommands
+
+	return nil
+}
+
+/* One-time setup, run before all TestRender test cases */
 func setup() (*TestState, error) {
 	// Create a mock config repo clone in a tmp dir
 	originalConfigRepoPath := os.Getenv(ConfigRepoPathEnvVar)
@@ -443,16 +511,21 @@ func setup() (*TestState, error) {
 		return nil, err
 	}
 
+	// Create scratch directory, cleaned after every test case.
+	scratchDir := path.Join(tmpDir, "scratch")
+
 	return &TestState{
 		originalRunner:         &originalRunner,
 		mockRunner:             mockRunner,
 		originalConfigRepoPath: originalConfigRepoPath,
 		mockConfigRepoPath:     mockConfigRepoPath,
 		mockChartDir:           mockChartDir,
-		tmpDir:                 tmpDir,
+		scratchDir:             scratchDir,
+		rootDir:                tmpDir,
 	}, nil
 }
 
+/* One-time cleanup, run after all TestCases have run */
 func cleanup(state *TestState) error {
 	// Restore original ShellRunner
 	shellRunner = *(state.originalRunner)
@@ -465,7 +538,7 @@ func cleanup(state *TestState) error {
 	}
 
 	// Clean up temp dir
-	return os.RemoveAll(state.tmpDir)
+	return os.RemoveAll(state.rootDir)
 }
 
 /* Create fake environment files like `environments/live/alpha.yaml` in mock config dir */
@@ -474,15 +547,38 @@ func createFakeEnvironmentFiles(mockConfigRepoPath string, envs []Environment) e
 		baseDir := path.Join(mockConfigRepoPath, envSubdir, env.base)
 		envFile := path.Join(baseDir, fmt.Sprintf("%s.yaml", env.name))
 
-		err := os.MkdirAll(baseDir, 0755)
-		if err != nil {
+		if err := createFile(envFile, "# Fake env file for testing"); err != nil {
 			return err
 		}
+	}
 
-		err = os.WriteFile(envFile, []byte("# Fake env file for testing"), 0644)
-		if err != nil {
+	return nil
+}
+
+/* Convenience function for creating multiple fake files in scratch directory */
+func (ts *TestState) createScratchFiles(content string, filenames ...string) error {
+	for _, f := range filenames {
+		if err := ts.createScratchFile(f, content); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+/* Convenience function for creating a fake file in scratch directory */
+func (ts *TestState) createScratchFile(filename string, content string) error {
+	return createFile(path.Join(ts.scratchDir, filename), content)
+}
+
+/* Convenience function for creating a fake file */
+func createFile(filepath string, content string) error {
+	dir := path.Dir(filepath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+
+	if err := os.WriteFile(filepath, []byte(content), 0644); err != nil {
+		return err
 	}
 
 	return nil

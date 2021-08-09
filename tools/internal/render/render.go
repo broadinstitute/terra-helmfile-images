@@ -12,40 +12,44 @@ import (
 	"strings"
 )
 
-/* Name of the `helmfile` binary */
+// Name of the `helmfile` binary
 const helmfileCommand = "helmfile"
 
-/* Subdirectory to search for environment config files */
-const envSubdir = "environments"
+// Subdirectory to search for environment config files
+const envDir = "environments"
 
-/* Struct encapsulating options for a render */
+// Options encapsulates CLI options for a render
 type Options struct {
-	App            string
-	Env            string
-	ChartVersion   string
-	AppVersion     string
-	ChartDir       string
-	OutputDir      string
-	ArgocdMode     bool
-	Stdout         bool
-	Verbose        int
-	ConfigRepoPath string
+	Env            string   // If supplied, render for a single environment instead of all
+	App            string   // If supplied, render for a single service instead of all
+	ChartVersion   string   // Optionally override chart version
+	AppVersion     string   // Optionally override app version
+	ChartDir       string   // When supplied, render chart from local directory instead of released version
+	ValuesFiles    []string // Optionally list of files for overriding chart values
+	ArgocdMode     bool     // If true, render ArgoCD manifests instead of application manifests
+	OutputDir      string   // Render to custom output directory intead of terra-helmfile/output
+	Stdout         bool     // Render to stdout instead of output directory
+	Verbose        int      // Invoke `helmfile` with verbose logging
+	ConfigRepoPath string   // Path to terra-helmfile repo clone
 }
 
+// Environment represents a Terra environment
 type Environment struct {
-	name string
-	base string
+	Name string // Environment name. Eg "dev", "alpha", "prod
+	Base string // Type of environment. Eg "live", "personal"
 }
 
+// Render generates manifests by invoking `helmfile` with the appropriate arguments
 type Render struct {
-	options          *Options               /* CLI options */
-	environments     map[string]Environment /* Collection of environments defined in the config repo, keyed by env name */
-	helmfileLogLevel string                 /* --log-level argument to pass to `helmfile` command */
+	options          *Options               // CLI options
+	environments     map[string]Environment // Collection of environments defined in the config repo, keyed by env Name
+	helmfileLogLevel string                 // --log-level argument to pass to `helmfile` command
 }
 
-/* ShellRunner object used to execute commands. Replaced with a mock in tests */
+// Global/package-level variable, used for executing commands. Replaced with a mock in tests.
 var shellRunner ShellRunner = &RealRunner{}
 
+// NewRender is a constructor
 func NewRender(options *Options) (*Render, error) {
 	render := new(Render)
 	render.options = options
@@ -64,7 +68,7 @@ func NewRender(options *Options) (*Render, error) {
 	return render, nil
 }
 
-/* Clean output directory */
+// CleanOutputDirectory removes any old files from output directory
 func (r *Render) CleanOutputDirectory() error {
 	if r.options.Stdout {
 		// No need to clean output directory if we're rendering to stdout
@@ -88,7 +92,7 @@ func (r *Render) CleanOutputDirectory() error {
 	}
 
 	for _, file := range dir {
-		filePath := path.Join([]string{ r.options.OutputDir, file.Name() }...)
+		filePath := path.Join([]string{r.options.OutputDir, file.Name()}...)
 		log.Debug().Msgf("Deleting %s", filePath)
 
 		err = os.RemoveAll(filePath)
@@ -100,13 +104,13 @@ func (r *Render) CleanOutputDirectory() error {
 	return nil
 }
 
-/* Update Helm repos */
+// HelmUpdate updates Helm repos
 func (r *Render) HelmUpdate() error {
 	log.Debug().Msg("Updating Helm repos...")
 	return r.runHelmfile("--allow-no-matching-release", "repos")
 }
 
-/* Render manifests */
+// RenderAll renders manifests based on supplied arguments
 func (r *Render) RenderAll() error {
 	targetEnvs, err := r.getTargetEnvs()
 	if err != nil {
@@ -125,13 +129,13 @@ func (r *Render) RenderAll() error {
 	return normalizeRenderDirectories(r.options.OutputDir)
 }
 
-/* Scan through environments/ subdirectory and build a slice of defined environments */
+// loadEnvironments scans through the environments/ subdirectory and build a slice of defined environments
 func loadEnvironments(configRepoPath string) (map[string]Environment, error) {
 	environments := make(map[string]Environment)
 
-	envDir := path.Join(configRepoPath, envSubdir)
+	envDir := path.Join(configRepoPath, envDir)
 	if _, err := os.Stat(envDir); err != nil {
-		return nil, fmt.Errorf("environments subdirectory %s does not exist in %s, is it a %s clone?", envSubdir, configRepoPath, ConfigRepoName)
+		return nil, fmt.Errorf("environments subdirectory %s does not exist in %s, is it a %s clone?", envDir, configRepoPath, configRepoName)
 	}
 
 	matches, err := filepath.Glob(path.Join(envDir, "*", "*.yaml"))
@@ -140,19 +144,20 @@ func loadEnvironments(configRepoPath string) (map[string]Environment, error) {
 	}
 
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("no environments found in %s, is it a %s clone?", configRepoPath, ConfigRepoName)
+		return nil, fmt.Errorf("no environments found in %s, is it a %s clone?", configRepoPath, configRepoName)
 	}
 
 	for _, filename := range matches {
 		env := Environment{}
-		env.base = path.Base(path.Dir(filename))
-		env.name = strings.TrimSuffix(path.Base(filename), ".yaml")
-		environments[env.name] = env
+		env.Base = path.Base(path.Dir(filename))
+		env.Name = strings.TrimSuffix(path.Base(filename), ".yaml")
+		environments[env.Name] = env
 	}
 
 	return environments, nil
 }
 
+// getTargetEnvs returns the set of target environments to render manifests for
 func (r *Render) getTargetEnvs() ([]Environment, error) {
 	if isSet(r.options.Env) {
 		// User wants to render for a specific environment
@@ -176,12 +181,12 @@ func (r *Render) getTargetEnvs() ([]Environment, error) {
 }
 
 func (r *Render) renderSingleEnvironment(env Environment) error {
-	log.Info().Msgf("Rendering manifests for %s", env.name)
+	log.Info().Msgf("Rendering manifests for %s", env.Name)
 
 	var args []string
 
 	// Append global Helmfile options
-	args = append(args, "-e", env.name)
+	args = append(args, "-e", env.Name)
 
 	selectors := r.getSelectors()
 	if len(selectors) != 0 {
@@ -198,15 +203,19 @@ func (r *Render) renderSingleEnvironment(env Environment) error {
 
 	// Append arguments specific to template subcommand
 	if r.options.ChartDir == optionUnset {
-		/* Skip dependencies unless we're rendering a local chart, to save time */
+		// Skip dependencies unless we're rendering a local chart, to save time
 		args = append(args, "--skip-deps")
+	}
+
+	if len(r.options.ValuesFiles) > 0 {
+		args = append(args, fmt.Sprintf("--values=%s", strings.Join(r.options.ValuesFiles, ",")))
 	}
 
 	if !r.options.Stdout {
 		// Expand output dir to absolute path, because Helmfile assumes paths
 		// are relative to helmfile.yaml and we want to be relative to CWD
 		// filepath.Abs()
-		args = append(args, fmt.Sprintf("--output-dir=%s/%s", r.options.OutputDir, env.name))
+		args = append(args, fmt.Sprintf("--output-dir=%s/%s", r.options.OutputDir, env.Name))
 	}
 
 	return r.runHelmfile(args...)
@@ -226,7 +235,7 @@ func (r *Render) runHelmfile(args ...string) error {
 	return shellRunner.Run(cmd)
 }
 
-/* Return map of state values that should be set on the command-line, given user-supplied options */
+// getStateValues returns a map of state values that should be set on the command-line, given user-supplied options
 func (r *Render) getStateValues() map[string]string {
 	stateValues := make(map[string]string)
 
@@ -246,7 +255,7 @@ func (r *Render) getStateValues() map[string]string {
 	return stateValues
 }
 
-/* Return map of Helmfile selectors that should be set on the command-line, given user-supplied options */
+// getSelectors returns a map of Helmfile selectors that should be set on the command-line, given user-supplied options
 func (r *Render) getSelectors() map[string]string {
 	selectors := make(map[string]string)
 	selectors["group"] = "terra"
@@ -263,16 +272,14 @@ func (r *Render) getSelectors() map[string]string {
 	return selectors
 }
 
-/*
-Convert auto-generated template directory names like
-  helmfile-b47efc70-workspacemanager
-into
-  workspacemanager
-so that diff -r can be run on two sets of rendered templates.
-
-We enforce that all release names in an environment are unique,
-so this should not cause conflicts.
-*/
+// normalizeRenderDirectories converts auto-generated template directory names like
+//   helmfile-b47efc70-workspacemanager
+// into
+//   workspacemanager
+// so that diff -r can be run on two sets of rendered templates.
+//
+// We enforce that all release names in an environment are unique,
+// so this should not cause conflicts.
 func normalizeRenderDirectories(outputDir string) error {
 	matches, err := filepath.Glob(path.Join(outputDir, "*", "helmfile-*"))
 	if err != nil {
@@ -296,23 +303,18 @@ func normalizeRenderDirectories(outputDir string) error {
 	return nil
 }
 
-/*
-Sort environments lexicographically by base, and then by name
-*/
+// sortEnvironments sorts environments lexicographically by base, and then by name
 func sortEnvironments(envs []Environment) {
 	sort.Slice(envs, func(i int, j int) bool {
-		if envs[i].base == envs[j].base {
-			return envs[i].name < envs[j].name
-		} else {
-			return envs[i].base < envs[j].base
+		if envs[i].Base == envs[j].Base {
+			return envs[i].Name < envs[j].Name
 		}
+		return envs[i].Base < envs[j].Base
 	})
 }
 
-/*
-Join map[string]string to string containing comma-separated key-value pairs.
-Eg. { "a": "b", "c": "d" } -> "a=b,c=d"
-*/
+// joinKeyValuePairs joins map[string]string to string containing comma-separated key-value pairs.
+// Eg. { "a": "b", "c": "d" } -> "a=b,c=d"
 func joinKeyValuePairs(pairs map[string]string) string {
 	var tokens []string
 	for k, v := range pairs {

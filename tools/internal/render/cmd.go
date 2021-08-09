@@ -10,24 +10,22 @@ import (
 	"path/filepath"
 )
 
-/*
-This file handles CLI option parsing the render utility. It uses Cobra in accordance with the
-documentation here: https://github.com/spf13/cobra/blob/master/user_guide.md
-*/
+// This file handles CLI option parsing the render utility. It uses Cobra in accordance with the
+// documentation here: https://github.com/spf13/cobra/blob/master/user_guide.md
 
-/* Name of the Helmfile configuration repo */
-const ConfigRepoName = "terra-helmfile"
+// Name of the Helmfile configuration repo
+const configRepoName = "terra-helmfile"
 
-/* Environment variable used to set path to config repo clone */
-const ConfigRepoPathEnvVar = "TERRA_HELMFILE_PATH"
+// Environment variable used to set path to config repo clone
+const configRepoPathEnvVar = "TERRA_HELMFILE_PATH"
 
-/* Name of default output directory */
-const DefaultOutputDirName = "output"
+// Name of default output directory
+const defaultOutputDirName = "output"
 
-/* Default value for string CLI options */
+// Default value for string CLI options
 const optionUnset = ""
 
-/* Main method/entrypoint for the render tool. */
+// Execute is the main method/entrypoint for the render tool.
 func Execute() {
 	cobraCommand := newCobraCommand()
 
@@ -37,7 +35,7 @@ func Execute() {
 	}
 }
 
-/* Construct new Cobra command */
+// Construct new Cobra command
 func newCobraCommand() *cobra.Command {
 	options := &Options{}
 	cobraCommand := &cobra.Command{
@@ -133,10 +131,10 @@ func init() {
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 }
 
-/* Check Options for incompatible flags */
+// Check Options for incompatible flags
 func checkIncompatibleFlags(options *Options) error {
 	if isSet(options.App) && !isSet(options.Env) {
-		/* Not all environments include all apps, so require users to specify -e with -a */
+		// Not all environments include all apps, so require users to specify -e with -a
 		return fmt.Errorf("an environment must be specified with -e when an app is specified with -a")
 	}
 
@@ -171,9 +169,7 @@ func checkIncompatibleFlags(options *Options) error {
 	return nil
 }
 
-/*
-Normalize and validate path arguments.
-*/
+// Normalize and validate path arguments.
 func normalizePaths(options *Options) error {
 	if err := normalizeConfigRepoPath(options); err != nil {
 		return err
@@ -194,7 +190,7 @@ func normalizePaths(options *Options) error {
 	return normalizeOutputDir(options)
 }
 
-/* Adjust logging verbosity based on CLI options */
+// Adjust logging verbosity based on CLI options
 func adjustLoggingVerbosity(verbosity int) {
 	if verbosity > 1 {
 		zerolog.SetGlobalLevel(zerolog.TraceLevel)
@@ -203,23 +199,23 @@ func adjustLoggingVerbosity(verbosity int) {
 	}
 }
 
-/* Short-hand helper function indicating whether a string option was set by the user */
+// Short-hand helper function indicating whether a string option was set by the user
 func isSet(optionValue string) bool {
 	return optionValue != optionUnset
 }
 
-/* Validate config repo path and add to Options */
+// Validate config repo path and add to Options
 func normalizeConfigRepoPath(options *Options) error {
 	// We require configRepoPath to be set via environment variable
-	configRepoPath, defined := os.LookupEnv(ConfigRepoPathEnvVar)
+	configRepoPath, defined := os.LookupEnv(configRepoPathEnvVar)
 	if !defined {
-		return fmt.Errorf("please specify path to %s clone via the environment variable %s", ConfigRepoName, ConfigRepoPathEnvVar)
+		return fmt.Errorf("please specify path to %s clone via the environment variable %s", configRepoName, configRepoPathEnvVar)
 	}
 	options.ConfigRepoPath = configRepoPath
 	return nil
 }
 
-/* Validate chart dir, expand it, and add to Options */
+// Validate chart dir, expand it, and add to Options
 func normalizeChartDir(options *Options) error {
 	expanded, err := expandAndVerifyExists(options.ChartDir, "chart directory")
 	if err != nil {
@@ -229,10 +225,8 @@ func normalizeChartDir(options *Options) error {
 	return nil
 }
 
-/*
-For every --values-file arguments, expand to full path and verify it exists
-Then update Options to use the normalized paths
-*/
+// For every --values-file arguments, expand to full path and verify it exists
+// Then update Options to use the normalized paths
 func normalizeValuesFiles(options *Options) error {
 	var expandedValuesFiles []string
 
@@ -248,26 +242,24 @@ func normalizeValuesFiles(options *Options) error {
 	return nil
 }
 
-/*
-If an output dir was given, validate it. Else update Options with the default
-output directory, $CONFIG_REPO_PATH/output
-
-Note: This MUST be called after normalizeConfigRepoPath()
-*/
+// If an output dir was given, validate it. Else update Options with the default
+// output directory, $CONFIG_REPO_PATH/output
+//
+// Note: This MUST be called after normalizeConfigRepoPath()
 func normalizeOutputDir(options *Options) error {
 	if options.Stdout {
 		if isSet(options.OutputDir) {
 			return fmt.Errorf("--stdout cannot be used with -d/--output-dir")
-		} else {
-			// We're rendering to stdout, so no need to set up default output dir
-			return nil
 		}
+
+		// We're rendering to stdout, so no need to set up default output dir
+		return nil
 	}
 
 	// No output directory was given on the command-line, so set to default output
 	// directory $CONFIG_REPO_PATH/output
 	if !isSet(options.OutputDir) {
-		options.OutputDir = path.Join(options.ConfigRepoPath, DefaultOutputDirName)
+		options.OutputDir = path.Join(options.ConfigRepoPath, defaultOutputDirName)
 		log.Debug().Msgf("Using default output dir %s", options.OutputDir)
 	}
 
@@ -281,11 +273,9 @@ func normalizeOutputDir(options *Options) error {
 	return nil
 }
 
-/*
-Expand relative path to absolute.
-This is necessary for many arguments because Helmfile assumes paths
-are relative to helmfile.yaml and we want them to be relative to CWD.
-*/
+// Expand relative path to absolute.
+// This is necessary for many arguments because Helmfile assumes paths
+// are relative to helmfile.yaml and we want them to be relative to CWD.
 func expandAndVerifyExists(filePath string, description string) (*string, error) {
 	expanded, err := filepath.Abs(filePath)
 	if err != nil {

@@ -12,16 +12,16 @@ import (
 	"testing"
 )
 
-/* This file contains an integration test for the render utility */
+// This file contains an integration test for the render utility
 
-/* Fake environments, mocked for integration testing */
+// Fake environments, mocked for integration testing
 var fakeEnvironments = []Environment{
-	{name: "dev", base: "live"},
-	{name: "alpha", base: "live"},
-	{name: "jdoe", base: "personal"},
+	{Name: "dev", Base: "live"},
+	{Name: "alpha", Base: "live"},
+	{Name: "jdoe", Base: "personal"},
 }
 
-/* Struct for tracking global state that is mocked when a test executes and restored/cleaned up after */
+// Struct for tracking global state that is mocked when a test executes and restored/cleaned up after
 type TestState struct {
 	mockRunner             *MockRunner  // mock ShellRunner, reset before every test case
 	mockConfigRepoPath     string       // mock terra-helmfile, created once before all test cases
@@ -40,22 +40,21 @@ type TestCase struct {
 	setup            func() error      // Optional hook for extra setup
 }
 
-/* Used in MockRunner to verify expected commands have been called */
+// Used in MockRunner to verify expected commands have been called
 type ExpectedCommand struct {
 	Command   Command // Expected Command
 	MockError error   // Optional error to return (for faking an error running the command)
 }
 
-/* MockRunner stores an ordered list (slice) of expected commands */
+// MockRunner stores an ordered list (slice) of expected commands
 type MockRunner struct {
 	expectedCommands []ExpectedCommand // Ordered list of expected commands
 }
 
-/*
-Mock implementation of ShellCommand#Run
-
-Instead of executing the command, compare it to the runner's list of expected commands, throwing an error on mismatch
-*/
+// Mock implementation of ShellCommand
+//
+// Instead of executing the command, compare it to the runner's list of expected commands,
+// throwing an error on mismatch
 func (m *MockRunner) Run(cmd Command) error {
 	if len(m.expectedCommands) == 0 {
 		return fmt.Errorf("MockRunner: Received unexpected command %v", cmd)
@@ -71,15 +70,13 @@ func (m *MockRunner) Run(cmd Command) error {
 	return expected.MockError
 }
 
-/*
-A table-driven integration test for the render tool.
-
-Given a list of CLI arguments to the render command, the test verifies
-that the correct underlying `helmfile` command(s) are run.
-
-Reference:
-https://gianarb.it/blog/golang-mockmania-cli-command-with-cobra
-*/
+// A table-driven integration test for the render tool.
+//
+// Given a list of CLI arguments to the render command, the test verifies
+// that the correct underlying `helmfile` command(s) are run.
+//
+// Reference:
+// https://gianarb.it/blog/golang-mockmania-cli-command-with-cobra
 func TestRender(t *testing.T) {
 	// Set up mocked global state before tests run
 	ts, err := setup()
@@ -346,7 +343,7 @@ func TestRender(t *testing.T) {
 	}
 }
 
-/* Integration test does not exercise normalizeRenderDirectories(), so add a unit test here */
+// Integration test does not exercise normalizeRenderDirectories(), so add a unit test here
 func TestNormalizeRenderDirectories(t *testing.T) {
 	t.Run("test directories are normalized", func(t *testing.T) {
 		// Create tmpdir
@@ -394,19 +391,15 @@ func TestNormalizeRenderDirectories(t *testing.T) {
 	})
 }
 
-/*
-Convenience function to generate tokenized argument list from format string w/ args
-
-Eg. args("-e   %s", "dev") -> []string{"-e", "dev"}
-*/
+// Convenience function to generate tokenized argument list from format string w/ args
+//
+// Eg. args("-e   %s", "dev") -> []string{"-e", "dev"}
 func args(format string, a ...interface{}) []string {
 	formatted := fmt.Sprintf(format, a...)
 	return strings.Fields(formatted)
 }
 
-/*
-Convenience function to return current working directory
-*/
+// Convenience function to return current working directory
 func cwd() string {
 	dir, err := os.Getwd()
 	if err != nil {
@@ -415,13 +408,10 @@ func cwd() string {
 	return dir
 }
 
-/*
-Convenience function to create a successful/non-erroring ExpectedCommand, given
-a format string _for_ the command.
-
-Eg. cmd("helmfile -e %s template", "alpha")
-
-*/
+// Convenience function to create a successful/non-erroring ExpectedCommand, given
+// a format string _for_ the command.
+//
+// Eg. cmd("helmfile -e %s template", "alpha")
 func (ts *TestState) cmd(format string, a ...interface{}) ExpectedCommand {
 	tokens := args(format, a...)
 
@@ -434,20 +424,17 @@ func (ts *TestState) cmd(format string, a ...interface{}) ExpectedCommand {
 	}
 }
 
-/*
-Convenience function to create a failing ExpectedCommand with an error
-a format string _for_ the command.
-
-Eg. cmd("helmfile -e %s template", "alpha")
-
-*/
+// Convenience function to create a failing ExpectedCommand with an error
+// a format string _for_ the command.
+//
+// Eg. cmd("helmfile -e %s template", "alpha")
 func (ts *TestState) failCmd(err string, format string, a ...interface{}) ExpectedCommand {
 	expectedCommand := ts.cmd(format, a...)
 	expectedCommand.MockError = errors.New(err)
 	return expectedCommand
 }
 
-/* Per-test case setup */
+// Per-test case setup
 func (ts *TestState) setupTestCase(tc TestCase) error {
 	// Delete and re-create scratch directory
 	if err := os.RemoveAll(ts.scratchDir); err != nil {
@@ -470,17 +457,17 @@ func (ts *TestState) setupTestCase(tc TestCase) error {
 	return nil
 }
 
-/* One-time setup, run before all TestRender test cases */
+// One-time setup, run before all TestRender test cases
 func setup() (*TestState, error) {
 	// Create a mock config repo clone in a tmp dir
-	originalConfigRepoPath := os.Getenv(ConfigRepoPathEnvVar)
+	originalConfigRepoPath := os.Getenv(configRepoPathEnvVar)
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "render-test")
 	if err != nil {
 		return nil, err
 	}
 
-	mockConfigRepoPath := path.Join(tmpDir, ConfigRepoName)
+	mockConfigRepoPath := path.Join(tmpDir, configRepoName)
 	err = os.MkdirAll(mockConfigRepoPath, 0755)
 	if err != nil {
 		return nil, err
@@ -494,7 +481,7 @@ func setup() (*TestState, error) {
 
 	// Overwrite TERRA_HELMFILE_PATH env var value with path to our fake config repo clone
 	// Note: When Golang 1.17 is released we can use t.Setenv() instead https://github.com/golang/go/issues/41260
-	err = os.Setenv(ConfigRepoPathEnvVar, mockConfigRepoPath)
+	err = os.Setenv(configRepoPathEnvVar, mockConfigRepoPath)
 	if err != nil {
 		return nil, err
 	}
@@ -525,14 +512,14 @@ func setup() (*TestState, error) {
 	}, nil
 }
 
-/* One-time cleanup, run after all TestCases have run */
+// One-time cleanup, run after all TestCases have run
 func cleanup(state *TestState) error {
 	// Restore original ShellRunner
 	shellRunner = *(state.originalRunner)
 
 	// Restore original config repo path
 	// When Golang 1.17 is released we can use t.Setenv() instead https://github.com/golang/go/issues/41260
-	err := os.Setenv(ConfigRepoPathEnvVar, state.originalConfigRepoPath)
+	err := os.Setenv(configRepoPathEnvVar, state.originalConfigRepoPath)
 	if err != nil {
 		return err
 	}
@@ -541,11 +528,11 @@ func cleanup(state *TestState) error {
 	return os.RemoveAll(state.rootDir)
 }
 
-/* Create fake environment files like `environments/live/alpha.yaml` in mock config dir */
+// Create fake environment files like `environments/live/alpha.yaml` in mock config dir
 func createFakeEnvironmentFiles(mockConfigRepoPath string, envs []Environment) error {
 	for _, env := range envs {
-		baseDir := path.Join(mockConfigRepoPath, envSubdir, env.base)
-		envFile := path.Join(baseDir, fmt.Sprintf("%s.yaml", env.name))
+		baseDir := path.Join(mockConfigRepoPath, envDir, env.Base)
+		envFile := path.Join(baseDir, fmt.Sprintf("%s.yaml", env.Name))
 
 		if err := createFile(envFile, "# Fake env file for testing"); err != nil {
 			return err
@@ -555,7 +542,7 @@ func createFakeEnvironmentFiles(mockConfigRepoPath string, envs []Environment) e
 	return nil
 }
 
-/* Convenience function for creating multiple fake files in scratch directory */
+// Convenience function for creating multiple fake files in scratch directory
 func (ts *TestState) createScratchFiles(content string, filenames ...string) error {
 	for _, f := range filenames {
 		if err := ts.createScratchFile(f, content); err != nil {
@@ -565,12 +552,12 @@ func (ts *TestState) createScratchFiles(content string, filenames ...string) err
 	return nil
 }
 
-/* Convenience function for creating a fake file in scratch directory */
+// Convenience function for creating a fake file in scratch directory
 func (ts *TestState) createScratchFile(filename string, content string) error {
 	return createFile(path.Join(ts.scratchDir, filename), content)
 }
 
-/* Convenience function for creating a fake file */
+// Convenience function for creating a fake file
 func createFile(filepath string, content string) error {
 	dir := path.Dir(filepath)
 	if err := os.MkdirAll(dir, 0755); err != nil {

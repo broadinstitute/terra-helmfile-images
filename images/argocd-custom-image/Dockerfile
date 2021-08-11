@@ -87,6 +87,11 @@ ENV PATH="/custom-tools/helm-values:${PATH}"
 COPY helmfile /custom-tools/helmfile
 ENV PATH="/custom-tools/helmfile:${PATH}"
 
+## `terra-helmfile-app` plugin
+# Wrapper script for rendering application manifests from terra-helmfile repo
+COPY terra-helmfile-app /custom-tools/terra-helmfile-app
+ENV PATH="/custom-tools/terra-helmfile-app:${PATH}"
+
 ## `terra-helmfile-argocd` plugin
 # Wrapper script for generating ArgoCD resources from terra-helmfile repo
 COPY terra-helmfile-argocd /custom-tools/terra-helmfile-argocd

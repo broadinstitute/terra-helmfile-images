@@ -2,9 +2,13 @@
 # Compile Go tools and install to /tools/bin
 #
 ARG GO_VERSION='1.16'
-ARG ALPINE_VERSION='3.13'
+ARG ALPINE_VERSION='3.14'
 
+#
+# Build & test code
+#
 FROM golang:${GO_VERSION}-alpine${ALPINE_VERSION} as build
+
 WORKDIR /build
 ENV CGO_ENABLED=0
 ENV GO111MODULE=on
@@ -41,6 +45,12 @@ RUN wget --timeout=15 -q -O helmfile "https://github.com/roboll/helmfile/release
 # Copy tools into runtime image
 #
 FROM alpine:${ALPINE_VERSION} as runtime
+
+# OS updates for security
+RUN apk update
+RUN apk upgrade
+
+# Copy tools into runtime image
 COPY --from=build /tools/bin/ /tools/bin/
 COPY --from=runtime-deps /tools/bin/ /tools/bin/
 ENV PATH="/tools/bin:${PATH}"

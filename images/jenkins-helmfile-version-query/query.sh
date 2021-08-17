@@ -8,7 +8,7 @@ set -o pipefail
 # the GitHub API.
 #
 REPO="broadinstitute/terra-helmfile"
-VERSIONS_FILE=${VERSIONS_FILE:-"versions.yaml"}
+VERSIONS_FILE=${VERSIONS_FILE:-"versions/app/dev.yaml"}
 
 if [[ $# -ne 1 ]]; then
   echo "Usage: $0 <project>" >&2

@@ -1,4 +1,4 @@
-FROM alpine:3.11.5
+FROM alpine:3
 
 # Specified in .github/workflows/build.yaml
 ARG argocd_version

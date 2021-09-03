@@ -129,7 +129,7 @@ jobs:
           - "jenkins-helmfile-version-query"
           - "render-action"
     env:
-      ARGOCD_VERSION: "1.7.7"
+      ARGOCD_VERSION: "2.0.5"
       VAULT_VERSION: "1.1.0"
     steps:
       - name: Checkout code

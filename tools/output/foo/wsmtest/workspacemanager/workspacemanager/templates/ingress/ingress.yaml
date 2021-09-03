@@ -1,0 +1,23 @@
+---
+# Source: workspacemanager/templates/ingress/ingress.yaml
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: workspacemanager-ingress
+  labels:
+    helm.sh/chart: "workspacemanager-0.33.0"
+    app.kubernetes.io/name: workspacemanager
+    app.kubernetes.io/instance: "workspacemanager"
+    app.kubernetes.io/managed-by: "Helm"
+    app.kubernetes.io/component: workspacemanager
+    app.kubernetes.io/part-of: terra
+  annotations:
+    networking.gke.io/v1beta1.FrontendConfig: "workspacemanager-ingress-frontendconfig"
+    kubernetes.io/ingress.global-static-ip-name: "terra-integration-wsmtest-workspace-ip"
+    kubernetes.io/ingress.allow-http: "false"
+spec:
+  tls:
+  - secretName: workspacemanager-cert
+  backend:
+    serviceName: workspacemanager-service
+    servicePort: 443

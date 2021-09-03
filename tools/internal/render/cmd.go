@@ -112,7 +112,9 @@ $0 -e alpha -a cromwell --argocd
 	}
 
 	cobraCommand.Flags().StringVarP(&options.Env, "env", "e", optionUnset, "Render manifests for a specific Terra environment only")
-	cobraCommand.Flags().StringVarP(&options.App, "app", "a", optionUnset, "Render manifests for a specific Terra application only")
+	cobraCommand.Flags().StringVarP(&options.Cluster, "cluster", "c", optionUnset, "Render manifests for a specific Terra cluster only")
+	cobraCommand.Flags().StringVarP(&options.Release, "release", "r", optionUnset, "Render manifests for a specific release only")
+	cobraCommand.Flags().StringVarP(&options.Release, "app", "a", optionUnset, "Render manifests for a specific app only. (Alias for -r/--release)")
 	cobraCommand.Flags().StringVar(&options.ChartVersion, "chart-version", optionUnset, "Override chart version")
 	cobraCommand.Flags().StringVar(&options.ChartDir, "chart-dir", optionUnset, "Render from local chart directory instead of official release")
 	cobraCommand.Flags().StringVar(&options.AppVersion, "app-version", optionUnset, "Override application version")
@@ -133,9 +135,9 @@ func init() {
 
 // Check Options for incompatible flags
 func checkIncompatibleFlags(options *Options) error {
-	if isSet(options.App) && !isSet(options.Env) {
-		// Not all environments include all apps, so require users to specify -e with -a
-		return fmt.Errorf("an environment must be specified with -e when an app is specified with -a")
+	if isSet(options.Release) && !(isSet(options.Env) || isSet(options.Cluster)) {
+		// Not all targets include all charts, so require users to specify target env or cluster with -a
+		return fmt.Errorf("an environment (-e) or cluster (-c) must be specified when a release is specified with -r")
 	}
 
 	if isSet(options.ChartDir) {
@@ -143,21 +145,26 @@ func checkIncompatibleFlags(options *Options) error {
 			return fmt.Errorf("only one of --chart-dir or --chart-version may be specified")
 		}
 
-		if !isSet(options.App) {
-			return fmt.Errorf("--chart-dir requires an app be specified with -a")
+		if !isSet(options.Release) {
+			return fmt.Errorf("--chart-dir requires a release be specified with -r")
 		}
 	}
 
-	if isSet(options.ChartVersion) && !isSet(options.App) {
-		return fmt.Errorf("--chart-version requires an app be specified with -a")
+	if isSet(options.ChartVersion) && !isSet(options.Release) {
+		return fmt.Errorf("--chart-version requires a release be specified with -r")
 	}
 
-	if isSet(options.AppVersion) && !isSet(options.App) {
-		return fmt.Errorf("--app-version requires an app be specified with -a")
+	if isSet(options.AppVersion) {
+		if !isSet(options.Release) {
+			return fmt.Errorf("--app-version requires a release be specified with -r")
+		}
+		if isSet(options.Cluster) {
+			return fmt.Errorf("--app-version cannot be used for cluster releases")
+		}
 	}
 
-	if len(options.ValuesFiles) > 0 && !isSet(options.App) {
-		return fmt.Errorf("--values-file requires an app be specified with -a")
+	if len(options.ValuesFiles) > 0 && !isSet(options.Release) {
+		return fmt.Errorf("--values-file requires a release be specified with -r")
 	}
 
 	if options.ArgocdMode {

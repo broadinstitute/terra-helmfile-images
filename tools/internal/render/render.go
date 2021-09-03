@@ -18,10 +18,14 @@ const helmfileCommand = "helmfile"
 // Subdirectory to search for environment config files
 const envDir = "environments"
 
+// Subdirectory to search for cluster config files
+const clusterDir = "clusters"
+
 // Options encapsulates CLI options for a render
 type Options struct {
-	Env            string   // If supplied, render for a single environment instead of all
-	App            string   // If supplied, render for a single service instead of all
+	Env            string   // If supplied, render for a single environment instead of all targets
+	Cluster        string   // If supplied, render for a single cluster instead of all targets
+	Release        string   // If supplied, render for a single release instead of all
 	ChartVersion   string   // Optionally override chart version
 	AppVersion     string   // Optionally override app version
 	ChartDir       string   // When supplied, render chart from local directory instead of released version
@@ -33,16 +37,36 @@ type Options struct {
 	ConfigRepoPath string   // Path to terra-helmfile repo clone
 }
 
+// ReleaseTarget represents where a release is being deployed (environment or cluster)
+type ReleaseTarget interface {
+	ConfigDir() string // Subdirectory in configrepo where environments or clusters are defined
+}
+
 // Environment represents a Terra environment
 type Environment struct {
-	Name string // Environment name. Eg "dev", "alpha", "prod
+	Name string // Environment name. Eg "dev", "alpha", "prod"
 	Base string // Type of environment. Eg "live", "personal"
+}
+
+func (e Environment) ConfigDir() string {
+	return envDir
+}
+
+// Cluster represents a Terra cluster
+type Cluster struct {
+	Name string // Cluster name. Eg "terra-dev", "terra-alpha", "datarepo-prod"
+	Base string // Type of cluster. Eg "terra", "datarepo"
+}
+
+func (c Cluster) ConfigDir() string {
+	return clusterDir
 }
 
 // Render generates manifests by invoking `helmfile` with the appropriate arguments
 type Render struct {
 	options          *Options               // CLI options
-	environments     map[string]Environment // Collection of environments defined in the config repo, keyed by env Name
+	environments     map[string]Environment // Collection of environments defined in the config repo, keyed by env name
+	clusters         map[string]Cluster     // Collection of clusters defined in the config repo, keyed by cluster name
 	helmfileLogLevel string                 // --log-level argument to pass to `helmfile` command
 }
 
@@ -221,13 +245,14 @@ func (r *Render) renderSingleEnvironment(env Environment) error {
 	return r.runHelmfile(args...)
 }
 
-func (r *Render) runHelmfile(args ...string) error {
+func (r *Render) runHelmfile(envVars []string, args ...string) error {
 	extraArgs := []string{
 		fmt.Sprintf("--log-level=%s", r.helmfileLogLevel),
 	}
 	args = append(extraArgs, args...)
 
 	cmd := Command{}
+	cmd.Env = envVars
 	cmd.Prog = helmfileCommand
 	cmd.Args = args
 	cmd.Dir = r.options.ConfigRepoPath
@@ -240,15 +265,15 @@ func (r *Render) getStateValues() map[string]string {
 	stateValues := make(map[string]string)
 
 	if isSet(r.options.ChartDir) {
-		key := fmt.Sprintf("releases.%s.repo", r.options.App)
+		key := fmt.Sprintf("releases.%s.repo", r.options.Release)
 		stateValues[key] = r.options.ChartDir
 	} else if isSet(r.options.ChartVersion) {
-		key := fmt.Sprintf("releases.%s.chartVersion", r.options.App)
+		key := fmt.Sprintf("releases.%s.chartVersion", r.options.Release)
 		stateValues[key] = r.options.ChartVersion
 	}
 
 	if isSet(r.options.AppVersion) {
-		key := fmt.Sprintf("releases.%s.appVersion", r.options.App)
+		key := fmt.Sprintf("releases.%s.appVersion", r.options.Release)
 		stateValues[key] = r.options.AppVersion
 	}
 
@@ -258,15 +283,15 @@ func (r *Render) getStateValues() map[string]string {
 // getSelectors returns a map of Helmfile selectors that should be set on the command-line, given user-supplied options
 func (r *Render) getSelectors() map[string]string {
 	selectors := make(map[string]string)
-	selectors["group"] = "terra"
+	selectors["manifestType"] = "release"
 	if r.options.ArgocdMode {
 		// Render ArgoCD manifests instead of application manifests
-		selectors["group"] = "argocd"
+		selectors["manifestType"] = "argocd"
 	}
 
-	if isSet(r.options.App) {
+	if isSet(r.options.Release) {
 		// Render manifests for the given app only
-		selectors["app"] = r.options.App
+		selectors["release"] = r.options.Release
 	}
 
 	return selectors

@@ -41,6 +41,7 @@ type Command struct {
 	Prog string   // Main CLI program to execute
 	Args []string // Arguments to pass to program
 	Dir  string   // Directory where command should be run
+	Env  []string // List of environment variables, eg []string{ "FOO=BAR", "BAZ=QUUX" }
 }
 
 // PrettyFormat converts command into a simple string for easy inspection. Eg.
@@ -48,12 +49,14 @@ type Command struct {
 //   Prog: []string{"echo"},
 //   Args: []string{"foo", "bar", "baz"},
 //   Dir:  "/tmp",
+//   Env:  []string{"A=B", "C=D"}
 // }
 // ->
-// "echo foo bar baz"
+// "A=B C=D echo foo bar baz"
 func (c *Command) PrettyFormat() string {
 	// TODO shellquote arguments for better readability
-	return strings.Join(append([]string{c.Prog}, c.Args...), " ")
+	a := append(append(c.Env, c.Prog), c.Args...)
+	return strings.Join(a, " ")
 }
 
 // RealRunner is an implementation of the Runner API that actually executes shell commands
@@ -64,6 +67,7 @@ type RealRunner struct{}
 func (r *RealRunner) Run(cmd Command) error {
 	execCmd := exec.Command(cmd.Prog, cmd.Args...)
 	execCmd.Dir = cmd.Dir
+	execCmd.Env = cmd.Env
 
 	// TODO - would be nice to capture out/err and stream to debug log, to cut down on noise
 	execCmd.Stdout = os.Stdout

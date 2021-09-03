@@ -1,0 +1,280 @@
+---
+# Source: workspacemanager/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workspacemanager-deployment
+  labels:
+    helm.sh/chart: "workspacemanager-0.33.0"
+    app.kubernetes.io/name: workspacemanager
+    app.kubernetes.io/instance: "workspacemanager"
+    app.kubernetes.io/managed-by: "Helm"
+    app.kubernetes.io/component: workspacemanager
+    app.kubernetes.io/part-of: terra
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  revisionHistoryLimit: 0
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  replicas: 1
+  selector:
+    matchLabels:
+      deployment: workspacemanager-deployment
+  template:
+    metadata:
+      labels:
+        deployment: workspacemanager-deployment
+        helm.sh/chart: "workspacemanager-0.33.0"
+        app.kubernetes.io/name: workspacemanager
+        app.kubernetes.io/instance: "workspacemanager"
+        app.kubernetes.io/managed-by: "Helm"
+        app.kubernetes.io/component: workspacemanager
+        app.kubernetes.io/part-of: terra
+      annotations:
+        checksum/workspacemanager-proxy-configmap: 5664ac57a80e00e4ca1fe9505501ce5d4391a9f5a444d74e349851e23c91fad2
+        checksum/workspacemanager-tcell-configmap: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+        checksum/workspacemanager-prometheus-configmap: 63d3a0c14fa14e58f01d5e708bc43e7070c3691bd8af98527d3f6f512745d77d
+    spec:
+      serviceAccountName: workspacemanager-service-sa
+      volumes:
+      - name: cloudsql-sa-creds
+        secret:
+          secretName: workspacemanager-sqlproxy-sa
+      - name: app-sa-creds
+        secret:
+          secretName: workspacemanager-app-sa
+      - name: apache-httpd-proxy-config
+        configMap:
+          name: workspacemanager-proxy-configmap
+          items:
+          - key: apache-httpd-proxy-config
+            path: workspacemanager-proxy.conf
+      - name: cert
+        secret:
+          secretName: workspacemanager-cert
+      - name: workspacemanager-prometheusjmx-config
+        configMap:
+          name: workspacemanager-prometheus-configmap
+      - name: workspacemanager-prometheusjmx-jar
+        emptyDir: {}
+      containers:
+      - name: workspacemanager
+        image: "gcr.io/terra-kernel-k8s/terra-workspace-manager:0.254.67"
+        ##  dynamically populates environment variables
+        env:
+        imagePullPolicy: Always
+        ports:
+        - name: status
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 1
+            memory: 8Gi
+          requests:
+            cpu: 1
+            memory: 8Gi
+        env:
+        - name: JAVA_TOOL_OPTIONS
+          value: "-javaagent:/etc/prometheusjmx/prometheusjmx.jar=9090:/etc/workspacemanager-prometheusjmx-config/prometheusJmx.yaml"
+        - name: DATABASE_USER
+          valueFrom:
+            secretKeyRef:
+              name: workspacemanager-postgres-db-creds
+              key: username
+        - name: DATABASE_USER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: workspacemanager-postgres-db-creds
+              key: password
+        - name: DATABASE_NAME
+          valueFrom:
+            secretKeyRef:
+              name: workspacemanager-postgres-db-creds
+              key: db
+        - name: STAIRWAY_DATABASE_USER
+          valueFrom:
+            secretKeyRef:
+              name: workspacemanager-stairway-db-creds
+              key: username
+        - name: STAIRWAY_DATABASE_USER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: workspacemanager-stairway-db-creds
+              key: password
+        - name: STAIRWAY_DATABASE_NAME
+          valueFrom:
+            secretKeyRef:
+              name: workspacemanager-stairway-db-creds
+              key: db
+        - name: SAM_ADDRESS
+          value: https://sam.dsde-dev.broadinstitute.org/
+        - name: SERVICE_GOOGLE_PROJECT
+          value: terra-kernel-k8s
+        - name: SAMPLING_PROBABILITY
+          value: "1"
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /secrets/app/service-account.json
+        - name: CLOUD_TRACE_ENABLED
+          value: "true"
+        - name: TERRA_DATAREPO_URL
+          value: "https://jade.datarepo-dev.broadinstitute.org"
+        - name: WORKSPACE_INGRESS_DOMAIN_NAME
+          value: "workspace.wsmtest.integ.envs.broadinstitute.org"
+        - name: WORKSPACE_SPEND_SPENDPROFILES_0_ID
+          value: "wm-default-spend-profile"
+        - name: WORKSPACE_SPEND_SPENDPROFILES_0_BILLINGACCOUNTID
+          value: "01A82E-CA8A14-367457"
+        - name: WORKSPACE_BUFFER_ENABLED
+          value: "true"
+        - name: WORKSPACE_BUFFER_INSTANCE_URL
+          value: "https://buffer.tools.integ.envs.broadinstitute.org"
+        - name: WORKSPACE_BUFFER_POOL_ID
+          value: "workspace_manager_v8"
+        - name: WORKSPACE_BUFFER_CLIENT_CREDENTIAL_FILE_PATH
+          value: /secrets/app/buffer-client-sa.json
+          # Environment variables for Kubernetes config
+        - name: TERRA_COMMON_KUBERNETES_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: TERRA_COMMON_KUBERNETES_POD_NAME_FILTER
+          value: workspacemanager-deployment
+        - name: TERRA_COMMON_KUBERNETES_IN_KUBERNETES
+          value: 'true'
+        volumeMounts:
+        - name: app-sa-creds
+          mountPath: /secrets/app
+          readOnly: true
+        - name: workspacemanager-prometheusjmx-config
+          mountPath: /etc/workspacemanager-prometheusjmx-config
+        - name: workspacemanager-prometheusjmx-jar
+          mountPath: /etc/prometheusjmx/prometheusjmx.jar
+          subPath: prometheusjmx.jar
+        readinessProbe:
+          failureThreshold: 6
+          httpGet:
+            path: /status
+            port: 8080
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        livenessProbe:
+          failureThreshold: 30
+          httpGet:
+            path: /version
+            port: 8080
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        startupProbe:
+          failureThreshold: 1080
+          httpGet:
+            path: /version
+            port: 8080
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+      - name: cloudsql-proxy
+        image: gcr.io/cloudsql-docker/gce-proxy:1.16
+        env:
+        - name: SQL_INSTANCE_PROJECT
+          valueFrom:
+            secretKeyRef:
+              name: workspacemanager-cloudsql-postgres-instance
+              key: project
+        - name: SQL_INSTANCE_REGION
+          valueFrom:
+            secretKeyRef:
+              name: workspacemanager-cloudsql-postgres-instance
+              key: region
+        - name: SQL_INSTANCE_NAME
+          valueFrom:
+            secretKeyRef:
+              name: workspacemanager-cloudsql-postgres-instance
+              key: name
+        command: ["/cloud_sql_proxy",
+                  "-instances=$(SQL_INSTANCE_PROJECT):$(SQL_INSTANCE_REGION):$(SQL_INSTANCE_NAME)=tcp:5432",
+                  "-credential_file=/secrets/cloudsql/service-account.json"]
+        securityContext:
+          runAsUser: 2  # non-root user
+          allowPrivilegeEscalation: false
+        volumeMounts:
+        - name: cloudsql-sa-creds
+          mountPath: /secrets/cloudsql
+          readOnly: true
+      - name: oidc-proxy
+        image: "broadinstitute/openidc-proxy:tcell_3_1_0"
+        env:
+        - name: AOU_PREPROD_WHITELIST
+          valueFrom:
+            secretKeyRef:
+              name: workspacemanager-proxy-oauth-whitelist
+              key: aou-preprod
+        - name: AOU_PERF_WHITELIST
+          valueFrom:
+            secretKeyRef:
+              name: workspacemanager-proxy-oauth-whitelist
+              key: aou-perf
+        - name: AOU_PROD_WHITELIST
+          valueFrom:
+            secretKeyRef:
+              name: workspacemanager-proxy-oauth-whitelist
+              key: aou-prod
+        - name: AOU_DEV_WHITELIST
+          valueFrom:
+            secretKeyRef:
+              name: workspacemanager-proxy-oauth-whitelist
+              key: aou-dev
+        - name: AOU_STABLE_WHITELIST
+          valueFrom:
+            secretKeyRef:
+              name: workspacemanager-proxy-oauth-whitelist
+              key: aou-stable
+        - name: AOU_STAGING_WHITELIST
+          valueFrom:
+            secretKeyRef:
+              name: workspacemanager-proxy-oauth-whitelist
+              key: aou-staging
+        - name: TERRA_ID_WHITELIST
+          valueFrom:
+            secretKeyRef:
+              name: workspacemanager-proxy-oauth-whitelist
+              key: terra
+        - name: REMOTE_USER_CLAIM
+          value: sub
+        ports:
+        - containerPort: 443
+        - containerPort: 80
+        volumeMounts:
+        - mountPath: /etc/apache2/sites-available/site.conf
+          name: apache-httpd-proxy-config
+          subPath: workspacemanager-proxy.conf
+        - mountPath: /etc/ssl/certs/server.crt
+          subPath: tls.crt
+          name: cert
+          readOnly: true
+        - mountPath: /etc/ssl/private/server.key
+          subPath: tls.key
+          name: cert
+          readOnly: true
+      initContainers:
+      - name: download-prometheus-jmx-jar
+        image: alpine:3.12.0
+        command: [
+          "wget",
+          "-O",
+          "/workspacemanager-prometheusjmx-jar/prometheusjmx.jar", "https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/0.13.0/jmx_prometheus_javaagent-0.13.0.jar"
+        ]
+        volumeMounts:
+        - name: workspacemanager-prometheusjmx-jar
+          mountPath: /workspacemanager-prometheusjmx-jar

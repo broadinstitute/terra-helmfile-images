@@ -1,0 +1,21 @@
+---
+# Source: workspacemanager/templates/ingress/cert.yaml
+apiVersion: certmanager.k8s.io/v1alpha1
+kind: Certificate
+metadata:
+  name: workspacemanager-cert
+  labels:
+    helm.sh/chart: "workspacemanager-0.33.0"
+    app.kubernetes.io/name: workspacemanager
+    app.kubernetes.io/instance: "workspacemanager"
+    app.kubernetes.io/managed-by: "Helm"
+    app.kubernetes.io/component: workspacemanager
+    app.kubernetes.io/part-of: terra
+spec:
+  secretName: workspacemanager-cert
+  renewBefore: 720h0m0s
+  dnsNames:
+  - workspace.wsmtest.integ.envs.broadinstitute.org
+  issuerRef:
+    name: cert-manager-letsencrypt-prod
+    kind: ClusterIssuer

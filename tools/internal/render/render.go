@@ -12,20 +12,23 @@ import (
 	"strings"
 )
 
-// Name of the `helmfile` binary
+// helmfileCommand is the name of the `helmfile` binary
 const helmfileCommand = "helmfile"
 
-// Subdirectory to search for environment config files
-const envDir = "environments"
+// targetTypeEnvVar is the name of the environment variable used to pass target type to helmfile
+const targetTypeEnvVar = "TARGET_TYPE"
 
-// Subdirectory to search for cluster config files
-const clusterDir = "clusters"
+// targetBaseEnvVar is the name of the environment variable used to pass target base to helmfile
+const targetBaseEnvVar = "TARGET_BASE"
+
+// targetNameEnvVar is the name of the environment variable used to pass target name to helmfile
+const targetNameEnvVar = "TARGET_NAME"
 
 // Options encapsulates CLI options for a render
 type Options struct {
 	Env            string   // If supplied, render for a single environment instead of all targets
 	Cluster        string   // If supplied, render for a single cluster instead of all targets
-	Release        string   // If supplied, render for a single release instead of all
+	Release        string   // If supplied, render for specific release only instead of all releases in environment/cluster
 	ChartVersion   string   // Optionally override chart version
 	AppVersion     string   // Optionally override app version
 	ChartDir       string   // When supplied, render chart from local directory instead of released version
@@ -37,37 +40,12 @@ type Options struct {
 	ConfigRepoPath string   // Path to terra-helmfile repo clone
 }
 
-// ReleaseTarget represents where a release is being deployed (environment or cluster)
-type ReleaseTarget interface {
-	ConfigDir() string // Subdirectory in configrepo where environments or clusters are defined
-}
-
-// Environment represents a Terra environment
-type Environment struct {
-	Name string // Environment name. Eg "dev", "alpha", "prod"
-	Base string // Type of environment. Eg "live", "personal"
-}
-
-func (e Environment) ConfigDir() string {
-	return envDir
-}
-
-// Cluster represents a Terra cluster
-type Cluster struct {
-	Name string // Cluster name. Eg "terra-dev", "terra-alpha", "datarepo-prod"
-	Base string // Type of cluster. Eg "terra", "datarepo"
-}
-
-func (c Cluster) ConfigDir() string {
-	return clusterDir
-}
-
 // Render generates manifests by invoking `helmfile` with the appropriate arguments
 type Render struct {
-	options          *Options               // CLI options
-	environments     map[string]Environment // Collection of environments defined in the config repo, keyed by env name
-	clusters         map[string]Cluster     // Collection of clusters defined in the config repo, keyed by cluster name
-	helmfileLogLevel string                 // --log-level argument to pass to `helmfile` command
+	options          *Options                 // CLI options
+	environments     map[string]ReleaseTarget // Collection of environments defined in the config repo, keyed by env name
+	clusters         map[string]ReleaseTarget // Collection of clusters defined in the config repo, keyed by cluster name
+	helmfileLogLevel string                   // --log-level argument to pass to `helmfile` command
 }
 
 // Global/package-level variable, used for executing commands. Replaced with a mock in tests.
@@ -83,6 +61,12 @@ func NewRender(options *Options) (*Render, error) {
 		return nil, err
 	}
 	render.environments = environments
+
+	clusters, err := loadClusters(options.ConfigRepoPath)
+	if err != nil {
+		return nil, err
+	}
+	render.clusters = clusters
 
 	render.helmfileLogLevel = "info"
 	if options.Verbose > 1 {
@@ -131,12 +115,12 @@ func (r *Render) CleanOutputDirectory() error {
 // HelmUpdate updates Helm repos
 func (r *Render) HelmUpdate() error {
 	log.Debug().Msg("Updating Helm repos...")
-	return r.runHelmfile("--allow-no-matching-release", "repos")
+	return r.runHelmfile([]string{}, "--allow-no-matching-release", "repos")
 }
 
 // RenderAll renders manifests based on supplied arguments
 func (r *Render) RenderAll() error {
-	targetEnvs, err := r.getTargetEnvs()
+	targetEnvs, err := r.getTargets()
 	if err != nil {
 		return err
 	}
@@ -144,7 +128,7 @@ func (r *Render) RenderAll() error {
 	log.Info().Msgf("Rendering manifests for %d environments...", len(targetEnvs))
 
 	for _, env := range targetEnvs {
-		err = r.renderSingleEnvironment(env)
+		err = r.renderSingleReleaseTarget(env)
 		if err != nil {
 			return err
 		}
@@ -154,63 +138,90 @@ func (r *Render) RenderAll() error {
 }
 
 // loadEnvironments scans through the environments/ subdirectory and build a slice of defined environments
-func loadEnvironments(configRepoPath string) (map[string]Environment, error) {
-	environments := make(map[string]Environment)
+func loadEnvironments(configRepoPath string) (map[string]ReleaseTarget, error) {
+	configDir := path.Join(configRepoPath, envConfigDir)
 
-	envDir := path.Join(configRepoPath, envDir)
-	if _, err := os.Stat(envDir); err != nil {
-		return nil, fmt.Errorf("environments subdirectory %s does not exist in %s, is it a %s clone?", envDir, configRepoPath, configRepoName)
+	return loadTargets(configDir, envTypeName, NewEnvironmentGeneric)
+}
+
+// loadClusters scans through the cluster/ subdirectory and build a slice of defined clusters
+func loadClusters(configRepoPath string) (map[string]ReleaseTarget, error) {
+	configDir := path.Join(configRepoPath, clusterConfigDir)
+
+	return loadTargets(configDir, clusterTypeName, NewClusterGeneric)
+}
+
+// loadTargets loads the set of configured clusters or environments from a config directory
+func loadTargets(configDir string, targetType string, constructor func(string, string) ReleaseTarget) (map[string]ReleaseTarget, error) {
+	targets := make(map[string]ReleaseTarget)
+
+	if _, err := os.Stat(configDir); err != nil {
+		return nil, fmt.Errorf("%s directory %s does not exist, is it a %s clone?", targetType, configDir, configRepoName)
 	}
 
-	matches, err := filepath.Glob(path.Join(envDir, "*", "*.yaml"))
+	matches, err := filepath.Glob(path.Join(configDir, "*", "*.yaml"))
 	if err != nil {
-		return nil, fmt.Errorf("error loading environments from %s: %v", configRepoPath, err)
+		return nil, fmt.Errorf("error loading %s configs from %s: %v", targetType, configDir, err)
 	}
 
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("no environments found in %s, is it a %s clone?", configRepoPath, configRepoName)
+		return nil, fmt.Errorf("no %s configs found in %s, is it a %s clone?", targetType, configDir, configRepoName)
 	}
 
 	for _, filename := range matches {
-		env := Environment{}
-		env.Base = path.Base(path.Dir(filename))
-		env.Name = strings.TrimSuffix(path.Base(filename), ".yaml")
-		environments[env.Name] = env
+		base := path.Base(path.Dir(filename))
+		name := strings.TrimSuffix(path.Base(filename), ".yaml")
+
+		target := constructor(name, base)
+		targets[target.Name()] = target
 	}
 
-	return environments, nil
+	return targets, nil
 }
 
-// getTargetEnvs returns the set of target environments to render manifests for
-func (r *Render) getTargetEnvs() ([]Environment, error) {
+// getTargets returns the set of release targets to render manifests for
+func (r *Render) getTargets() ([]ReleaseTarget, error) {
 	if isSet(r.options.Env) {
 		// User wants to render for a specific environment
 		env, ok := r.environments[r.options.Env]
 		if !ok {
 			return nil, fmt.Errorf("unknown environment: %s", r.options.Env)
 		}
-		return []Environment{env}, nil
+		return []ReleaseTarget{env}, nil
 	}
 
-	// No environment specified; render for _all_ environments
-	var envs []Environment
+	if isSet(r.options.Cluster) {
+		// User wants to render for a specific cluster
+		cluster, ok := r.clusters[r.options.Cluster]
+		if !ok {
+			return nil, fmt.Errorf("unknown cluster: %s", r.options.Cluster)
+		}
+		return []ReleaseTarget{cluster}, nil
+	}
+
+	// No target specified; render for _all_ targets
+	var targets []ReleaseTarget
 	for _, env := range r.environments {
-		envs = append(envs, env)
+		targets = append(targets, env)
+	}
+	for _, cluster := range r.clusters {
+		targets = append(targets, cluster)
 	}
 
-	// Sort environments so they are rendered in a predictable order
-	sortEnvironments(envs)
+	// Sort targets so they are rendered in a predictable order
+	sortReleaseTargets(targets)
 
-	return envs, nil
+	return targets, nil
 }
 
-func (r *Render) renderSingleEnvironment(env Environment) error {
-	log.Info().Msgf("Rendering manifests for %s", env.Name)
+func (r *Render) renderSingleReleaseTarget(target ReleaseTarget) error {
+	log.Info().Msgf("Rendering manifests for %s %s", target.Type(), target.Name())
 
+	// Get environment variables for `helmfile`
+	envVars := getEnvVars(target)
+
+	// Build list of CLI args to `helmfile`
 	var args []string
-
-	// Append global Helmfile options
-	args = append(args, "-e", env.Name)
 
 	selectors := r.getSelectors()
 	if len(selectors) != 0 {
@@ -239,10 +250,10 @@ func (r *Render) renderSingleEnvironment(env Environment) error {
 		// Expand output dir to absolute path, because Helmfile assumes paths
 		// are relative to helmfile.yaml and we want to be relative to CWD
 		// filepath.Abs()
-		args = append(args, fmt.Sprintf("--output-dir=%s/%s", r.options.OutputDir, env.Name))
+		args = append(args, fmt.Sprintf("--output-dir=%s/%s", r.options.OutputDir, target.Name))
 	}
 
-	return r.runHelmfile(args...)
+	return r.runHelmfile(envVars, args...)
 }
 
 func (r *Render) runHelmfile(envVars []string, args ...string) error {
@@ -258,6 +269,22 @@ func (r *Render) runHelmfile(envVars []string, args ...string) error {
 	cmd.Dir = r.options.ConfigRepoPath
 
 	return shellRunner.Run(cmd)
+}
+
+// getEnvVars returns a slice of environment variables that are needed for a helmfile render, . Eg.
+// []string{"TARGET_TYPE": "environment", "TARGET_NAME": "dev", "TARGET_BASE": "live" }
+func getEnvVars(t ReleaseTarget) []string {
+	m := map[string]string {
+		targetTypeEnvVar: t.Type(),
+		targetNameEnvVar: t.Name(),
+		targetBaseEnvVar: t.Base(),
+	}
+
+	var pairs []string
+	for name, value := range m {
+		pairs = append(pairs, fmt.Sprintf("%s=%s", name, value))
+	}
+	return pairs
 }
 
 // getStateValues returns a map of state values that should be set on the command-line, given user-supplied options
@@ -326,16 +353,6 @@ func normalizeRenderDirectories(outputDir string) error {
 	}
 
 	return nil
-}
-
-// sortEnvironments sorts environments lexicographically by base, and then by name
-func sortEnvironments(envs []Environment) {
-	sort.Slice(envs, func(i int, j int) bool {
-		if envs[i].Base == envs[j].Base {
-			return envs[i].Name < envs[j].Name
-		}
-		return envs[i].Base < envs[j].Base
-	})
 }
 
 // joinKeyValuePairs joins map[string]string to string containing comma-separated key-value pairs.

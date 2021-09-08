@@ -135,6 +135,10 @@ func init() {
 
 // Check Options for incompatible flags
 func checkIncompatibleFlags(options *Options) error {
+	if isSet(options.Env) && isSet(options.Cluster) {
+		return fmt.Errorf("only one of -e/--environment and -c/--cluster may be specified")
+	}
+
 	if isSet(options.Release) && !(isSet(options.Env) || isSet(options.Cluster)) {
 		// Not all targets include all charts, so require users to specify target env or cluster with -a
 		return fmt.Errorf("an environment (-e) or cluster (-c) must be specified when a release is specified with -r")

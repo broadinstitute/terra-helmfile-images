@@ -479,22 +479,6 @@ func (ts *TestState) cmd(format string, a ...interface{}) ExpectedCommand {
 	}
 }
 
-// Convenience function to create a successful/non-erroring ExpectedCommand, given
-// a format string _for_ the command.
-//
-// Eg. cmd("helmfile -e %s template", "alpha")
-func (ts *TestState) targetCmd(target ReleaseTarget, format string, a ...interface{}) ExpectedCommand {
-	tokens := args(format, a...)
-
-	return ExpectedCommand{
-		Command: Command{
-			Prog: tokens[0],
-			Args: tokens[1:],
-			Dir:  ts.mockConfigRepoPath,
-		},
-	}
-}
-
 // Convenience function to create a failing ExpectedCommand with an error
 // a format string _for_ the command.
 //

@@ -56,7 +56,10 @@ type Command struct {
 // "A=B C=D echo foo bar baz"
 func (c *Command) PrettyFormat() string {
 	// TODO shellquote arguments for better readability
-	a := append(append(c.Env, c.Prog), c.Args...)
+	var a []string
+	a = append(a, c.Env...)
+	a = append(a, c.Prog)
+	a = append(a, c.Args...)
 	return strings.Join(a, " ")
 }
 

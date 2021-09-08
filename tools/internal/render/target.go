@@ -43,26 +43,33 @@ type Environment struct {
 	base string // Type of environment. Eg "live", "personal"
 }
 
+// NewEnvironment constructs a new Environment
 func NewEnvironment(name string, base string) *Environment {
 	return &Environment{name, base}
 }
 
+// NewEnvironmentGeneric like NewEnvironment, but with a return type of ReleaseTarget
+// (this won't be necessary once Go's upcoming support for generic types is available)
 func NewEnvironmentGeneric(name string, base string) ReleaseTarget {
 	return NewEnvironment(name, base)
 }
 
+// ConfigDir environment configuration subdirectory within terra-helmfile ("environments")
 func (e *Environment) ConfigDir() string {
 	return envConfigDir
 }
 
+// Type type name ("environment")
 func (e *Environment) Type() string {
 	return envTypeName
 }
 
+// Name environment name, eg. "alpha"
 func (e *Environment) Name() string {
 	return e.name
 }
 
+// Base environment base, eg. "live"
 func (e *Environment) Base() string {
 	return e.base
 }
@@ -73,26 +80,33 @@ type Cluster struct {
 	base string // Type of cluster. Eg "terra", "datarepo"
 }
 
+// NewCluster constructs a new Cluster
 func NewCluster(name string, base string) *Cluster {
 	return &Cluster{name, base}
 }
 
+// NewClusterGeneric like NewCluster, but with a return type of ReleaseTarget
+// (this won't be necessary once Go's upcoming support for generic types is available)
 func NewClusterGeneric(name string, base string) ReleaseTarget {
 	return NewCluster(name, base)
 }
 
+// ConfigDir cluster configuration subdirectory within terra-helmfile ("clusters")
 func (c *Cluster) ConfigDir() string {
 	return clusterConfigDir
 }
 
+// Type type name ("cluster")
 func (c *Cluster) Type() string {
 	return clusterTypeName
 }
 
+// Name cluster name, eg. "terra-alpha"
 func (c *Cluster) Name() string {
 	return c.name
 }
 
+// Base cluster base, eg. "terra"
 func (c *Cluster) Base() string {
 	return c.base
 }

@@ -104,12 +104,12 @@ func TestRender(t *testing.T) {
 		{
 			description:   "-a should require -e or -c",
 			arguments:     args("-a foo"),
-			expectedError: regexp.MustCompile("an environment \\(-e\\) or cluster \\(-c\\) must be specified when a release is specified with -r"),
+			expectedError: regexp.MustCompile(`an environment \(-e\) or cluster \(-c\) must be specified when a release is specified with -r`),
 		},
 		{
 			description:   "-r should require -e or -c",
 			arguments:     args("-r foo"),
-			expectedError: regexp.MustCompile("an environment \\(-e\\) or cluster \\(-c\\) must be specified when a release is specified with -r"),
+			expectedError: regexp.MustCompile(`an environment \(-e\) or cluster \(-c\) must be specified when a release is specified with -r`),
 		},
 		{
 			description:   "--app-version should require -r",

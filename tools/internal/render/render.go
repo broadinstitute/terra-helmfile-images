@@ -250,7 +250,7 @@ func (r *Render) renderSingleReleaseTarget(target ReleaseTarget) error {
 		// Expand output dir to absolute path, because Helmfile assumes paths
 		// are relative to helmfile.yaml and we want to be relative to CWD
 		// filepath.Abs()
-		args = append(args, fmt.Sprintf("--output-dir=%s/%s", r.options.OutputDir, target.Name))
+		args = append(args, fmt.Sprintf("--output-dir=%s/%s", r.options.OutputDir, target.Name()))
 	}
 
 	return r.runHelmfile(envVars, args...)
@@ -274,7 +274,7 @@ func (r *Render) runHelmfile(envVars []string, args ...string) error {
 // getEnvVars returns a slice of environment variables that are needed for a helmfile render, . Eg.
 // []string{"TARGET_TYPE": "environment", "TARGET_NAME": "dev", "TARGET_BASE": "live" }
 func getEnvVars(t ReleaseTarget) []string {
-	m := map[string]string {
+	m := map[string]string{
 		targetTypeEnvVar: t.Type(),
 		targetNameEnvVar: t.Name(),
 		targetBaseEnvVar: t.Base(),

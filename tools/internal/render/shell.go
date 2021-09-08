@@ -38,10 +38,11 @@ func (e *ShellError) Error() string {
 
 // Command encapsulates a shell command
 type Command struct {
-	Prog string   // Main CLI program to execute
-	Args []string // Arguments to pass to program
-	Dir  string   // Directory where command should be run
-	Env  []string // List of environment variables, eg []string{ "FOO=BAR", "BAZ=QUUX" }
+	Prog        string   // Main CLI program to execute
+	Args        []string // Arguments to pass to program
+	Dir         string   // Directory where command should be run
+	Env         []string // List of environment variables, eg []string{ "FOO=BAR", "BAZ=QUUX" }, to set when executing
+	PristineEnv bool     // When true, set only supplied Env vars without inheriting current process's env vars
 }
 
 // PrettyFormat converts command into a simple string for easy inspection. Eg.
@@ -67,7 +68,11 @@ type RealRunner struct{}
 func (r *RealRunner) Run(cmd Command) error {
 	execCmd := exec.Command(cmd.Prog, cmd.Args...)
 	execCmd.Dir = cmd.Dir
-	execCmd.Env = cmd.Env
+
+	if !cmd.PristineEnv {
+		execCmd.Env = os.Environ()
+	}
+	execCmd.Env = append(execCmd.Env, cmd.Env...)
 
 	// TODO - would be nice to capture out/err and stream to debug log, to cut down on noise
 	execCmd.Stdout = os.Stdout

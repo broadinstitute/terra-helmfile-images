@@ -6,20 +6,22 @@ import (
 
 // envConfigDir is the subdirectory to search for environment config files
 const envConfigDir = "environments"
+
 // envTypeName is the name of the environment target type, as referenced in the helmfile config repo
 const envTypeName = "environment"
 
 // clusterConfigDir is the subdirectory to search for cluster config files
 const clusterConfigDir = "clusters"
+
 // clusterTypeName is the name of the cluster target type, as referenced in the helmfile config repo
 const clusterTypeName = "cluster"
 
 // ReleaseTarget represents where a release is being deployed (environment or cluster)
 type ReleaseTarget interface {
 	ConfigDir() string // ConfigDir returns the subdirectory in the terra-helmfile config repo where environments or clusters are defined
-	Type() string // Type is the name of the target type, either "environment" or "cluster", as referenced in the helmfile repo
-	Base() string // Base is the base of the environment or cluster
-	Name() string // Name is the name of the environment or cluster
+	Type() string      // Type is the name of the target type, either "environment" or "cluster", as referenced in the helmfile repo
+	Base() string      // Base is the base of the environment or cluster
+	Name() string      // Name is the name of the environment or cluster
 }
 
 // sortReleaseTargets sorts release targets lexicographically by type, by base, and then by name

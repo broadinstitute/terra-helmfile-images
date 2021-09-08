@@ -18,8 +18,8 @@ func TestRunSuccess(t *testing.T) {
 	runner := RealRunner{}
 	cmd := Command{}
 	cmd.Prog = "sh"
-	cmd.Env  = []string{ "VAR1=foo" }
-	cmd.Args = []string{ "-c", "mkdir test-dir-$VAR1" }
+	cmd.Env = []string{"VAR1=foo"}
+	cmd.Args = []string{"-c", "mkdir test-dir-$VAR1"}
 	cmd.Dir = tmpdir
 
 	err = runner.Run(cmd)
@@ -42,7 +42,7 @@ func TestRunFailed(t *testing.T) {
 	runner := RealRunner{}
 	cmd := Command{}
 	cmd.Prog = "sh"
-	cmd.Args = []string{ "-c", "exit 42" }
+	cmd.Args = []string{"-c", "exit 42"}
 	cmd.Dir = ""
 
 	err := runner.Run(cmd)
@@ -62,7 +62,7 @@ func TestRunError(t *testing.T) {
 	runner := RealRunner{}
 	cmd := Command{}
 	cmd.Prog = "echo"
-	cmd.Args = []string{ "a", "b" }
+	cmd.Args = []string{"a", "b"}
 	cmd.Dir = "/this-file-does-not-exist-398u48"
 
 	err := runner.Run(cmd)
@@ -77,4 +77,3 @@ func TestRunError(t *testing.T) {
 		t.Errorf("Unexpected error message: %v", err)
 	}
 }
-

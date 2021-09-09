@@ -182,7 +182,7 @@ func TestRender(t *testing.T) {
 			expectedError: regexp.MustCompile("--app-version cannot be used for cluster releases"),
 		},
 		{
-			description: "incorrect environment should return error",
+			description: "unknown environment should return error",
 			arguments:   args("-e foo"),
 			expectedCommands: []ExpectedCommand{
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
@@ -190,7 +190,7 @@ func TestRender(t *testing.T) {
 			expectedError: regexp.MustCompile("unknown environment: foo"),
 		},
 		{
-			description: "incorrect cluster should return error",
+			description: "unknown cluster should return error",
 			arguments:   args("-c blargh"),
 			expectedCommands: []ExpectedCommand{
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
@@ -354,6 +354,27 @@ func TestRender(t *testing.T) {
 				ts.cmd("TARGET_TYPE=environment TARGET_BASE=personal TARGET_NAME=jdoe helmfile --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/path/to/nowhere/jdoe", cwd()),
 			},
 		},
+		{
+			description: "two environments with the same name should raise an error",
+			setup: func() error {
+				return createFakeTargetFiles(ts.mockConfigRepoPath, []ReleaseTarget{NewEnvironmentGeneric("dev", "personal")})
+			},
+			expectedError: regexp.MustCompile(`environment name conflict dev \(personal\) and dev \(live\)`),
+		},
+		{
+			description: "two clusters with the same name should raise an error",
+			setup: func() error {
+				return createFakeTargetFiles(ts.mockConfigRepoPath, []ReleaseTarget{NewClusterGeneric("terra-perf", "tdr")})
+			},
+			expectedError: regexp.MustCompile(`cluster name conflict terra-perf \(terra\) and terra-perf \(tdr\)`),
+		},
+		{
+			description: "environment and cluster with the same name should raise an error",
+			setup: func() error {
+				return createFakeTargetFiles(ts.mockConfigRepoPath, []ReleaseTarget{NewClusterGeneric("dev", "terra")})
+			},
+			expectedError: regexp.MustCompile("cluster name dev conflicts with environment name dev"),
+		},
 	}
 
 	for _, test := range tests {
@@ -456,7 +477,14 @@ func cwd() string {
 // Convenience function to create a successful/non-erroring ExpectedCommand, given
 // a format string _for_ the command.
 //
-// Eg. cmd("helmfile -e %s template", "alpha")
+// Eg. cmd("TARGET_NAME=%s FOO=BAR helmfile template", "alpha")
+// ->
+// Command{
+//   Env: []string{"TARGET_NAME=alpha", "FOO=BAR"},
+//   Prog: "helmfile",
+//   Args: []string{"template"},
+//   Dir: "mock/config/repo/path" // tmpdir
+// }
 func (ts *TestState) cmd(format string, a ...interface{}) ExpectedCommand {
 	tokens := args(format, a...)
 
@@ -499,6 +527,18 @@ func (ts *TestState) setupTestCase(tc TestCase) error {
 		return err
 	}
 
+	// Create fake environment files
+	if err := os.RemoveAll(ts.mockConfigRepoPath); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(ts.mockConfigRepoPath, 0755); err != nil {
+		return err
+	}
+
+	if err := createFakeTargetFiles(ts.mockConfigRepoPath, fakeReleaseTargets); err != nil {
+		return err
+	}
+
 	// Execute setup callback function if one was given
 	if tc.setup != nil {
 		if err := tc.setup(); err != nil {
@@ -524,12 +564,6 @@ func setup() (*TestState, error) {
 
 	mockConfigRepoPath := path.Join(tmpDir, configRepoName)
 	err = os.MkdirAll(mockConfigRepoPath, 0755)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create fake environment files
-	err = createFakeTargetFiles(mockConfigRepoPath, fakeReleaseTargets)
 	if err != nil {
 		return nil, err
 	}

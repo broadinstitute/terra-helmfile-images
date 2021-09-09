@@ -375,6 +375,20 @@ func TestRender(t *testing.T) {
 			},
 			expectedError: regexp.MustCompile("cluster name dev conflicts with environment name dev"),
 		},
+		{
+			description: "missing config directory should raise an error",
+			setup: func() error {
+				return os.RemoveAll(ts.mockConfigRepoPath)
+			},
+			expectedError: regexp.MustCompile("does not exist, is it a terra-helmfile clone"),
+		},
+		{
+			description: "missing environments directory should raise an error",
+			setup: func() error {
+				return os.RemoveAll(path.Join(ts.mockConfigRepoPath, "environments"))
+			},
+			expectedError: regexp.MustCompile("does not exist, is it a terra-helmfile clone"),
+		},
 	}
 
 	for _, test := range tests {

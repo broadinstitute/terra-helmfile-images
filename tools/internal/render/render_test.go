@@ -389,6 +389,17 @@ func TestRender(t *testing.T) {
 			},
 			expectedError: regexp.MustCompile("does not exist, is it a terra-helmfile clone"),
 		},
+		{
+			description: "no environment definitions should raise an error",
+			setup: func() error {
+				envDir := path.Join(ts.mockConfigRepoPath, "environments")
+				if err := os.RemoveAll(envDir); err != nil {
+					return err
+				}
+				return os.MkdirAll(envDir, 0755)
+			},
+			expectedError: regexp.MustCompile("no environment configs found"),
+		},
 	}
 
 	for _, test := range tests {

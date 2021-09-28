@@ -12,7 +12,7 @@ set -eo pipefail
 set -x
 
 target=
-if [[ -n "${TERRA_ENV}" ]]
+if [[ -n "${TERRA_ENV}" ]]; then
   target="--environment ${TERRA_ENV}"
 elif [[ -n "${TERRA_CLUSTER}" ]]; then
   target="--cluster ${TERRA_CLUSTER}"

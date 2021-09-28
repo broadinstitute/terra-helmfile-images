@@ -5,6 +5,8 @@
 #
 # This script is executed by the ArgoCD applications for Terra apps. (eg. cromwell-dev)
 #
+# TODO: We should make render use viper at some point, it would make these scripts
+# muuuch simpler.
 
 set -eo pipefail
 set -x

@@ -3,7 +3,9 @@ package render
 import (
 	"errors"
 	"fmt"
-	"github.com/google/go-cmp/cmp"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shellmock"
+	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"os"
 	"path"
@@ -14,7 +16,7 @@ import (
 
 // This file contains an integration test for the render utility
 
-// Fake environments and clusters, mocked for integration testing
+// Fake environments and clusters, mocked for integration mock
 var fakeReleaseTargets = []ReleaseTarget{
 	NewEnvironment("dev", "live"),
 	NewEnvironment("alpha", "live"),
@@ -25,56 +27,22 @@ var fakeReleaseTargets = []ReleaseTarget{
 
 // Struct for tracking global state that is mocked when a test executes and restored/cleaned up after
 type TestState struct {
-	mockRunner             *MockRunner  // mock ShellRunner, reset before every test case
-	mockConfigRepoPath     string       // mock terra-helmfile, created once before all test cases
-	mockChartDir           string       // mock chart directory, created once before all test cases
-	scratchDir             string       // scratch directory, cleaned out before each test case
-	rootDir                string       // root/parent directory for all test files
-	originalRunner         *ShellRunner // real ShellRunner, saved before tests start and restored after they finish
-	originalConfigRepoPath string       // real config repo path, saved before tests start and restored after they finish
-}
-
-type TestCase struct {
-	description      string            // Testcase description
-	arguments        []string          // Fake user-supplied CLI arguments to pass to `render`
-	expectedCommands []ExpectedCommand // Ordered list of CLI commands we expect `render` to run
-	expectedError    *regexp.Regexp    // Optional error we expect to be raised
-	setup            func() error      // Optional hook for extra setup
+	mockConfigRepoPath     string // mock terra-helmfile, created once before all test cases
+	mockChartDir           string // mock chart directory, created once before all test cases
+	scratchDir             string // scratch directory, cleaned out before each test case
+	rootDir                string // root/parent directory for all test files
+	originalConfigRepoPath string // real config repo path, saved before tests start and restored after they finish
 }
 
 // Used in MockRunner to verify expected commands have been called
 type ExpectedCommand struct {
-	Command   Command // Expected Command
-	MockError error   // Optional error to return (for faking an error running the command)
-}
-
-// MockRunner stores an ordered list (slice) of expected commands
-type MockRunner struct {
-	expectedCommands []ExpectedCommand // Ordered list of expected commands
-}
-
-// Mock implementation of ShellCommand
-//
-// Instead of executing the command, compare it to the runner's list of expected commands,
-// throwing an error on mismatch
-func (m *MockRunner) Run(cmd Command) error {
-	if len(m.expectedCommands) == 0 {
-		return fmt.Errorf("MockRunner: Received unexpected command %v", cmd)
-	}
-
-	var expected ExpectedCommand
-	expected, m.expectedCommands = m.expectedCommands[0], m.expectedCommands[1:]
-
-	if diff := cmp.Diff(cmd, expected.Command); diff != "" {
-		return fmt.Errorf("MockRunner: %T differ (-got, +want): %s", expected.Command, diff)
-	}
-
-	return expected.MockError
+	Command shell.Command // Expected Command
+	Error   error         // Optional error to return (for faking an error running the command)
 }
 
 // A table-driven integration test for the render tool.
 //
-// Given a list of CLI arguments to the render command, the test verifies
+// Given a list of CLI arguments to the render Cobra command, the test verifies
 // that the correct underlying `helmfile` command(s) are run.
 //
 // Reference:
@@ -95,7 +63,13 @@ func TestRender(t *testing.T) {
 		}
 	})
 
-	var tests = []TestCase{
+	var testCases = []struct {
+		description      string            // Testcase description
+		arguments        []string          // Fake user-supplied CLI arguments to pass to `render`
+		expectedCommands []ExpectedCommand // Ordered list of CLI commands we expect `render` to run
+		expectedError    *regexp.Regexp    // Optional error we expect to be returned when we execute the Cobra command
+		setup            func() error      // Optional hook for extra setup
+	}{
 		{
 			description:   "invalid argument",
 			arguments:     args("--foo"),
@@ -402,34 +376,44 @@ func TestRender(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.description, func(t *testing.T) {
-			if err := ts.setupTestCase(test); err != nil {
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			if err := ts.setupTestCase(); err != nil {
 				t.Error(err)
 				return
 			}
 
+			// Execute setup callback function if one was given
+			if testCase.setup != nil {
+				if err := testCase.setup(); err != nil {
+					t.Errorf("setup error: %v", err)
+				}
+			}
+
+			// Set up expectations for this test case's commands
+			mockRunner, originalRunner := shellmock.DefaultMockRunner(), shellRunner
+			shellRunner = mockRunner
+			defer func() { shellRunner = originalRunner }()
+
+			for _, expectedCmd := range testCase.expectedCommands {
+				mockRunner.ExpectCmd(t, expectedCmd.Command).Return(expectedCmd.Error)
+			}
+
+			// Run the Cobra command
 			cobraCmd := newCobraCommand()
-			cobraCmd.SetArgs(test.arguments)
+			cobraCmd.SetArgs(testCase.arguments)
 			err := cobraCmd.Execute()
 
-			if err == nil && test.expectedError != nil {
-				t.Errorf("Did not receive an error matching %v", test.expectedError)
-				return
-			}
-			if err != nil && test.expectedError == nil {
-				t.Error(err)
-				return
-			}
-			if err != nil && !test.expectedError.MatchString(err.Error()) {
-				t.Errorf("Expected error matching %v, got %v", test.expectedError, err)
-				return
+			// Verify error matches expectations
+			if testCase.expectedError == nil {
+				assert.Nil(t, err, "Unexpected error returned: %v", err)
+			} else {
+				assert.NotNil(t, err, "Expected command execution to return an error, but it did not")
+				assert.Regexp(t, testCase.expectedError, err.Error(), "Error mismatch")
 			}
 
-			if len(ts.mockRunner.expectedCommands) != 0 {
-				t.Errorf("MockRunner: Unmatched expectedCommands %v", ts.mockRunner.expectedCommands)
-				return
-			}
+			// Verify all expected commands were run
+			mockRunner.AssertExpectations(t)
 		})
 	}
 }
@@ -523,7 +507,7 @@ func (ts *TestState) cmd(format string, a ...interface{}) ExpectedCommand {
 	}
 
 	return ExpectedCommand{
-		Command: Command{
+		Command: shell.Command{
 			Env:  tokens[0:i],
 			Prog: tokens[i],
 			Args: tokens[i+1:],
@@ -538,12 +522,12 @@ func (ts *TestState) cmd(format string, a ...interface{}) ExpectedCommand {
 // Eg. cmd("helmfile -e %s template", "alpha")
 func (ts *TestState) failCmd(err string, format string, a ...interface{}) ExpectedCommand {
 	expectedCommand := ts.cmd(format, a...)
-	expectedCommand.MockError = errors.New(err)
+	expectedCommand.Error = errors.New(err)
 	return expectedCommand
 }
 
 // Per-test case setup
-func (ts *TestState) setupTestCase(tc TestCase) error {
+func (ts *TestState) setupTestCase() error {
 	// Delete and re-create scratch directory
 	if err := os.RemoveAll(ts.scratchDir); err != nil {
 		return err
@@ -563,16 +547,6 @@ func (ts *TestState) setupTestCase(tc TestCase) error {
 	if err := createFakeTargetFiles(ts.mockConfigRepoPath, fakeReleaseTargets); err != nil {
 		return err
 	}
-
-	// Execute setup callback function if one was given
-	if tc.setup != nil {
-		if err := tc.setup(); err != nil {
-			return fmt.Errorf("setup error: %v", err)
-		}
-	}
-
-	// Set expectedCommands to the test-case's expected commands
-	ts.mockRunner.expectedCommands = tc.expectedCommands
 
 	return nil
 }
@@ -600,11 +574,6 @@ func setup() (*TestState, error) {
 		return nil, err
 	}
 
-	// Replace package-level default ShellRunner with a mock
-	originalRunner := shellRunner
-	mockRunner := &MockRunner{}
-	shellRunner = mockRunner
-
 	// Create mock chart dir inside tmp dir
 	mockChartDir := path.Join(tmpDir, "charts")
 	err = os.MkdirAll(mockChartDir, 0755)
@@ -616,8 +585,6 @@ func setup() (*TestState, error) {
 	scratchDir := path.Join(tmpDir, "scratch")
 
 	return &TestState{
-		originalRunner:         &originalRunner,
-		mockRunner:             mockRunner,
 		originalConfigRepoPath: originalConfigRepoPath,
 		mockConfigRepoPath:     mockConfigRepoPath,
 		mockChartDir:           mockChartDir,
@@ -628,9 +595,6 @@ func setup() (*TestState, error) {
 
 // One-time cleanup, run after all TestCases have run
 func cleanup(state *TestState) error {
-	// Restore original ShellRunner
-	shellRunner = *(state.originalRunner)
-
 	// Restore original config repo path
 	// When Golang 1.17 is released we can use t.Setenv() instead https://github.com/golang/go/issues/41260
 	err := os.Setenv(configRepoPathEnvVar, state.originalConfigRepoPath)
@@ -648,7 +612,7 @@ func createFakeTargetFiles(mockConfigRepoPath string, targets []ReleaseTarget) e
 		baseDir := path.Join(mockConfigRepoPath, target.ConfigDir(), target.Base())
 		configFile := path.Join(baseDir, fmt.Sprintf("%s.yaml", target.Name()))
 
-		if err := createFile(configFile, "# Fake file for testing"); err != nil {
+		if err := createFile(configFile, "# Fake file for mock"); err != nil {
 			return err
 		}
 	}

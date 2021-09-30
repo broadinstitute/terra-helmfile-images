@@ -46,32 +46,32 @@ func newCobraCommand() *cobra.Command {
 Examples:
 
 # Render all manifests for all Terra services in all environments
-$0
+render
 
 # Render manifests for all Terra services in the dev environment
-$0 -e dev
+render -e dev
 
 # Render manifests for the cromwell service in the alpha environment
-$0 -e alpha -a cromwell
+render -e alpha -a cromwell
 
 # Render manifests for the cromwell service in the alpha environment,
 # overriding app and chart version
-$0 -e alpha -a cromwell --chart-version="~> 0.8" --app-version="53-9b11416"
+render -e alpha -a cromwell --chart-version="~> 0.8" --app-version="53-9b11416"
 
 # Render manifests from a local copy of a chart
-$0 -e alpha -a cromwell --chart-dir=../terra-helm/charts
+render -e alpha -a cromwell --chart-dir=../terra-helm/charts
 
 # Render manifests, overriding chart values with a local file
-$0 -e alpha -a cromwell --values-file=path/to/my-values.yaml
+render -e alpha -a cromwell --values-file=path/to/my-values.yaml
 
 # Render all manifests to a directory called my-manifests
-$0 --output-dir=/tmp/my-manifests
+render --output-dir=/tmp/my-manifests
 
 # Render ArgoCD manifests for all Terra services in all environments
-$0 --argocd
+render --argocd
 
 # Render ArgoCD manifests for the Cromwell service in the alpha environment
-$0 -e alpha -a cromwell --argocd
+render -e alpha -a cromwell --argocd
 `,
 		// Only print out usage error when user supplies -h/--help
 		SilenceUsage: true,

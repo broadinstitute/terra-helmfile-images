@@ -1,4 +1,4 @@
-package render
+package shell
 
 import (
 	"os"
@@ -8,22 +8,16 @@ import (
 )
 
 func TestRunSuccess(t *testing.T) {
-	// Create tmp dir and remove it
-	tmpdir, err := os.MkdirTemp("", "shell-test")
-	if err != nil {
-		t.Error(err)
-	}
-	defer os.RemoveAll(tmpdir)
+	tmpdir := t.TempDir()
 
-	runner := RealRunner{}
+	runner := NewRealRunner()
 	cmd := Command{}
 	cmd.Prog = "sh"
 	cmd.Env = []string{"VAR1=foo"}
 	cmd.Args = []string{"-c", "mkdir test-dir-$VAR1"}
 	cmd.Dir = tmpdir
 
-	err = runner.Run(cmd)
-	if err != nil {
+	if err := runner.Run(cmd); err != nil {
 		t.Error(err)
 	}
 
@@ -39,7 +33,7 @@ func TestRunSuccess(t *testing.T) {
 }
 
 func TestRunFailed(t *testing.T) {
-	runner := RealRunner{}
+	runner := NewRealRunner()
 	cmd := Command{}
 	cmd.Prog = "sh"
 	cmd.Args = []string{"-c", "exit 42"}
@@ -49,7 +43,7 @@ func TestRunFailed(t *testing.T) {
 	if err == nil {
 		t.Errorf("Expected error when running command: %v", cmd)
 	}
-	shellErr, ok := err.(*ShellError)
+	shellErr, ok := err.(*Error)
 	if !ok {
 		t.Errorf("Expected ShellError, got: %v", err)
 	}
@@ -59,7 +53,7 @@ func TestRunFailed(t *testing.T) {
 }
 
 func TestRunError(t *testing.T) {
-	runner := RealRunner{}
+	runner := NewRealRunner()
 	cmd := Command{}
 	cmd.Prog = "echo"
 	cmd.Args = []string{"a", "b"}
@@ -69,7 +63,7 @@ func TestRunError(t *testing.T) {
 	if err == nil {
 		t.Errorf("Expected error when running command: %v", cmd)
 	}
-	shellErr, ok := err.(*ShellError)
+	shellErr, ok := err.(*Error)
 	if !ok {
 		t.Errorf("Expected ShellError, got: %v", err)
 	}

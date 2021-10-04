@@ -151,7 +151,7 @@ func siblingPath(relpath string, suffix string, hidden bool) string {
 	parent := path.Dir(cleaned)
 	base := path.Base(cleaned)
 
-	prefix := ""
+	var prefix string
 	if hidden {
 		prefix = "."
 	}

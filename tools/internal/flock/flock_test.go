@@ -22,7 +22,7 @@ const lockTimeout = 1000 * baseInterval
 func TestWithLockEnsuresConcurrentExecution(t *testing.T) {
 	numWorkers := 25
 
-	// should be small, we want every routine to get the lock in serial
+	// should be small, we want every worker to get the lock in serial
 	// _without_ triggering a timeout
 	lockSleepTime := lockTimeout / 1000
 

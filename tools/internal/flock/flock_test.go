@@ -82,7 +82,8 @@ func TestWithLockTimesOut(t *testing.T) {
 	// In foreground, try to get a lock and trigger a timeout
 	<-lockedCh // Block until background routine has lock
 	err := WithLock(opts, func() error {
-		panic("I should never have obtained the lock!")
+		t.Fatalf("I should never have obtained the lock!")
+		return nil
 	})
 
 	// Verify we got a timeout error and not something else

@@ -24,15 +24,15 @@ type Error struct {
 }
 
 // Error() implements error interface
-func (e *Error) Error() string {
-	return e.message
+func (err *Error) Error() string {
+	return err.message
 }
 
 // newError constructs an Error from underlying error, format string and args
-func newError(e error, format string, a ...interface{}) *Error {
+func newError(err error, format string, args ...interface{}) *Error {
 	return &Error{
-		message: fmt.Sprintf(format, a...),
-		Err:     e,
+		message: fmt.Sprintf(format, args...),
+		Err:     err,
 	}
 }
 

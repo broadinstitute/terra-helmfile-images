@@ -83,7 +83,7 @@ func TestFetch(t *testing.T) {
 			if testCase.expectedError == nil {
 				assert.Nil(t, err, "Expected command to execute successfully, but it returned an error: %v", err)
 			} else {
-				assert.NotNil(t, err, "Expected command to return error, but it did not")
+				assert.Error(t, err, "Expected command to return an error, but it did not")
 				assert.Regexp(t, testCase.expectedError, err, "Error mismatch: %v", err)
 			}
 

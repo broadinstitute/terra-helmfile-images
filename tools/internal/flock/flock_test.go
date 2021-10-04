@@ -86,10 +86,8 @@ func TestWithLockTimesOut(t *testing.T) {
 	})
 
 	// Verify we got a timeout error and not something else
-	assert.NotNil(t, err)
-	flockErr, ok := err.(*Error)
-	assert.True(t, ok)
-	assert.Regexp(t, regexp.MustCompile("deadline exceeded"), flockErr.Error())
+	assert.ErrorIs(t, err, err.(*Error), "Expected an Flock timeout error")
+	assert.Regexp(t, regexp.MustCompile("deadline exceeded"), err.Error())
 
 	// Verify the background routine didn't encounter an unexpected error
 	assert.Nil(t, <-errCh, "Background routine should never return an error")

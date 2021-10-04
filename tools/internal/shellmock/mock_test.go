@@ -77,7 +77,7 @@ func TestMockRunnerCanMockErrors(t *testing.T) {
 	m.ExpectCmdFmt(t, "echo 1").Return(fmt.Errorf("my error"))
 
 	e := m.Run(CmdFmt("echo 1"))
-	assert.NotNil(t, e, "error should not be nil")
+	assert.Error(t, e, "error should not be nil")
 	assert.Errorf(t, e, "my error", "mock runner should return the mocked error")
 }
 

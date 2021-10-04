@@ -408,7 +408,7 @@ func TestRender(t *testing.T) {
 			if testCase.expectedError == nil {
 				assert.Nil(t, err, "Unexpected error returned: %v", err)
 			} else {
-				assert.NotNil(t, err, "Expected command execution to return an error, but it did not")
+				assert.Error(t, err, "Expected command execution to return an error, but it did not")
 				assert.Regexp(t, testCase.expectedError, err.Error(), "Error mismatch")
 			}
 

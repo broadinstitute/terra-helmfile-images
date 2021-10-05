@@ -31,7 +31,7 @@ chartfetch terra-helm/agora -v 1.2.3 -d /tmp/charts/agora-v1.2.3
 const lockRetryInterval = 100 * time.Millisecond
 
 // lockTimeout is how long to wait to obtain a lock before giving up
-const lockTimeout = 10 * time.Second
+const lockTimeout = 30 * time.Second
 
 // Options for a chartfetch command
 type Options struct {

@@ -1,0 +1,9 @@
+# it's hard to get full coverage in Go
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true

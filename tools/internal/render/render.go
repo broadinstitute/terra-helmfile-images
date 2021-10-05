@@ -2,6 +2,7 @@ package render
 
 import (
 	"fmt"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
 	"github.com/rs/zerolog/log"
 	"io/ioutil"
 	"os"
@@ -48,7 +49,7 @@ type Render struct {
 }
 
 // Global/package-level variable, used for executing commands. Replaced with a mock in tests.
-var shellRunner ShellRunner = &RealRunner{}
+var shellRunner shell.Runner = shell.NewRealRunner()
 
 // NewRender is a constructor
 func NewRender(options *Options) (*Render, error) {
@@ -287,7 +288,7 @@ func (r *Render) runHelmfile(envVars []string, args ...string) error {
 	}
 	finalArgs = append(finalArgs, args...)
 
-	cmd := Command{}
+	cmd := shell.Command{}
 	cmd.Env = envVars
 	cmd.Prog = helmfileCommand
 	cmd.Args = finalArgs

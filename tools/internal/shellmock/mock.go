@@ -17,12 +17,14 @@ import (
 // commands are run in a specific order.
 //
 
-// FailureMode: what to do when there's an order verification failure (panic or fail the test)
+// FailureMode what to do when there's an order verification failure (panic or fail the test)
 type FailureMode int
 
+// Panic when an order mismatch is found
+// FailTest will fail the test when an order mismatch is found
 const (
-	Panic    FailureMode = iota // Panic when an order mismatch is found
-	FailTest                    // FailTest will fail the test when an order mismatch is found
+	Panic FailureMode = iota
+	FailTest
 )
 
 // Options for a MockRunner
@@ -55,9 +57,8 @@ func NewMockRunner(options Options) *MockRunner {
 	return m
 }
 
-
 // RunS Converts string arguments to a Command and delegates to Run
-func (m *MockRunner) RunS(args... string) error {
+func (m *MockRunner) RunS(args ...string) error {
 	return m.Run(shell.CmdFromTokens(args...))
 }
 
@@ -69,9 +70,8 @@ func (m *MockRunner) Run(cmd shell.Command) error {
 	// Return error if one was added to the mocked call
 	if len(args) > 0 {
 		return args.Error(0)
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // ExpectCmd Updates mock runner with an expectation for a given command.

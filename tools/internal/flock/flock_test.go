@@ -15,9 +15,9 @@ func TestWithLockEnsuresConcurrentExecution(t *testing.T) {
 	numWorkers := 25 // Number of worker routines that should attempt to grab the lock
 
 	lockRetryInterval := 10 * time.Millisecond // How frequently flock should retry to get the lock
-	lockSleepTime := 100 * time.Millisecond // How long each worker should sleep after obtaining lock
-	lockTimeout := 10 * time.Second // How long each worker should wait for lock before returning timeout (shouldn't happen in this test)
-	testTimeout := 2 * lockTimeout // How long to wait for workers to complete before failing the test (shouldn't happen)
+	lockSleepTime := 100 * time.Millisecond    // How long each worker should sleep after obtaining lock
+	lockTimeout := 10 * time.Second            // How long each worker should wait for lock before returning timeout (shouldn't happen in this test)
+	testTimeout := 2 * lockTimeout             // How long to wait for workers to complete before failing the test (shouldn't happen)
 
 	type result struct {
 		err error
@@ -83,16 +83,16 @@ func TestWithLockEnsuresConcurrentExecution(t *testing.T) {
 
 func TestWithLockTimesOut(t *testing.T) {
 	lockRetryInterval := 1 * time.Millisecond // How frequently flock should retry to get the lock
-	lockTimeout := 2 * time.Second // How long workers should wait for lock before returning timeout (we _want_ this to happen in this test)
-	lockSleepTime := 2 * lockTimeout // (4s) How long workers should sleep after obtaining lock (we _want_ to trigger a timeout)
-	testTimeout := 10 * lockSleepTime // (40s) How long to wait for workers to complete before failing the test (shouldn't happen)
+	lockTimeout := 2 * time.Second            // How long workers should wait for lock before returning timeout (we _want_ this to happen in this test)
+	lockSleepTime := 2 * lockTimeout          // (4s) How long workers should sleep after obtaining lock (we _want_ to trigger a timeout)
+	testTimeout := 10 * lockSleepTime         // (40s) How long to wait for workers to complete before failing the test (shouldn't happen)
 
 	lockOpts := testOptions(t, lockRetryInterval, lockTimeout)
 
 	type victimResult struct {
-		err error
+		err       error
 		startTime time.Time
-		stopTime time.Time
+		stopTime  time.Time
 	}
 
 	var wg sync.WaitGroup

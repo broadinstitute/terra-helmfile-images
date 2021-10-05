@@ -109,7 +109,7 @@ func TestCmdFromTokens(t *testing.T) {
 		},
 		{
 			description: "Many args",
-			tokens: []string{"echo", "the", "quick", "brown", "fox", "jumps", "over", "the", "lazy", "dog"},
+			tokens:      []string{"echo", "the", "quick", "brown", "fox", "jumps", "over", "the", "lazy", "dog"},
 			expected: Command{
 				Prog: "echo",
 				Args: []string{"the", "quick", "brown", "fox", "jumps", "over", "the", "lazy", "dog"},
@@ -117,7 +117,7 @@ func TestCmdFromTokens(t *testing.T) {
 		},
 		{
 			description: "Single env var",
-			tokens: []string{"FOO=BAR", "echo", "hello", "world"},
+			tokens:      []string{"FOO=BAR", "echo", "hello", "world"},
 			expected: Command{
 				Prog: "echo",
 				Args: []string{"hello", "world"},
@@ -126,7 +126,7 @@ func TestCmdFromTokens(t *testing.T) {
 		},
 		{
 			description: "Multiple env vars",
-			tokens: []string{"FOO=BAR", "EMPTY=", "HOME=/root", "_n=data", "LANG=en", "echo", "hello", "world"},
+			tokens:      []string{"FOO=BAR", "EMPTY=", "HOME=/root", "_n=data", "LANG=en", "echo", "hello", "world"},
 			expected: Command{
 				Prog: "echo",
 				Args: []string{"hello", "world"},
@@ -135,7 +135,7 @@ func TestCmdFromTokens(t *testing.T) {
 		},
 		{
 			description: "Only env vars",
-			tokens: []string{"FOO=BAR", "EMPTY=", "HOME=/root", "_n=data", "LANG=en"},
+			tokens:      []string{"FOO=BAR", "EMPTY=", "HOME=/root", "_n=data", "LANG=en"},
 			expected: Command{
 				Prog: "",
 				Env:  []string{"FOO=BAR", "EMPTY=", "HOME=/root", "_n=data", "LANG=en"},
@@ -143,7 +143,7 @@ func TestCmdFromTokens(t *testing.T) {
 		},
 		{
 			description: "Env vars no args",
-			tokens: []string{"FOO=BAR", "EMPTY=", "HOME=/root", "_n=data", "LANG=en", "echo"},
+			tokens:      []string{"FOO=BAR", "EMPTY=", "HOME=/root", "_n=data", "LANG=en", "echo"},
 			expected: Command{
 				Prog: "echo",
 				Env:  []string{"FOO=BAR", "EMPTY=", "HOME=/root", "_n=data", "LANG=en"},

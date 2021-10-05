@@ -20,10 +20,10 @@ func TestFetch(t *testing.T) {
 	testDir := t.TempDir()
 
 	testCases := []struct {
-		description   string
-		args          []string
-		setupMocks    func(t *testing.T, m *shellmock.MockRunner)
-		expectedError *regexp.Regexp
+		description       string
+		args              []string
+		setupMocks        func(t *testing.T, m *shellmock.MockRunner)
+		expectedError     *regexp.Regexp
 		extraVerification func(t *testing.T)
 	}{
 		{
@@ -49,7 +49,7 @@ func TestFetch(t *testing.T) {
 			args:        args("terra-helm/leonardo -v 1.2.3 -d %s/my/nested/download-dir", testDir),
 			setupMocks: func(t *testing.T, m *shellmock.MockRunner) {
 				m.ExpectCmdFmt(t, "helm fetch terra-helm/leonardo --untar -d %s/my/nested/.download-dir.tmp", testDir).
-					Run(func (args mock.Arguments) {
+					Run(func(args mock.Arguments) {
 						chartDir := path.Join(testDir, "my", "nested", ".download-dir.tmp", "leonardo")
 						if err := os.MkdirAll(chartDir, 0755); err != nil {
 							t.Fatalf("Error creating fake downloaded chart directory %s: %v", chartDir, err)
@@ -57,7 +57,7 @@ func TestFetch(t *testing.T) {
 						if err := os.WriteFile(path.Join(chartDir, "Chart.yaml"), []byte("# fake"), 0644); err != nil {
 							t.Fatalf("Error writing fake Chart.yaml file: %v", err)
 						}
-				    })
+					})
 			},
 			extraVerification: func(t *testing.T) {
 				assert.FileExists(t, path.Join(testDir, "my", "nested", "download-dir", "Chart.yaml"), "all chart files should exist in download dir")

@@ -105,7 +105,7 @@ func fetchChart(chart string, options *Options) error {
 	lockFile := siblingPath(options.DownloadDir, ".lk", true)
 
 	// create lock file parent directory if it does not exist
-	if err := os.MkdirAll(path.Dir(lockFile),0755); err != nil {
+	if err := os.MkdirAll(path.Dir(lockFile), 0755); err != nil {
 		return err
 	}
 

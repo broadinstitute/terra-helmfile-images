@@ -51,7 +51,7 @@ func (r *RealRunner) Run(cmd Command) error {
 // }
 // and pass it to Run()
 //
-func (r *RealRunner) RunS(args... string) error {
+func (r *RealRunner) RunS(args ...string) error {
 	return r.Run(CmdFromTokens(args...))
 }
 
@@ -63,7 +63,7 @@ func (r *RealRunner) RunS(args... string) error {
 //   Prog: "ls",
 //   Args: []string{"-al", "~"},
 // }
-func CmdFromTokens(args... string) Command {
+func CmdFromTokens(args ...string) Command {
 	// count number of leading NAME=VALUE environment var pairs preceding command
 	var i int
 	for i = 0; i < len(args); i++ {

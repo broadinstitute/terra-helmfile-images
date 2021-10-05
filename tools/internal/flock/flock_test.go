@@ -55,9 +55,9 @@ func TestWithLockEnsuresConcurrentExecution(t *testing.T) {
 
 	// Verify results, but wrapped in a timeout, so that if something goes wrong
 	// in this test we don't hang the whole suite
-	wgFinished := make(chan struct{})
+	testFinished := make(chan struct{})
 	go func() {
-		defer close(wgFinished)
+		defer close(testFinished)
 		log.Debug().Msg("Waiting for workers to finish")
 
 		// Result results off the channel as they come in
@@ -74,9 +74,8 @@ func TestWithLockEnsuresConcurrentExecution(t *testing.T) {
 	}()
 
 	select {
-	case <-wgFinished:
+	case <-testFinished:
 		log.Debug().Msg("Workers finished")
-		break
 	case <-time.After(testTimeout):
 		t.Fatalf("Test timed out after %s", testTimeout)
 	}
@@ -143,10 +142,9 @@ func TestWithLockTimesOut(t *testing.T) {
 
 	// Verify results, but wrapped in a timeout, so that if
 	// something goes wrong in this test we don't hang the whole suite
-	wgFinished := make(chan struct{})
+	testFinished := make(chan struct{})
 	go func() {
-		defer close(wgFinished)
-		log.Debug().Msg("Waiting for workers to finish")
+		defer close(testFinished)
 
 		// Verify results
 		r := <-victimResultCh
@@ -174,9 +172,8 @@ func TestWithLockTimesOut(t *testing.T) {
 	}()
 
 	select {
-	case <-wgFinished:
+	case <-testFinished:
 		log.Debug().Msg("Workers finished")
-		break
 	case <-time.After(testTimeout):
 		t.Fatalf("Timed out after %s waiting for workers to finish!", testTimeout)
 	}

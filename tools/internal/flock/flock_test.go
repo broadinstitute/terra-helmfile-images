@@ -153,7 +153,7 @@ func TestWithLockTimesOut(t *testing.T) {
 		actualWaitDuration := r.stopTime.Sub(r.startTime)
 
 		// Allow a delta of 1/8th the existing timeout.
-		// (we shift because integer division involves casting)
+		// (we shift instead of dividing because integer division requires casting)
 		delta := lockTimeout >> 3
 
 		// Verify we timed out within the expected window

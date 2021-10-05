@@ -31,8 +31,8 @@ func TestWithLockEnsuresConcurrentExecution(t *testing.T) {
 
 	for i := 0; i < numWorkers; i++ {
 		id := i // Copy to local variable to prevent leaks
+		wg.Add(1)
 		go func() {
-			wg.Add(1)
 			err := WithLock(opts, func() error {
 				log.Debug().Msgf("[%d] got lock", id)
 				if lockOwner != -1 {
@@ -101,8 +101,8 @@ func TestWithLockTimesOut(t *testing.T) {
 	victimResultCh := make(chan victimResult, 1)
 
 	// Launch a worker (the thief) to steal lock in background
+	wg.Add(1)
 	go func() {
-		wg.Add(1)
 		defer wg.Done()
 		defer close(thiefErrCh)
 
@@ -118,8 +118,8 @@ func TestWithLockTimesOut(t *testing.T) {
 	}()
 
 	// Launch a second worker (the victim) to try to claim the lock. We _want_ this one to time out.
+	wg.Add(1)
 	go func() {
-		wg.Add(1)
 		defer wg.Done()
 		defer close(victimResultCh)
 

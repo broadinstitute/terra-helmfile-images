@@ -17,7 +17,7 @@ func TestWithLockEnsuresConcurrentExecution(t *testing.T) {
 	lockRetryInterval := 10 * time.Millisecond // How frequently flock should retry to get the lock
 	lockSleepTime := 100 * time.Millisecond    // How long each worker should sleep after obtaining lock
 	lockTimeout := 10 * time.Second            // How long each worker should wait for lock before returning timeout (shouldn't happen in this test)
-	testTimeout := 2 * lockTimeout             // How long to wait for workers to complete before failing the test (shouldn't happen)
+	testTimeout := 2 * lockTimeout             // (20s) How long to wait for workers to complete before failing the test (shouldn't happen)
 
 	type result struct {
 		err error

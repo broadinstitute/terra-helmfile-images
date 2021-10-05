@@ -6,124 +6,195 @@ import (
 	"github.com/stretchr/testify/assert"
 	"path"
 	"regexp"
+	"sync"
 	"testing"
 	"time"
 )
 
-// Base interval for all sleeps in this test.
-// Unfortunately these concurrency tests depend on timing, and on slow infrastructure,
-// like public GitHub actions runners, long intervals are needed to prevent unexpected
-// failures.
-const baseInterval = 1 * time.Millisecond
-
-const lockRetryInterval = baseInterval
-const lockTimeout = 1000 * baseInterval
-
 func TestWithLockEnsuresConcurrentExecution(t *testing.T) {
-	numWorkers := 25
+	numWorkers := 25 // Number of worker routines that should attempt to grab the lock
 
-	// should be small, we want every worker to get the lock in serial
-	// _without_ triggering a timeout
-	lockSleepTime := lockTimeout / 1000
+	lockRetryInterval := 10 * time.Millisecond // How frequently flock should retry to get the lock
+	lockSleepTime := 100 * time.Millisecond // How long each worker should sleep after obtaining lock
+	lockTimeout := 10 * time.Second // How long each worker should wait for lock before returning timeout (shouldn't happen in this test)
+	testTimeout := 2 * lockTimeout // How long to wait for workers to complete before failing the test (shouldn't happen)
 
 	type result struct {
 		err error
 		id  int
 	}
 
-	ch := make(chan result)
-	opts := testOptions(t)
+	var wg sync.WaitGroup
+	resultCh := make(chan result, numWorkers)
+	opts := testOptions(t, lockRetryInterval, lockTimeout)
 	lockOwner := -1
 
 	for i := 0; i < numWorkers; i++ {
 		id := i // Copy to local variable to prevent leaks
 		go func() {
+			wg.Add(1)
 			err := WithLock(opts, func() error {
-				log.Info().Msgf("[%d] got lock", id)
+				log.Debug().Msgf("[%d] got lock", id)
 				if lockOwner != -1 {
 					return fmt.Errorf("[%d] another routine also owns the lock? %d", id, lockOwner)
 				}
 				lockOwner = id
 
-				log.Info().Msgf("[%d] sleeping for %s", id, lockSleepTime)
+				log.Debug().Msgf("[%d] sleeping for %s", id, lockSleepTime)
 				time.Sleep(lockSleepTime)
 
-				log.Info().Msgf("[%d] woke, releasing lock", id)
+				log.Debug().Msgf("[%d] woke, releasing lock", id)
 				lockOwner = -1
 
 				return nil
 			})
-			ch <- result{err, id}
+			resultCh <- result{err, id}
+			wg.Done()
 		}()
 	}
 
-	// Verify none of the routines returned an error
-	for i := 0; i < numWorkers; i++ {
-		r := <-ch
-		if r.err != nil {
-			t.Errorf("[%d] unexpected error: %v", r.id, r.err)
+	// Verify results, but wrapped in a timeout, so that if something goes wrong
+	// in this test we don't hang the whole suite
+	wgFinished := make(chan struct{})
+	go func() {
+		defer close(wgFinished)
+		log.Debug().Msg("Waiting for workers to finish")
+
+		// Result results off the channel as they come in
+		for i := 0; i < numWorkers; i++ {
+			r := <-resultCh
+			log.Debug().Msgf("Processing result: %v", r)
+			if r.err != nil {
+				t.Errorf("Unexpected error for worker %v: %v", r.id, r.err)
+			}
 		}
+
+		// This should finish immediately, since all results have already been processed
+		wg.Wait()
+	}()
+
+	select {
+	case <-wgFinished:
+		log.Debug().Msg("Workers finished")
+		break
+	case <-time.After(testTimeout):
+		t.Fatalf("Test timed out after %s", testTimeout)
 	}
 }
 
 func TestWithLockTimesOut(t *testing.T) {
-	lockSleepTime := 10 * lockTimeout // we _want_ to trigger a timeout
-	errCh := make(chan error)
-	lockedCh := make(chan bool)
-	opts := testOptions(t)
+	lockRetryInterval := 1 * time.Millisecond // How frequently flock should retry to get the lock
+	lockTimeout := 2 * time.Second // How long workers should wait for lock before returning timeout (we _want_ this to happen in this test)
+	lockSleepTime := 2 * lockTimeout // (4s) How long workers should sleep after obtaining lock (we _want_ to trigger a timeout)
+	testTimeout := 10 * lockSleepTime // (40s) How long to wait for workers to complete before failing the test (shouldn't happen)
 
-	// Launch a goroutine to claim lock in background
+	lockOpts := testOptions(t, lockRetryInterval, lockTimeout)
+
+	type victimResult struct {
+		err error
+		startTime time.Time
+		stopTime time.Time
+	}
+
+	var wg sync.WaitGroup
+	thiefHasLockCh := make(chan struct{})
+	thiefErrCh := make(chan error, 1)
+	victimResultCh := make(chan victimResult, 1)
+
+	// Launch a worker (the thief) to steal lock in background
 	go func() {
-		errCh <- WithLock(opts, func() error {
-			log.Info().Msgf("[lock thief] obtained the lock")
-			lockedCh <- true
-			log.Info().Msgf("[lock thief] sleeping for %s", lockSleepTime)
+		wg.Add(1)
+		defer wg.Done()
+		defer close(thiefErrCh)
+
+		thiefErrCh <- WithLock(lockOpts, func() error {
+			log.Debug().Msgf("[thief] obtained the lock, sending signal")
+			close(thiefHasLockCh)
+			log.Debug().Msgf("[thief] sleeping for %s", lockSleepTime)
 			time.Sleep(lockSleepTime)
 			return nil
 		})
+
+		log.Debug().Msg("[thief] done")
 	}()
 
-	// In foreground, try to get a lock and trigger a timeout
-	<- lockedCh // Block until background routine has lock
-	log.Info().Msgf("[foreground] received a signal from thief that it has obtained the lock")
-	start := time.Now()
-	log.Info().Msgf("[foreground] calling withLock...")
+	// Launch a second worker (the victim) to try to claim the lock. We _want_ this one to time out.
+	go func() {
+		wg.Add(1)
+		defer wg.Done()
+		defer close(victimResultCh)
 
-	err := WithLock(opts, func() error {
-		t.Fatalf("[foreground] I should never have obtained the lock!")
-		return nil
-	})
+		log.Debug().Msgf("[victim] waiting for thief to steal the lock")
+		<-thiefHasLockCh
+		log.Debug().Msgf("[victim] thief has stolen lock, calling withLock...")
 
-	actualEndTime := time.Now()
-	actualWaitTime := actualEndTime.Sub(start)
-	expectedEndTime := start.Add(lockTimeout)
+		startTime := time.Now()
+		err := WithLock(lockOpts, func() error {
+			// this should never be called because we should hit a timeout
+			t.Fatal("[victim] I should never have obtained the lock!")
+			return nil
+		})
+		stopTime := time.Now()
 
-	log.Info().Msgf("[foreground] WithLock returned %v after %s", err, actualWaitTime)
+		log.Debug().Msgf("[victim] WithLock returned %v after %s", err, stopTime.Sub(startTime))
+		victimResultCh <- victimResult{err: err, startTime: startTime, stopTime: stopTime}
+		log.Debug().Msg("[victim] done")
+	}()
 
-	// Allow a delta of 1/8th the existing timeout.
-	// (we shift to avoid casting for a division)
-	// okay - duration is a 64bit unsigned integer.
-	delta := lockTimeout >> 3
+	// Verify results, but wrapped in a timeout, so that if
+	// something goes wrong in this test we don't hang the whole suite
+	wgFinished := make(chan struct{})
+	go func() {
+		defer close(wgFinished)
+		log.Debug().Msg("Waiting for workers to finish")
 
-	assert.WithinDuration(t, expectedEndTime, actualEndTime, delta, "Expected to get a timeout after about ~%s, got one after %s (allowed delta %s)", lockTimeout, actualWaitTime, delta)
+		// Verify results
+		r := <-victimResultCh
+		expectedStopTime := r.startTime.Add(lockTimeout)
+		actualStopTime := r.stopTime
+		actualWaitDuration := r.stopTime.Sub(r.startTime)
 
-	// Verify we got a timeout error and not something else
-	assert.ErrorIs(t, err, err.(*Error), "Expected an Flock timeout error")
-	assert.Regexp(t, regexp.MustCompile("deadline exceeded"), err.Error())
+		// Allow a delta of 1/8th the existing timeout.
+		// (we shift because integer division involves casting)
+		delta := lockTimeout >> 3
 
-	// Verify the background routine didn't encounter an unexpected error
-	assert.Nil(t, <-errCh, "Background routine should never return an error")
+		// Verify we timed out within the expected window
+		assert.WithinDuration(t, expectedStopTime, actualStopTime, delta, "Expected to get a timeout after about ~%s, got one after %s (allowed delta %s)", lockTimeout, actualWaitDuration, delta)
+
+		// Verify we got an flock timeout error and not something else
+		assert.ErrorIs(t, r.err, r.err.(*Error), "Expected an Flock timeout error")
+		assert.Regexp(t, regexp.MustCompile("deadline exceeded"), r.err.Error())
+
+		// Verify the thief worker didn't encounter an unexpected error
+		thiefErr := <-thiefErrCh
+		assert.Nil(t, thiefErr, "Thief worker should never return an error, but got: %v", thiefErr)
+
+		// Should return immediately, since by now results from all workers have been processed
+		wg.Wait()
+	}()
+
+	select {
+	case <-wgFinished:
+		log.Debug().Msg("Workers finished")
+		break
+	case <-time.After(testTimeout):
+		t.Fatalf("Timed out after %s waiting for workers to finish!", testTimeout)
+	}
 }
 
 func TestWithLockReturnsCallbackError(t *testing.T) {
-	err := WithLock(testOptions(t), func() error {
+	lockRetryInterval := 1 * time.Millisecond
+	lockTimeout := 1_000 * time.Millisecond
+
+	// We don't expect any timeouts here! Just want to make sure errors are correctly propagated to caller
+	err := WithLock(testOptions(t, lockRetryInterval, lockTimeout), func() error {
 		return fmt.Errorf("fake error from callback")
 	})
 	assert.Error(t, err, "Expected error to propagate up from WithLock")
 	assert.Equal(t, "fake error from callback", err.Error())
 }
 
-func testOptions(t *testing.T) Options {
+func testOptions(t *testing.T, lockRetryInterval time.Duration, lockTimeout time.Duration) Options {
 	return Options{
 		Path:          path.Join(t.TempDir(), "lock"),
 		RetryInterval: lockRetryInterval,

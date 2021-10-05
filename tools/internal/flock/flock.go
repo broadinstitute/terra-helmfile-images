@@ -38,7 +38,7 @@ func newError(err error, format string, args ...interface{}) *Error {
 
 // WithLock executes a callback function with a global exclusive file-system lock
 // If the lock is never acquired, the returned error will be of type flock.Error
-// Else, the error will be the result from synchronizedFn
+// Else, the error will be the victimResult from synchronizedFn
 func WithLock(options Options, syncFn func() error) error {
 	lock := flock.New(options.Path)
 

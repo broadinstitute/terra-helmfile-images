@@ -13,7 +13,7 @@ func TestMockRunnerPassesSingleCommand(t *testing.T) {
 	m := DefaultMockRunner()
 	m.ExpectCmdS(t, "FOO=BAR echo hello world")
 
-	assert.Nil(t, m.Run(CmdFmt("FOO=BAR echo hello world")))
+	assert.Nil(t, m.Run(CmdFromFmt("FOO=BAR echo hello world")))
 
 	m.mock.AssertExpectations(t)
 	m.mock.AssertNumberOfCalls(t, "Run", 1)
@@ -25,8 +25,8 @@ func TestMockRunnerPassesMultipleCommandsInOrder(t *testing.T) {
 	m.ExpectCmdS(t, "echo 1")
 	m.ExpectCmdS(t, "echo 2")
 
-	assert.Nil(t, m.Run(CmdFmt("echo 1")))
-	assert.Nil(t, m.Run(CmdFmt("echo 2")))
+	assert.Nil(t, m.Run(CmdFromFmt("echo 1")))
+	assert.Nil(t, m.Run(CmdFromFmt("echo 2")))
 
 	m.mock.AssertExpectations(t)
 	m.mock.AssertNumberOfCalls(t, "Run", 2)
@@ -54,7 +54,7 @@ func TestMockRunnerFailsWhenOutOfOrder(t *testing.T) {
 	m.ExpectCmdS(t, "echo 1")
 	m.ExpectCmdS(t, "echo 2")
 
-	_ = m.Run(CmdFmt("echo 2")) // this will trigger a panic
+	_ = m.Run(CmdFromFmt("echo 2")) // this will trigger a panic
 	t.Errorf("This line of code should never be reached")
 }
 
@@ -64,8 +64,8 @@ func TestMockRunnerOutOfOrderPassesWithNoVerify(t *testing.T) {
 	m.ExpectCmdS(t, "echo 1")
 	m.ExpectCmdS(t, "echo 2")
 
-	assert.Nil(t, m.Run(CmdFmt("echo 2")))
-	assert.Nil(t, m.Run(CmdFmt("echo 1")))
+	assert.Nil(t, m.Run(CmdFromFmt("echo 2")))
+	assert.Nil(t, m.Run(CmdFromFmt("echo 1")))
 
 	m.mock.AssertExpectations(t)
 	m.mock.AssertNumberOfCalls(t, "Run", 2)
@@ -76,7 +76,7 @@ func TestMockRunnerCanMockErrors(t *testing.T) {
 	m := DefaultMockRunner()
 	m.ExpectCmdFmt(t, "echo 1").Return(fmt.Errorf("my error"))
 
-	e := m.Run(CmdFmt("echo 1"))
+	e := m.Run(CmdFromFmt("echo 1"))
 	assert.Error(t, e, "error should not be nil")
 	assert.Errorf(t, e, "my error", "mock runner should return the mocked error")
 }
@@ -85,7 +85,7 @@ func TestCmdFmt(t *testing.T) {
 	testCases := []struct {
 		description string
 		format      string
-		args        []interface{}
+		args        []string
 		expected    shell.Command
 	}{
 		{
@@ -94,14 +94,14 @@ func TestCmdFmt(t *testing.T) {
 			expected:    shell.Command{},
 		},
 		{
-			description: "No args",
+			description: "No args, no substitution",
 			format:      "echo",
 			expected: shell.Command{
 				Prog: "echo",
 			},
 		},
 		{
-			description: "With one arg",
+			description: "With one arg, no substitution",
 			format:      "echo hello",
 			expected: shell.Command{
 				Prog: "echo",
@@ -109,7 +109,7 @@ func TestCmdFmt(t *testing.T) {
 			},
 		},
 		{
-			description: "With two args",
+			description: "With two args and substitution",
 			format:      "echo hello world",
 			expected: shell.Command{
 				Prog: "echo",
@@ -117,44 +117,12 @@ func TestCmdFmt(t *testing.T) {
 			},
 		},
 		{
-			description: "Many args",
-			format:      "echo the quick brown fox jumps over the lazy dog",
-			expected: shell.Command{
-				Prog: "echo",
-				Args: []string{"the", "quick", "brown", "fox", "jumps", "over", "the", "lazy", "dog"},
-			},
-		},
-		{
-			description: "Single env var",
-			format:      "FOO=BAR echo hello world",
+			description: "Multiple env vars with substitutions",
+			format:      "FOO=%s EMPTY= HOME=%s _n=data LANG=en echo %s %s",
+			args:        []string{"BAR", "/root", "hello", "world"},
 			expected: shell.Command{
 				Prog: "echo",
 				Args: []string{"hello", "world"},
-				Env:  []string{"FOO=BAR"},
-			},
-		},
-		{
-			description: "Multiple env vars",
-			format:      "FOO=BAR EMPTY= HOME=/root _n=data LANG=en echo hello world",
-			expected: shell.Command{
-				Prog: "echo",
-				Args: []string{"hello", "world"},
-				Env:  []string{"FOO=BAR", "EMPTY=", "HOME=/root", "_n=data", "LANG=en"},
-			},
-		},
-		{
-			description: "Only env vars",
-			format:      "FOO=BAR EMPTY= HOME=/root _n=data LANG=en",
-			expected: shell.Command{
-				Prog: "",
-				Env:  []string{"FOO=BAR", "EMPTY=", "HOME=/root", "_n=data", "LANG=en"},
-			},
-		},
-		{
-			description: "Env vars no args",
-			format:      "FOO=BAR EMPTY= HOME=/root _n=data LANG=en echo",
-			expected: shell.Command{
-				Prog: "echo",
 				Env:  []string{"FOO=BAR", "EMPTY=", "HOME=/root", "_n=data", "LANG=en"},
 			},
 		},
@@ -162,7 +130,12 @@ func TestCmdFmt(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			actual := CmdFmt(testCase.format, testCase.args...)
+			// convert []string to []interface...
+			argsi := make([]interface{}, len(testCase.args))
+			for i, s := range testCase.args {
+				argsi[i] = s
+			}
+			actual := CmdFromFmt(testCase.format, argsi...)
 			assert.Equal(t, testCase.expected, actual)
 		})
 	}

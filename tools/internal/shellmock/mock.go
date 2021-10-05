@@ -55,6 +55,12 @@ func NewMockRunner(options Options) *MockRunner {
 	return m
 }
 
+
+// RunS Converts string arguments to a Command and delegates to Run
+func (m *MockRunner) RunS(args... string) error {
+	return m.Run(shell.CmdFromTokens(args...))
+}
+
 // Run Instead of executing the command, logs an info message and registers the call with testify mock
 func (m *MockRunner) Run(cmd shell.Command) error {
 	log.Info().Msgf("[MockRunner] Run called: %q\n", cmd.PrettyFormat())
@@ -107,13 +113,13 @@ func (m *MockRunner) ExpectCmd(t *testing.T, cmd shell.Command) *mock.Call {
 
 // ExpectCmdS is a convenience function for generating a Command from a string and expecting it
 func (m *MockRunner) ExpectCmdS(t *testing.T, str string) *mock.Call {
-	cmd := CmdFmt(str)
+	cmd := CmdFromString(str)
 	return m.ExpectCmd(t, cmd)
 }
 
-// ExpectCmdFmt is a convenience function combining CmdFmt and ExpectCmd
+// ExpectCmdFmt is a convenience function combining CmdFromFmt and ExpectCmd
 func (m *MockRunner) ExpectCmdFmt(t *testing.T, fmt string, a ...interface{}) *mock.Call {
-	cmd := CmdFmt(fmt, a...)
+	cmd := CmdFromFmt(fmt, a...)
 	return m.ExpectCmd(t, cmd)
 }
 
@@ -122,10 +128,10 @@ func (m *MockRunner) AssertExpectations(t *testing.T) bool {
 	return m.mock.AssertExpectations(t)
 }
 
-// CmdFmt is a convenience function for creating a Command, given a format string
+// CmdFromFmt is a convenience function for creating a Command, given a format string
 // and arguments.
 //
-// Eg. CmdFmt("HOME=%s FOO=%s ls -l %d", "/root", "BAR", "/tmp")
+// Eg. CmdFromFmt("HOME=%s FOO=%s ls -l %d", "/root", "BAR", "/tmp")
 // ->
 // Command{
 //   Env: []string{"HOME=/root", "FOO=BAR"},
@@ -134,40 +140,33 @@ func (m *MockRunner) AssertExpectations(t *testing.T) bool {
 //   ...
 // }
 //
-// Note: CmdFmt is NOT smart about shell quoting and escaping. I.e.
+// Note: CmdFromFmt is NOT smart about shell quoting and escaping. I.e.
 // "echo hello\\ world" will be parsed as "echo", "hello\\", "world" instead
 // of "echo", "hello world". Similarly, "echo 'hello world'" will be parsed as
 // "echo", "'hello", "world'". If you need to test arguments with whitespace or other
 // special characters, create a shell.Command manually.
 //
-func CmdFmt(format string, a ...interface{}) shell.Command {
+func CmdFromFmt(format string, a ...interface{}) shell.Command {
 	formatted := fmt.Sprintf(format, a...)
-	tokens := strings.Fields(formatted)
+	return CmdFromString(formatted)
+}
 
-	// count number of leading NAME=VALUE environment var pairs preceding `helmfile` command
-	var i int
-	for i = 0; i < len(tokens); i++ {
-		if !strings.Contains(tokens[i], "=") {
-			// if this is not a NAME=VALUE pair, exit
-			break
-		}
-	}
-
-	numEnvVars := i
-	progIndex := i
-	numArgs := len(tokens) - (numEnvVars + 1)
-
-	cmd := shell.Command{}
-
-	if numEnvVars > 0 {
-		cmd.Env = tokens[0:numEnvVars]
-	}
-	if progIndex < len(tokens) {
-		cmd.Prog = tokens[progIndex]
-	}
-	if numArgs > 0 {
-		cmd.Args = tokens[progIndex+1:]
-	}
-
-	return cmd
+// CmdFromString is a convenience function for creating a Command, given a string.
+// Eg. CmdFromString("HOME=/tmp ls -al ~")
+// ->
+// Command{
+//   Env: []string{"HOME=/tmp"},
+//   Prog: "ls",
+//   Args: []string{"-al", "~"},
+// }
+//
+// Note: CmdFromString is NOT smart about shell quoting and escaping. I.e.
+// "echo hello\\ world" will be parsed as "echo", "hello\\", "world" instead
+// of "echo", "hello world". Similarly, "echo 'hello world'" will be parsed as
+// "echo", "'hello", "world'". If you need to test arguments with whitespace or other
+// special characters, create a shell.Command manually.
+// and arguments.
+func CmdFromString(cmd string) shell.Command {
+	tokens := strings.Fields(cmd)
+	return shell.CmdFromTokens(tokens...)
 }

@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shellmock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"os"
+	"path"
 	"regexp"
 	"strings"
 	"testing"
@@ -14,13 +17,14 @@ import (
 // Executes the Cobra command with the given arguments and verifies that the
 // correct "helm fetch" command is executed under the hood.
 func TestFetch(t *testing.T) {
-	tmpDir := t.TempDir()
+	testDir := t.TempDir()
 
 	testCases := []struct {
 		description   string
 		args          []string
 		setupMocks    func(t *testing.T, m *shellmock.MockRunner)
 		expectedError *regexp.Regexp
+		extraVerification func(t *testing.T)
 	}{
 		{
 			description:   "no arguments",
@@ -38,20 +42,33 @@ func TestFetch(t *testing.T) {
 		},
 		{
 			description: "should exit without downloading if directory exists",
-			args:        args("terra-helm/leonardo -v 1.2.3 -d %s", tmpDir),
+			args:        args("terra-helm/leonardo -v 1.2.3 -d %s", testDir),
 		},
 		{
 			description: "should download if directory does not exist",
-			args:        args("terra-helm/leonardo -v 1.2.3 -d %s/download-dir", tmpDir),
+			args:        args("terra-helm/leonardo -v 1.2.3 -d %s/my/nested/download-dir", testDir),
 			setupMocks: func(t *testing.T, m *shellmock.MockRunner) {
-				m.ExpectCmdFmt(t, "helm fetch terra-helm/leonardo --untar -d %s/download-dir", tmpDir)
+				m.ExpectCmdFmt(t, "helm fetch terra-helm/leonardo --untar -d %s/my/nested/.download-dir.tmp", testDir).
+					Run(func (args mock.Arguments) {
+						chartDir := path.Join(testDir, "my", "nested", ".download-dir.tmp", "leonardo")
+						if err := os.MkdirAll(chartDir, 0755); err != nil {
+							t.Fatalf("Error creating fake downloaded chart directory %s: %v", chartDir, err)
+						}
+						if err := os.WriteFile(path.Join(chartDir, "Chart.yaml"), []byte("# fake"), 0644); err != nil {
+							t.Fatalf("Error writing fake Chart.yaml file: %v", err)
+						}
+				    })
+			},
+			extraVerification: func(t *testing.T) {
+				assert.FileExists(t, path.Join(testDir, "my", "nested", "download-dir", "Chart.yaml"), "all chart files should exist in download dir")
+				assert.NoDirExists(t, path.Join(testDir, "my", "nested", ".download-dir.tmp"), "tmp download dir should be cleaned up")
 			},
 		},
 		{
 			description: "should return an error if the helm fetch command fails",
-			args:        args("terra-helm/leonardo -v 1.2.3 -d %s/download-dir", tmpDir),
+			args:        args("terra-helm/leonardo -v 1.2.3 -d %s/download-dir", testDir),
 			setupMocks: func(t *testing.T, m *shellmock.MockRunner) {
-				m.ExpectCmdFmt(t, "helm fetch terra-helm/leonardo --untar -d %s/download-dir", tmpDir).
+				m.ExpectCmdFmt(t, "helm fetch terra-helm/leonardo --untar -d %s/.download-dir.tmp", testDir).
 					Return(errors.New("command failed because reasons"))
 			},
 			expectedError: regexp.MustCompile("command failed because reasons"),
@@ -81,14 +98,19 @@ func TestFetch(t *testing.T) {
 
 			// Verify error was correctly returned if expected
 			if testCase.expectedError == nil {
-				assert.Nil(t, err, "Expected command to execute successfully, but it returned an error: %v", err)
+				assert.Nil(t, err, "Expected cobra to execute successfully, but it returned an error: %v", err)
 			} else {
-				assert.Error(t, err, "Expected command to return an error, but it did not")
+				assert.Error(t, err, "Expected cobra to return an error, but it did not")
 				assert.Regexp(t, testCase.expectedError, err, "Error mismatch: %v", err)
 			}
 
 			// Verify all expected shell commands were called
 			mockRunner.AssertExpectations(t)
+
+			// Perform any additional verification for this test case
+			if testCase.extraVerification != nil {
+				testCase.extraVerification(t)
+			}
 		})
 	}
 }

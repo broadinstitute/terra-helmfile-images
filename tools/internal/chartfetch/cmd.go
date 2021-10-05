@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"io/ioutil"
 	"os"
 	"path"
 	"time"
@@ -101,6 +102,13 @@ func fetchChart(chart string, options *Options) error {
 		return err
 	}
 
+	lockFile := siblingPath(options.DownloadDir, ".lk", true)
+
+	// create lock file parent directory if it does not exist
+	if err := os.MkdirAll(path.Dir(lockFile),0755); err != nil {
+		return err
+	}
+
 	lockOptions := flock.Options{
 		Path:          siblingPath(options.DownloadDir, ".lk", true),
 		RetryInterval: lockRetryInterval,
@@ -109,15 +117,40 @@ func fetchChart(chart string, options *Options) error {
 
 	return flock.WithLock(lockOptions, func() error {
 		// check for download directory again to make sure that it doesn't exist.
-		// (someone else could have gotten the lock and made it in the mean time)
+		// (someone else could have gotten the lock and created it in the mean time)
 		if exists, err := checkDownloadDirExists(options.DownloadDir); exists || err != nil {
 			return err
 		}
 
-		return shellRunner.Run(shell.Command{
-			Prog: "helm",
-			Args: []string{"fetch", chart, "--untar", "-d", options.DownloadDir},
-		})
+		// download chart into a temporary directory
+		tmpDir := siblingPath(options.DownloadDir, ".tmp", true)
+		log.Info().Msgf("Downloading chart to tmp dir %s", tmpDir)
+		if err := shellRunner.RunS("helm", "fetch", chart, "--untar", "-d", tmpDir); err != nil {
+			return err
+		}
+
+		// helm fetch repo/chart --untar -d /mydir will nest the chart one level, so we'll end up
+		// with /mydir/<chart>/Chart.yaml, for example.
+		// But we _want_ /mydir/Chart.yaml, so we remove the extra level of nesting.
+		files, err := ioutil.ReadDir(tmpDir)
+		if err != nil {
+			return err
+		}
+		if len(files) != 1 {
+			return fmt.Errorf("expected exactly one file in %s, got: %v", tmpDir, files)
+		}
+
+		chartDir := path.Join(tmpDir, files[0].Name())
+		log.Info().Msgf("Rename %s to %s", chartDir, options.DownloadDir)
+		if err = os.Rename(chartDir, options.DownloadDir); err != nil {
+			return err
+		}
+
+		if err = os.RemoveAll(tmpDir); err != nil {
+			return err
+		}
+
+		return nil
 	})
 }
 

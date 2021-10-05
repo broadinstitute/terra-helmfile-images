@@ -1,6 +1,7 @@
 package shell
 
 import (
+	"github.com/stretchr/testify/assert"
 	"os"
 	"path"
 	"regexp"
@@ -69,5 +70,91 @@ func TestRunError(t *testing.T) {
 	}
 	if !regexp.MustCompile("Command \"echo a b\" failed to start").MatchString(shellErr.Error()) {
 		t.Errorf("Unexpected error message: %v", err)
+	}
+}
+
+func TestCmdFromTokens(t *testing.T) {
+	testCases := []struct {
+		description string
+		tokens      []string
+		expected    Command
+	}{
+		{
+			description: "Empty",
+			tokens:      []string{},
+			expected:    Command{},
+		},
+		{
+			description: "No args",
+			tokens:      []string{"echo"},
+			expected: Command{
+				Prog: "echo",
+			},
+		},
+		{
+			description: "With one arg",
+			tokens:      []string{"echo", "hello"},
+			expected: Command{
+				Prog: "echo",
+				Args: []string{"hello"},
+			},
+		},
+		{
+			description: "With two args",
+			tokens:      []string{"echo", "hello", "world"},
+			expected: Command{
+				Prog: "echo",
+				Args: []string{"hello", "world"},
+			},
+		},
+		{
+			description: "Many args",
+			tokens: []string{"echo", "the", "quick", "brown", "fox", "jumps", "over", "the", "lazy", "dog"},
+			expected: Command{
+				Prog: "echo",
+				Args: []string{"the", "quick", "brown", "fox", "jumps", "over", "the", "lazy", "dog"},
+			},
+		},
+		{
+			description: "Single env var",
+			tokens: []string{"FOO=BAR", "echo", "hello", "world"},
+			expected: Command{
+				Prog: "echo",
+				Args: []string{"hello", "world"},
+				Env:  []string{"FOO=BAR"},
+			},
+		},
+		{
+			description: "Multiple env vars",
+			tokens: []string{"FOO=BAR", "EMPTY=", "HOME=/root", "_n=data", "LANG=en", "echo", "hello", "world"},
+			expected: Command{
+				Prog: "echo",
+				Args: []string{"hello", "world"},
+				Env:  []string{"FOO=BAR", "EMPTY=", "HOME=/root", "_n=data", "LANG=en"},
+			},
+		},
+		{
+			description: "Only env vars",
+			tokens: []string{"FOO=BAR", "EMPTY=", "HOME=/root", "_n=data", "LANG=en"},
+			expected: Command{
+				Prog: "",
+				Env:  []string{"FOO=BAR", "EMPTY=", "HOME=/root", "_n=data", "LANG=en"},
+			},
+		},
+		{
+			description: "Env vars no args",
+			tokens: []string{"FOO=BAR", "EMPTY=", "HOME=/root", "_n=data", "LANG=en", "echo"},
+			expected: Command{
+				Prog: "echo",
+				Env:  []string{"FOO=BAR", "EMPTY=", "HOME=/root", "_n=data", "LANG=en"},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			actual := CmdFromTokens(testCase.tokens...)
+			assert.Equal(t, testCase.expected, actual)
+		})
 	}
 }

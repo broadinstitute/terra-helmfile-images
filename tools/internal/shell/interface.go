@@ -14,6 +14,7 @@ import (
 //
 type Runner interface {
 	Run(cmd Command) error
+	RunS(args... string) error
 }
 
 // Error represents an error encountered running a shell command

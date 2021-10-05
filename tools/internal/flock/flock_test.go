@@ -130,7 +130,7 @@ func TestWithLockTimesOut(t *testing.T) {
 		startTime := time.Now()
 		err := WithLock(lockOpts, func() error {
 			// this should never be called because we should hit a timeout
-			t.Fatal("[victim] I should never have obtained the lock!")
+			t.Error("[victim] I should never have obtained the lock!")
 			return nil
 		})
 		stopTime := time.Now()

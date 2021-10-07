@@ -4,7 +4,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"os"
 	"os/exec"
-	"strings"
 )
 
 // RealRunner is an implementation of the Runner interface that actually executes shell commands
@@ -39,11 +38,11 @@ func (r *RealRunner) Run(cmd Command) error {
 	return nil
 }
 
-// RunS is a convenience wrapper around Run.
-// Given a list of string arguments, RunS calls
+// RunWithArgs is a convenience wrapper around Run.
+// Given a list of string arguments, RunWithArgs calls
 // CmdFromTokens() to create a command passes it to Run()
 //
-// Eg. RunS("FOO=BAR", "HOME=/tmp", "ls", "-al", "~")
+// Eg. RunWithArgs("FOO=BAR", "HOME=/tmp", "ls", "-al", "~")
 // will create a new Command{
 //   Env: []string{"FOO=BAR", "HOME=/tmp"},
 //   Prog: "ls",
@@ -51,43 +50,9 @@ func (r *RealRunner) Run(cmd Command) error {
 // }
 // and pass it to Run()
 //
-func (r *RealRunner) RunS(args ...string) error {
-	return r.Run(CmdFromTokens(args...))
-}
-
-// CmdFromTokens converts list of string arguments to a Command.
-// Eg. CmdFromTokens("FOO=BAR", "HOME=/tmp", "ls", "-al", "~")
-// ->
-// Command{
-//   Env: []string{"FOO=BAR", "HOME=/tmp"},
-//   Prog: "ls",
-//   Args: []string{"-al", "~"},
-// }
-func CmdFromTokens(args ...string) Command {
-	// count number of leading NAME=VALUE environment var pairs preceding command
-	var i int
-	for i = 0; i < len(args); i++ {
-		if !strings.Contains(args[i], "=") {
-			// if this is not a NAME=VALUE pair, exit
-			break
-		}
-	}
-
-	numEnvVars := i
-	progIndex := i
-	numArgs := len(args) - (numEnvVars + 1)
-
-	cmd := Command{}
-
-	if numEnvVars > 0 {
-		cmd.Env = args[0:numEnvVars]
-	}
-	if progIndex < len(args) {
-		cmd.Prog = args[progIndex]
-	}
-	if numArgs > 0 {
-		cmd.Args = args[progIndex+1:]
-	}
-
-	return cmd
+func (r *RealRunner) RunWithArgs(prog string, args ...string) error {
+	return r.Run(Command{
+		Prog: prog,
+		Args: args,
+	})
 }

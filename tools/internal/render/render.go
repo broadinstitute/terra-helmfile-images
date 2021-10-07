@@ -16,14 +16,19 @@ import (
 // helmfileCommand is the name of the `helmfile` binary
 const helmfileCommand = "helmfile"
 
-// targetTypeEnvVar is the name of the environment variable used to pass target type to helmfile
-const targetTypeEnvVar = "TARGET_TYPE"
+// Environment variables -- prefixed with THF for "Terra Helmfile"
+//
+// helmfileTargetTypeEnvVar is the name of the environment variable used to pass target type to helmfile
+const helmfileTargetTypeEnvVar = "THF_TARGET_TYPE"
 
-// targetBaseEnvVar is the name of the environment variable used to pass target base to helmfile
-const targetBaseEnvVar = "TARGET_BASE"
+// hemfileTargetBaseEnvVar is the name of the environment variable used to pass target base to helmfile
+const hemfileTargetBaseEnvVar = "THF_TARGET_BASE"
 
-// targetNameEnvVar is the name of the environment variable used to pass target name to helmfile
-const targetNameEnvVar = "TARGET_NAME"
+// helmfileTargetNameEnvVar is the name of the environment variable used to pass target name to helmfile
+const helmfileTargetNameEnvVar = "THF_TARGET_NAME"
+
+// helmfileScratchDirEnvVar is the name of the environment variable used to pass unpack dir to helmfile
+const helmfileScratchDirEnvVar = "THF_SCRATCH_DIR"
 
 // Options encapsulates CLI options for a render
 type Options struct {
@@ -39,21 +44,52 @@ type Options struct {
 	Stdout         bool     // Render to stdout instead of output directory
 	Verbose        int      // Invoke `helmfile` with verbose logging
 	ConfigRepoPath string   // Path to terra-helmfile repo clone
+	ScratchDir     string   // Supply a specific scratch directory to Helmfile instead of creating & deleting a tmp dir
 }
 
-// Render generates manifests by invoking `helmfile` with the appropriate arguments
-type Render struct {
-	options          *Options                 // CLI options
+// render generates manifests by invoking `helmfile` with the appropriate arguments
+type render struct {
+	options          Options                  // CLI options
+	scratchDir       scratchDir               // Scratch directory where charts may be downloaded and unpacked, etc.
 	releaseTargets   map[string]ReleaseTarget // Collection of release targets (environments and clusters) defined in the config repo, keyed by name
 	helmfileLogLevel string                   // --log-level argument to pass to `helmfile` command
+}
+
+// scratchDir struct containing paths for temporary/scratch work
+type scratchDir struct {
+	root              string // root directory for all scratch files
+	cleanupOnTeardown bool   // cleanUpOnExit if true, scratch files will be deleted on exit
+	helmfileDir       string // scratch directory that helmfile.yaml should use
 }
 
 // Global/package-level variable, used for executing commands. Replaced with a mock in tests.
 var shellRunner shell.Runner = shell.NewRealRunner()
 
-// NewRender is a constructor
-func NewRender(options *Options) (*Render, error) {
-	render := new(Render)
+// DoRender constructs a render and invokes all functions in correct order to perform a complete
+// render.
+func DoRender(options Options) error {
+	render, err := newRender(options)
+	if err != nil {
+		return err
+	}
+	if err = render.Setup(); err != nil {
+		return err
+	}
+	if err = render.HelmUpdate(); err != nil {
+		return err
+	}
+	if err = render.RenderAll(); err != nil {
+		return err
+	}
+	if err = render.Teardown(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// newRender is a constructor
+func newRender(options Options) (*render, error) {
+	render := new(render)
 	render.options = options
 
 	targets, err := loadTargets(options.ConfigRepoPath)
@@ -67,11 +103,85 @@ func NewRender(options *Options) (*Render, error) {
 		render.helmfileLogLevel = "debug"
 	}
 
+	scratchDir, err := createScratchDir(options)
+	if err != nil {
+		return nil, err
+	}
+	render.scratchDir = *scratchDir
+
 	return render, nil
 }
 
-// CleanOutputDirectory removes any old files from output directory
-func (r *Render) CleanOutputDirectory() error {
+// Setup performs necessary setup for a render
+func (r *render) Setup() error {
+	return r.cleanOutputDirectory()
+}
+
+// Teardown cleans up resources, such as the Helmfile scratch directory, that are no longer needed
+// once the render is finished
+func (r *render) Teardown() error {
+	if r.scratchDir.cleanupOnTeardown {
+		return os.RemoveAll(r.scratchDir.root)
+	}
+	return nil
+}
+
+// HelmUpdate updates Helm repos
+func (r *render) HelmUpdate() error {
+	log.Debug().Msg("Updating Helm repos...")
+	return r.runHelmfile([]string{}, "--allow-no-matching-release", "repos")
+}
+
+// RenderAll renders manifests based on supplied arguments
+func (r *render) RenderAll() error {
+	targetEnvs, err := r.getTargets()
+	if err != nil {
+		return err
+	}
+
+	log.Info().Msgf("Rendering manifests for %d environments...", len(targetEnvs))
+
+	for _, env := range targetEnvs {
+		err = r.renderSingleTarget(env)
+		if err != nil {
+			return err
+		}
+	}
+
+	return normalizeRenderDirectories(r.options.OutputDir)
+}
+
+// createScratchDir creates scratch directory structure, given user-supplied options
+func createScratchDir(options Options) (*scratchDir, error) {
+	scratchDir := scratchDir{}
+	if isSet(options.ScratchDir) {
+		// User supplied a scratch directory
+		scratchDir.root = options.ScratchDir
+		scratchDir.cleanupOnTeardown = false
+	} else {
+		root, err := os.MkdirTemp("", "render-unpack-*")
+		if err != nil {
+			return nil, err
+		}
+		log.Debug().Msgf("Created new scratch directory: %s", root)
+		scratchDir.root = root
+		scratchDir.cleanupOnTeardown = true
+	}
+
+	scratchDir.helmfileDir = path.Join(scratchDir.root, "helmfile")
+
+	dirs := []string{ scratchDir.helmfileDir }
+	for _, dir := range dirs {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return nil, err
+		}
+	}
+
+	return &scratchDir, nil
+}
+
+// cleanOutputDirectory removes any old files from output directory
+func (r *render) cleanOutputDirectory() error {
 	if r.options.Stdout {
 		// No need to clean output directory if we're rendering to stdout
 		return nil
@@ -104,31 +214,6 @@ func (r *Render) CleanOutputDirectory() error {
 	}
 
 	return nil
-}
-
-// HelmUpdate updates Helm repos
-func (r *Render) HelmUpdate() error {
-	log.Debug().Msg("Updating Helm repos...")
-	return r.runHelmfile([]string{}, "--allow-no-matching-release", "repos")
-}
-
-// RenderAll renders manifests based on supplied arguments
-func (r *Render) RenderAll() error {
-	targetEnvs, err := r.getTargets()
-	if err != nil {
-		return err
-	}
-
-	log.Info().Msgf("Rendering manifests for %d environments...", len(targetEnvs))
-
-	for _, env := range targetEnvs {
-		err = r.renderSingleTarget(env)
-		if err != nil {
-			return err
-		}
-	}
-
-	return normalizeRenderDirectories(r.options.OutputDir)
 }
 
 // loadTargets loads all environment and cluster release targets from the config repo
@@ -207,7 +292,7 @@ func loadTargetsFromDirectory(configDir string, targetType string, constructor f
 }
 
 // getTargets returns the set of release targets to render manifests for
-func (r *Render) getTargets() ([]ReleaseTarget, error) {
+func (r *render) getTargets() ([]ReleaseTarget, error) {
 
 	if isSet(r.options.Env) {
 		// User wants to render for a specific environment
@@ -240,11 +325,11 @@ func (r *Render) getTargets() ([]ReleaseTarget, error) {
 }
 
 // renderSingleTarget renders manifests for a single environment or cluster
-func (r *Render) renderSingleTarget(target ReleaseTarget) error {
+func (r *render) renderSingleTarget(target ReleaseTarget) error {
 	log.Info().Msgf("Rendering manifests for %s %s", target.Type(), target.Name())
 
 	// Get environment variables for `helmfile`
-	envVars := getEnvVarsForTarget(target)
+	envVars := r.getEnvVarsForTarget(target)
 
 	// Build list of CLI args to `helmfile`
 	var args []string
@@ -282,7 +367,7 @@ func (r *Render) renderSingleTarget(target ReleaseTarget) error {
 	return r.runHelmfile(envVars, args...)
 }
 
-func (r *Render) runHelmfile(envVars []string, args ...string) error {
+func (r *render) runHelmfile(envVars []string, args ...string) error {
 	finalArgs := []string{
 		fmt.Sprintf("--log-level=%s", r.helmfileLogLevel),
 	}
@@ -299,16 +384,17 @@ func (r *Render) runHelmfile(envVars []string, args ...string) error {
 
 // getEnvVarsForTarget returns a slice of environment variables that are needed for a helmfile render, . Eg.
 // []string{"TARGET_TYPE": "environment", "TARGET_NAME": "dev", "TARGET_BASE": "live" }
-func getEnvVarsForTarget(t ReleaseTarget) []string {
+func (r *render) getEnvVarsForTarget(t ReleaseTarget) []string {
 	return []string{
-		fmt.Sprintf("%s=%s", targetTypeEnvVar, t.Type()),
-		fmt.Sprintf("%s=%s", targetBaseEnvVar, t.Base()),
-		fmt.Sprintf("%s=%s", targetNameEnvVar, t.Name()),
+		fmt.Sprintf("%s=%s", helmfileTargetTypeEnvVar, t.Type()),
+		fmt.Sprintf("%s=%s", hemfileTargetBaseEnvVar, t.Base()),
+		fmt.Sprintf("%s=%s", helmfileTargetNameEnvVar, t.Name()),
+		fmt.Sprintf("%s=%s", helmfileScratchDirEnvVar, r.scratchDir.helmfileDir),
 	}
 }
 
 // getStateValues returns a map of state values that should be set on the command-line, given user-supplied options
-func (r *Render) getStateValues() map[string]string {
+func (r *render) getStateValues() map[string]string {
 	stateValues := make(map[string]string)
 
 	if isSet(r.options.ChartDir) {
@@ -328,7 +414,7 @@ func (r *Render) getStateValues() map[string]string {
 }
 
 // getSelectors returns a map of Helmfile selectors that should be set on the command-line, given user-supplied options
-func (r *Render) getSelectors() map[string]string {
+func (r *render) getSelectors() map[string]string {
 	selectors := make(map[string]string)
 	selectors["mode"] = "release"
 	if r.options.ArgocdMode {

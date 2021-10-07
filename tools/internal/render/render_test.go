@@ -175,11 +175,11 @@ func TestRender(t *testing.T) {
 			description: "no arguments should render for all targets",
 			expectedCommands: []ExpectedCommand{
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
-				ts.cmd("TARGET_TYPE=cluster     TARGET_BASE=tdr      TARGET_NAME=tdr-staging helmfile --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/tdr-staging", ts.mockConfigRepoPath),
-				ts.cmd("TARGET_TYPE=cluster     TARGET_BASE=terra    TARGET_NAME=terra-perf  helmfile --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/terra-perf", ts.mockConfigRepoPath),
-				ts.cmd("TARGET_TYPE=environment TARGET_BASE=live     TARGET_NAME=alpha       helmfile --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/alpha", ts.mockConfigRepoPath),
-				ts.cmd("TARGET_TYPE=environment TARGET_BASE=live     TARGET_NAME=dev         helmfile --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
-				ts.cmd("TARGET_TYPE=environment TARGET_BASE=personal TARGET_NAME=jdoe        helmfile --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/jdoe", ts.mockConfigRepoPath),
+				ts.cmd("THF_TARGET_TYPE=cluster     THF_TARGET_BASE=tdr      THF_TARGET_NAME=tdr-staging helmfile --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/tdr-staging", ts.mockConfigRepoPath),
+				ts.cmd("THF_TARGET_TYPE=cluster     THF_TARGET_BASE=terra    THF_TARGET_NAME=terra-perf  helmfile --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/terra-perf", ts.mockConfigRepoPath),
+				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live     THF_TARGET_NAME=alpha       helmfile --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/alpha", ts.mockConfigRepoPath),
+				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live     THF_TARGET_NAME=dev         helmfile --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
+				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=personal THF_TARGET_NAME=jdoe        helmfile --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/jdoe", ts.mockConfigRepoPath),
 			},
 		},
 		{
@@ -187,11 +187,11 @@ func TestRender(t *testing.T) {
 			arguments:   args("--argocd"),
 			expectedCommands: []ExpectedCommand{
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
-				ts.cmd("TARGET_TYPE=cluster     TARGET_BASE=tdr      TARGET_NAME=tdr-staging helmfile --log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/tdr-staging", ts.mockConfigRepoPath),
-				ts.cmd("TARGET_TYPE=cluster     TARGET_BASE=terra    TARGET_NAME=terra-perf  helmfile --log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/terra-perf", ts.mockConfigRepoPath),
-				ts.cmd("TARGET_TYPE=environment TARGET_BASE=live     TARGET_NAME=alpha       helmfile --log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/alpha", ts.mockConfigRepoPath),
-				ts.cmd("TARGET_TYPE=environment TARGET_BASE=live     TARGET_NAME=dev         helmfile --log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
-				ts.cmd("TARGET_TYPE=environment TARGET_BASE=personal TARGET_NAME=jdoe        helmfile --log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/jdoe", ts.mockConfigRepoPath),
+				ts.cmd("THF_TARGET_TYPE=cluster     THF_TARGET_BASE=tdr      THF_TARGET_NAME=tdr-staging helmfile --log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/tdr-staging", ts.mockConfigRepoPath),
+				ts.cmd("THF_TARGET_TYPE=cluster     THF_TARGET_BASE=terra    THF_TARGET_NAME=terra-perf  helmfile --log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/terra-perf", ts.mockConfigRepoPath),
+				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live     THF_TARGET_NAME=alpha       helmfile --log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/alpha", ts.mockConfigRepoPath),
+				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live     THF_TARGET_NAME=dev         helmfile --log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
+				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=personal THF_TARGET_NAME=jdoe        helmfile --log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/jdoe", ts.mockConfigRepoPath),
 			},
 		},
 		{
@@ -199,7 +199,7 @@ func TestRender(t *testing.T) {
 			arguments:   args("-e dev"),
 			expectedCommands: []ExpectedCommand{
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
-				ts.cmd("TARGET_TYPE=environment TARGET_BASE=live TARGET_NAME=dev helmfile --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
+				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live THF_TARGET_NAME=dev helmfile --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
 			},
 		},
 		{
@@ -207,7 +207,7 @@ func TestRender(t *testing.T) {
 			arguments:   args("-c terra-perf"),
 			expectedCommands: []ExpectedCommand{
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
-				ts.cmd("TARGET_TYPE=cluster TARGET_BASE=terra TARGET_NAME=terra-perf helmfile --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/terra-perf", ts.mockConfigRepoPath),
+				ts.cmd("THF_TARGET_TYPE=cluster THF_TARGET_BASE=terra THF_TARGET_NAME=terra-perf helmfile --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/terra-perf", ts.mockConfigRepoPath),
 			},
 		},
 		{
@@ -215,7 +215,7 @@ func TestRender(t *testing.T) {
 			arguments:   args("-e dev --argocd"),
 			expectedCommands: []ExpectedCommand{
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
-				ts.cmd("TARGET_TYPE=environment TARGET_BASE=live TARGET_NAME=dev helmfile --log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
+				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live THF_TARGET_NAME=dev helmfile --log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
 			},
 		},
 		{
@@ -223,7 +223,7 @@ func TestRender(t *testing.T) {
 			arguments:   args("-c tdr-staging --argocd"),
 			expectedCommands: []ExpectedCommand{
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
-				ts.cmd("TARGET_TYPE=cluster TARGET_BASE=tdr TARGET_NAME=tdr-staging helmfile --log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/tdr-staging", ts.mockConfigRepoPath),
+				ts.cmd("THF_TARGET_TYPE=cluster THF_TARGET_BASE=tdr THF_TARGET_NAME=tdr-staging helmfile --log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/tdr-staging", ts.mockConfigRepoPath),
 			},
 		},
 		{
@@ -231,7 +231,7 @@ func TestRender(t *testing.T) {
 			arguments:   args("-e dev -r leonardo"),
 			expectedCommands: []ExpectedCommand{
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
-				ts.cmd("TARGET_TYPE=environment TARGET_BASE=live TARGET_NAME=dev helmfile --log-level=info --selector=mode=release,release=leonardo template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
+				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live THF_TARGET_NAME=dev helmfile --log-level=info --selector=mode=release,release=leonardo template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
 			},
 		},
 		{
@@ -239,7 +239,7 @@ func TestRender(t *testing.T) {
 			arguments:   args("--argocd -e dev -a leonardo"),
 			expectedCommands: []ExpectedCommand{
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
-				ts.cmd("TARGET_TYPE=environment TARGET_BASE=live TARGET_NAME=dev helmfile --log-level=info --selector=mode=argocd,release=leonardo template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
+				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live THF_TARGET_NAME=dev helmfile --log-level=info --selector=mode=argocd,release=leonardo template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
 			},
 		},
 		{
@@ -247,7 +247,7 @@ func TestRender(t *testing.T) {
 			arguments:   args("-e dev -r leonardo --app-version 1.2.3"),
 			expectedCommands: []ExpectedCommand{
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
-				ts.cmd("TARGET_TYPE=environment TARGET_BASE=live TARGET_NAME=dev helmfile --log-level=info --selector=mode=release,release=leonardo --state-values-set=releases.leonardo.appVersion=1.2.3 template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
+				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live THF_TARGET_NAME=dev helmfile --log-level=info --selector=mode=release,release=leonardo --state-values-set=releases.leonardo.appVersion=1.2.3 template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
 			},
 		},
 		{
@@ -255,7 +255,7 @@ func TestRender(t *testing.T) {
 			arguments:   args("-e dev -r leonardo --chart-dir=%s", ts.mockChartDir),
 			expectedCommands: []ExpectedCommand{
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
-				ts.cmd("TARGET_TYPE=environment TARGET_BASE=live TARGET_NAME=dev helmfile --log-level=info --selector=mode=release,release=leonardo --state-values-set=releases.leonardo.repo=%s template --output-dir=%s/output/dev", ts.mockChartDir, ts.mockConfigRepoPath),
+				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live THF_TARGET_NAME=dev helmfile --log-level=info --selector=mode=release,release=leonardo --state-values-set=releases.leonardo.repo=%s template --output-dir=%s/output/dev", ts.mockChartDir, ts.mockConfigRepoPath),
 			},
 		},
 		{
@@ -263,7 +263,7 @@ func TestRender(t *testing.T) {
 			arguments:   args("-e dev -r leonardo --app-version 1.2.3 --chart-version 4.5.6"),
 			expectedCommands: []ExpectedCommand{
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
-				ts.cmd("TARGET_TYPE=environment TARGET_BASE=live TARGET_NAME=dev helmfile --log-level=info --selector=mode=release,release=leonardo --state-values-set=releases.leonardo.appVersion=1.2.3,releases.leonardo.chartVersion=4.5.6 template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
+				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live THF_TARGET_NAME=dev helmfile --log-level=info --selector=mode=release,release=leonardo --state-values-set=releases.leonardo.appVersion=1.2.3,releases.leonardo.chartVersion=4.5.6 template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
 			},
 		},
 		{
@@ -274,7 +274,7 @@ func TestRender(t *testing.T) {
 			},
 			expectedCommands: []ExpectedCommand{
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
-				ts.cmd("TARGET_TYPE=environment TARGET_BASE=live TARGET_NAME=dev helmfile --log-level=info --selector=mode=release,release=leonardo template --skip-deps --values=%s/v.yaml --output-dir=%s/output/dev", ts.scratchDir, ts.mockConfigRepoPath),
+				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live THF_TARGET_NAME=dev helmfile --log-level=info --selector=mode=release,release=leonardo template --skip-deps --values=%s/v.yaml --output-dir=%s/output/dev", ts.scratchDir, ts.mockConfigRepoPath),
 			},
 		},
 		{
@@ -285,7 +285,7 @@ func TestRender(t *testing.T) {
 			},
 			expectedCommands: []ExpectedCommand{
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
-				ts.cmd("TARGET_TYPE=environment TARGET_BASE=live TARGET_NAME=dev helmfile --log-level=info --selector=mode=release,release=leonardo template --skip-deps --values=%s/v1.yaml,%s/v2.yaml,%s/v3.yaml --output-dir=%s/output/dev", ts.scratchDir, ts.scratchDir, ts.scratchDir, ts.mockConfigRepoPath),
+				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live THF_TARGET_NAME=dev helmfile --log-level=info --selector=mode=release,release=leonardo template --skip-deps --values=%s/v1.yaml,%s/v2.yaml,%s/v3.yaml --output-dir=%s/output/dev", ts.scratchDir, ts.scratchDir, ts.scratchDir, ts.mockConfigRepoPath),
 			},
 		},
 		{
@@ -300,7 +300,7 @@ func TestRender(t *testing.T) {
 			arguments:   args("-e dev"),
 			expectedCommands: []ExpectedCommand{
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
-				ts.failCmd("dieee", "TARGET_TYPE=environment TARGET_BASE=live TARGET_NAME=dev helmfile --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
+				ts.failCmd("dieee", "THF_TARGET_TYPE=environment THF_TARGET_BASE=live THF_TARGET_NAME=dev helmfile --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
 			},
 			expectedError: regexp.MustCompile("dieee"),
 		},
@@ -309,7 +309,7 @@ func TestRender(t *testing.T) {
 			arguments:   args("-e dev -v -v"),
 			expectedCommands: []ExpectedCommand{
 				ts.cmd("helmfile --log-level=debug --allow-no-matching-release repos"),
-				ts.cmd("TARGET_TYPE=environment TARGET_BASE=live TARGET_NAME=dev helmfile --log-level=debug --selector=mode=release template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
+				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live THF_TARGET_NAME=dev helmfile --log-level=debug --selector=mode=release template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath),
 			},
 		},
 		{
@@ -317,7 +317,7 @@ func TestRender(t *testing.T) {
 			arguments:   args("--env=alpha --stdout"),
 			expectedCommands: []ExpectedCommand{
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
-				ts.cmd("TARGET_TYPE=environment TARGET_BASE=live TARGET_NAME=alpha helmfile --log-level=info --selector=mode=release template --skip-deps"),
+				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live THF_TARGET_NAME=alpha helmfile --log-level=info --selector=mode=release template --skip-deps"),
 			},
 		},
 		{
@@ -325,7 +325,7 @@ func TestRender(t *testing.T) {
 			arguments:   args("-e jdoe -d path/to/nowhere"),
 			expectedCommands: []ExpectedCommand{
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos"),
-				ts.cmd("TARGET_TYPE=environment TARGET_BASE=personal TARGET_NAME=jdoe helmfile --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/path/to/nowhere/jdoe", cwd()),
+				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=personal THF_TARGET_NAME=jdoe helmfile --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/path/to/nowhere/jdoe", cwd()),
 			},
 		},
 		{
@@ -393,10 +393,12 @@ func TestRender(t *testing.T) {
 			// Set up expectations for this test case's commands
 			mockRunner, originalRunner := shellmock.DefaultMockRunner(), shellRunner
 			shellRunner = mockRunner
+			mockRunner.Test(t)
+			// Replace mock runner with real runner when this test completes
 			defer func() { shellRunner = originalRunner }()
 
 			for _, expectedCmd := range testCase.expectedCommands {
-				mockRunner.ExpectCmd(t, expectedCmd.Command).Return(expectedCmd.Error)
+				mockRunner.OnCmd(expectedCmd.Command).Return(expectedCmd.Error)
 			}
 
 			// Run the Cobra command
@@ -408,7 +410,9 @@ func TestRender(t *testing.T) {
 			if testCase.expectedError == nil {
 				assert.Nil(t, err, "Unexpected error returned: %v", err)
 			} else {
-				assert.Error(t, err, "Expected command execution to return an error, but it did not")
+				if !assert.Error(t, err, "Expected command execution to return an error, but it did not") {
+					return
+				}
 				assert.Regexp(t, testCase.expectedError, err.Error(), "Error mismatch")
 			}
 
@@ -486,10 +490,10 @@ func cwd() string {
 // Convenience function to create a successful/non-erroring ExpectedCommand, given
 // a format string _for_ the command.
 //
-// Eg. cmd("TARGET_NAME=%s FOO=BAR helmfile template", "alpha")
+// Eg. cmd("THF_TARGET_NAME=%s FOO=BAR helmfile template", "alpha")
 // ->
 // Command{
-//   Env: []string{"TARGET_NAME=alpha", "FOO=BAR"},
+//   Env: []string{"THF_TARGET_NAME=alpha", "FOO=BAR"},
 //   Prog: "helmfile",
 //   Args: []string{"template"},
 //   Dir: "mock/config/repo/path" // tmpdir

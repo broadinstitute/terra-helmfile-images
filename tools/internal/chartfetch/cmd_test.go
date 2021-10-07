@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shellmock"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shellmock/matchers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"os"
@@ -48,8 +49,14 @@ func TestFetch(t *testing.T) {
 			description: "should download if directory does not exist",
 			args:        args("terra-helm/leonardo -v 1.2.3 -d %s/my/nested/download-dir", testDir),
 			setupMocks: func(t *testing.T, m *shellmock.MockRunner) {
-				m.ExpectCmdFmt(t, "helm fetch terra-helm/leonardo --untar -d %s/my/nested/.download-dir.tmp", testDir).
-					Run(func(args mock.Arguments) {
+				cmd := matchers.CmdWithArgs("helm",
+					"fetch",
+					"terra-helm/leonardo",
+					"--untar",
+					"-d",
+					fmt.Sprintf("%s/my/nested/.download-dir.tmp", testDir),
+				)
+				m.OnCmd(cmd).Run(func(args mock.Arguments) {
 						chartDir := path.Join(testDir, "my", "nested", ".download-dir.tmp", "leonardo")
 						if err := os.MkdirAll(chartDir, 0755); err != nil {
 							t.Fatalf("Error creating fake downloaded chart directory %s: %v", chartDir, err)
@@ -68,8 +75,15 @@ func TestFetch(t *testing.T) {
 			description: "should return an error if the helm fetch command fails",
 			args:        args("terra-helm/leonardo -v 1.2.3 -d %s/download-dir", testDir),
 			setupMocks: func(t *testing.T, m *shellmock.MockRunner) {
-				m.ExpectCmdFmt(t, "helm fetch terra-helm/leonardo --untar -d %s/.download-dir.tmp", testDir).
-					Return(errors.New("command failed because reasons"))
+				cmd := matchers.CmdWithArgs("helm",
+					"fetch",
+					"terra-helm/leonardo",
+					"--untar",
+					"-d",
+					fmt.Sprintf("%s/.download-dir.tmp", testDir),
+				)
+
+				m.OnCmd(cmd).Return(errors.New("command failed because reasons"))
 			},
 			expectedError: regexp.MustCompile("command failed because reasons"),
 		},

@@ -38,8 +38,16 @@ func MatchesRegexp(expected *regexp.Regexp) StringMatcher {
 			return expected.MatchString(actual)
 		},
 		stringer: func () string {
-		return fmt.Sprintf("match(/%s/)", expected.String())
+			return fmt.Sprintf("match(/%s/)", expected.String())
 		},
+	}
+}
+
+// MatchesPredicate will check if a string matches the given predicate
+func MatchesPredicate(description string, predicate func (string) bool) StringMatcher {
+	return StringMatcher{
+		predicate: predicate,
+		stringer: func () string { return description },
 	}
 }
 
@@ -52,14 +60,6 @@ func Contains(expected string) StringMatcher {
 		stringer: func () string {
 			return fmt.Sprintf("contains(%s)", expected)
 		},
-	}
-}
-
-// MatchesPredicate will check if a string matches the given predicate
-func MatchesPredicate(description string, predicate func (string) bool) StringMatcher {
-	return StringMatcher{
-		predicate: predicate,
-		stringer: func () string { return description },
 	}
 }
 

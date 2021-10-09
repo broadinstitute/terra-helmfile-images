@@ -36,7 +36,14 @@ func AnyCmd() *CmdMatcher {
 	return matcher
 }
 
-// CmdWithArgs returns a new command matcher that will the given prog + args
+// CmdWithArgs returns a new command matcher that will the given prog + args.
+//
+// Eg. CmdWithArgs("ls", "-al", "/tmp")
+// will match
+// shell.Command{
+//   Prog: "ls",
+//   Args: []string{"-al", "/tmp"}
+// }
 func CmdWithArgs(prog string, args... string) *CmdMatcher {
 	matcher := newCmdMatcher()
 	matcher.WithProg(prog)
@@ -170,6 +177,9 @@ func (m *CmdMatcher) Matches(cmd shell.Command) bool {
 		return false
 	}
 	for i, arg := range cmd.Args {
+		if i >= len(m.argConstraints) {
+			break
+		}
 		constraint := m.argConstraints[i]
 		if !constraint.Matches(arg) {
 			return false

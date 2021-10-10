@@ -39,7 +39,7 @@ func SayHello(runner shell.Runner) {
 
 	_ = runner.Run(shell.Command{
 		Prog: "ls",
-		Dir: "/tmp",
+		Dir:  "/tmp",
 	})
 
 }

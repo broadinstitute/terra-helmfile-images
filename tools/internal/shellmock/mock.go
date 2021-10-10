@@ -25,17 +25,17 @@ type CmdDumpStyle int
 const (
 	Default CmdDumpStyle = iota // Default prints the command using "%v"
 	Pretty                      // Pretty formats commands using PrettyFormat
-	Spew						// Spew uses the spew library to spew the entire struct
+	Spew                        // Spew uses the spew library to spew the entire struct
 )
 
 // Options for a MockRunner
 type Options struct {
-	VerifyOrder bool    // VerifyOrder If true, verify commands are run in the order they were declared
-	DumpStyle CmdDumpStyle // DumpStyle how to style the dump
+	VerifyOrder bool         // VerifyOrder If true, verify commands are run in the order they were declared
+	DumpStyle   CmdDumpStyle // DumpStyle how to style the dump
 }
 
 type expectedCommand struct {
-	cmd shell.Command
+	cmd  shell.Command
 	call *mock.Call
 }
 
@@ -44,7 +44,7 @@ type MockRunner struct {
 	options          Options
 	expectedCommands []expectedCommand
 	runCounter       int
-	t *testing.T
+	t                *testing.T
 	mock.Mock
 }
 
@@ -102,7 +102,7 @@ func (m *MockRunner) OnCmd(cmdOrMatcher interface{}) *mock.Call {
 	switch c := cmdOrMatcher.(type) {
 	case *matchers.CmdMatcher:
 		cmd = c.AsCmd()
-		call = m.Mock.On("Run", mock.MatchedBy(func (actual shell.Command) bool {
+		call = m.Mock.On("Run", mock.MatchedBy(func(actual shell.Command) bool {
 			return c.Matches(actual)
 		}))
 	case shell.Command:
@@ -177,8 +177,8 @@ func (m *MockRunner) dumpExpectedCmd(index int, expected expectedCommand) {
 		fmt.Println()
 
 		scs := spew.ConfigState{
-			Indent: "\t",
-			DisableCapacities: true,
+			Indent:                  "\t",
+			DisableCapacities:       true,
 			DisablePointerAddresses: true,
 		}
 
@@ -195,4 +195,3 @@ func (m *MockRunner) panicOrFailNow(err error) {
 	m.t.Error(err)
 	m.t.FailNow()
 }
-

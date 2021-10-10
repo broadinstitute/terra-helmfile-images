@@ -19,7 +19,7 @@ func TestMockRunnerPassesSingleCommand(t *testing.T) {
 	assert.Nil(t, m.Run(shell.Command{
 		Prog: "echo",
 		Args: []string{"hello", "world"},
-		Env: []string{"FOO=BAR"},
+		Env:  []string{"FOO=BAR"},
 	}))
 
 	m.AssertExpectations(t)

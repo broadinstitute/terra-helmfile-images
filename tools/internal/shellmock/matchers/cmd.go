@@ -6,12 +6,17 @@ import (
 	"strings"
 )
 
+type envConstraint struct {
+	name string // name of the environment variable this constraint matches
+	valueMatcher StringMatcher // valueMatcher matches the value of hte environment variable
+}
+
 // CmdMatcher is for evaluating whether a shell.Command matches configured
 // constraints.
 type CmdMatcher struct {
 	progConstraint StringMatcher
 	argConstraints []StringMatcher
-	envConstraints map[string]StringMatcher
+	envConstraints []envConstraint
 	dirConstraint  StringMatcher
 	// TODO check pristineEnv? (haven't encountered a use case where it was necessary to test)
 	allowExtraEnvVars bool
@@ -21,8 +26,7 @@ type CmdMatcher struct {
 // newCmdMatcher initializes a new command matchers with sensible defaults
 func newCmdMatcher() *CmdMatcher {
 	matcher := new(CmdMatcher)
-	matcher.progConstraint = None()
-	matcher.envConstraints = make(map[string]StringMatcher)
+	matcher.progConstraint = Equals("")
 	matcher.dirConstraint = AnyString()
 	return matcher
 }
@@ -44,7 +48,7 @@ func AnyCmd() *CmdMatcher {
 //   Prog: "ls",
 //   Args: []string{"-al", "/tmp"}
 // }
-func CmdWithArgs(prog string, args... string) *CmdMatcher {
+func CmdWithArgs(prog string, args ...string) *CmdMatcher {
 	matcher := newCmdMatcher()
 	matcher.WithProg(prog)
 	matcher.WithExactArgs(toGeneric(args)...)
@@ -52,7 +56,6 @@ func CmdWithArgs(prog string, args... string) *CmdMatcher {
 	matcher.FailIfExtraEnvVars()
 	return matcher
 }
-
 
 // CmdWithEnv returns a new command matcher that will match the given prog, arg, and any
 // leading NAME=VAL environment variable pairs
@@ -94,7 +97,6 @@ func CmdWithEnv(args ...string) *CmdMatcher {
 	return matcher
 }
 
-
 // WithProg configures the matcher to expect a prog matching
 // the given argument matcher
 //
@@ -109,7 +111,7 @@ func (m *CmdMatcher) WithProg(matcher interface{}) *CmdMatcher {
 //
 // eg. matcher.WithExactArgs("-al", "/tmp")
 //     matcher.WithExactArgs("-al", Contains("/tmp"))
-func (m *CmdMatcher) WithExactArgs(matchers... interface{}) *CmdMatcher {
+func (m *CmdMatcher) WithExactArgs(matchers ...interface{}) *CmdMatcher {
 	args := make([]StringMatcher, len(matchers))
 	for i, matcher := range matchers {
 		args[i] = toStringMatcher(matcher)
@@ -134,13 +136,17 @@ func (m *CmdMatcher) WithArg(matcher interface{}) *CmdMatcher {
 // set of env vars, supplied as NAME=VALUE pairs.
 //
 // eg. matcher.WithExactEnvVars("FOO=BAR", "BAZ=QUUX")
-func (m *CmdMatcher) WithExactEnvVars(pairs... string) *CmdMatcher {
-	envVars := make(map[string]StringMatcher, len(pairs))
-	for _, pair := range pairs {
+func (m *CmdMatcher) WithExactEnvVars(pairs ...string) *CmdMatcher {
+	envConstraints := make([]envConstraint, len(pairs))
+	for i, pair := range pairs {
 		name, value := splitEnvPair(pair)
-		envVars[name] = Equals(value)
+		constraint := envConstraint{
+			name: name,
+			valueMatcher: Equals(value),
+		}
+		envConstraints[i] = constraint
 	}
-	m.envConstraints = envVars
+	m.envConstraints = envConstraints
 	m.FailIfExtraEnvVars()
 	return m
 }
@@ -150,7 +156,11 @@ func (m *CmdMatcher) WithExactEnvVars(pairs... string) *CmdMatcher {
 //
 // eg. matcher.WithEnvVar("FOO", "BAR").WithEnvVar("BAZ", HasPrefix("FOO_"))
 func (m *CmdMatcher) WithEnvVar(name string, matcher interface{}) *CmdMatcher {
-	m.envConstraints[name] = toStringMatcher(matcher)
+	constraint := envConstraint{
+		name: name,
+		valueMatcher: toStringMatcher(matcher),
+	}
+	m.envConstraints = append(m.envConstraints, constraint)
 	return m
 }
 
@@ -167,47 +177,14 @@ func (m *CmdMatcher) Matches(cmd shell.Command) bool {
 		return false
 	}
 
-	// check Args
-	if len(cmd.Args) < len(m.argConstraints) {
-		// not enough args to satisfy our constraints
+	// checkArgs
+	if !m.matchesArgs(cmd) {
 		return false
-	}
-	if len(cmd.Args) > len(m.argConstraints) && !m.allowExtraArgs {
-		// too many args to satisfy our constraints
-		return false
-	}
-	for i, arg := range cmd.Args {
-		if i >= len(m.argConstraints) {
-			break
-		}
-		constraint := m.argConstraints[i]
-		if !constraint.Matches(arg) {
-			return false
-		}
 	}
 
 	// check Env
-	if len(cmd.Env) < len(m.envConstraints) {
-		// not enough env vars to satisfy our constraints
+	if !m.matchesEnvVars(cmd) {
 		return false
-	}
-
-	for _, pair := range cmd.Env {
-		tokens := strings.SplitN(pair, "=", 2)
-		name := tokens[0]
-		value := ""
-		if len(tokens) > 1 {
-			value = tokens[1]
-		}
-
-		constraint, existsInMap := m.envConstraints[name]
-		if !existsInMap && !m.allowExtraEnvVars {
-			// extraneous env var
-			return false
-		}
-		if !constraint.Matches(value) {
-			return false
-		}
 	}
 
 	// check Dir
@@ -217,7 +194,6 @@ func (m *CmdMatcher) Matches(cmd shell.Command) bool {
 
 	return true
 }
-
 
 // FailIfExtraEnvVars configures the matcher to fail the match if there are any
 // extra env vars in a given shell.Command that don't match the given matchers
@@ -247,7 +223,6 @@ func (m *CmdMatcher) AllowExtraArgs() *CmdMatcher {
 	return m
 }
 
-
 // AsCmd returns a representation of this matcher as a shell.Command object,
 // useful for displaying in console output
 func (m *CmdMatcher) AsCmd() shell.Command {
@@ -264,10 +239,8 @@ func (m *CmdMatcher) AsCmd() shell.Command {
 	}
 
 	cmd.Env = make([]string, len(m.envConstraints))
-	i := 0
-	for name, val := range m.envConstraints {
-		cmd.Env[i] = fmt.Sprintf("%s=%s", name, val.String())
-		i++
+	for i, constraint := range m.envConstraints {
+		cmd.Env[i] = fmt.Sprintf("%s=%s", constraint.name, constraint.valueMatcher.String())
 	}
 	if m.allowExtraEnvVars {
 		cmd.Env = append(cmd.Env, "<...>")
@@ -276,6 +249,69 @@ func (m *CmdMatcher) AsCmd() shell.Command {
 	cmd.Dir = m.dirConstraint.String()
 
 	return cmd
+}
+
+// matchesArgs checks that the given shell.Command's arguments match this matcher's constraints
+func (m *CmdMatcher) matchesArgs(cmd shell.Command) bool {
+	if len(cmd.Args) < len(m.argConstraints) {
+		// not enough args to satisfy our constraints
+		return false
+	}
+	if len(cmd.Args) > len(m.argConstraints) && !m.allowExtraArgs {
+		// too many args to satisfy our constraints
+		return false
+	}
+	for i, arg := range cmd.Args {
+		if i >= len(m.argConstraints) {
+			break
+		}
+		constraint := m.argConstraints[i]
+		if !constraint.Matches(arg) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// matchesEnvVars checks that the given shell.Command's arguments match this matcher's constraints
+func (m *CmdMatcher) matchesEnvVars(cmd shell.Command) bool {
+	// convert list of "NAME=VALUE" pairs to map of "NAME" => "VALUE" associations
+	// as a side-effect this will remove duplicate env vars in the slice (last wins)
+	cmdVars := make(map[string]string, len(cmd.Env))
+	for _, pair := range cmd.Env {
+		name, value := splitEnvPair(pair)
+		cmdVars[name] = value
+	}
+
+	if len(cmdVars) < len(m.envConstraints) {
+		// not enough env vars to satisfy our constraints
+		return false
+	}
+
+	if len(cmdVars) > len(m.envConstraints) {
+		// more variables than constraints...
+		if !m.allowExtraEnvVars {
+			// and we don't allow extras, so fail the match
+			return false
+		}
+	}
+
+	// iterate through our constraints and check that each one is matched
+	// by the corresponding env var
+	for _, constraint := range m.envConstraints {
+		value, existsInMap := cmdVars[constraint.name]
+		if !existsInMap {
+			// there's no env var that matches this constraint
+			return false
+		}
+		if !constraint.valueMatcher.Matches(value) {
+			// we have an env var but the value doesn't match the constraint
+			return false
+		}
+	}
+
+	return true
 }
 
 // splitEnvPair splits an environment key value pair "NAME=VALUE" into

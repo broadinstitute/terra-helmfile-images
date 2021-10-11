@@ -7,6 +7,8 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/mock"
+	"io"
+	"os"
 	"testing"
 )
 
@@ -147,34 +149,42 @@ func (m *MockRunner) Test(t *testing.T) {
 	m.t = t
 	t.Cleanup(func() {
 		if t.Failed() {
-			m.dumpExpectedCmds()
+			if err := m.dumpExpectedCmds(os.Stderr); err != nil {
+				t.Error(err)
+			}
 		}
 	})
 	m.Mock.Test(t)
 }
 
-func (m *MockRunner) dumpExpectedCmds() {
-	fmt.Print("\n\n")
-	fmt.Println("Expected commands:")
-	fmt.Println()
-	for i, ec := range m.expectedCommands {
-		m.dumpExpectedCmd(i, ec)
+func (m *MockRunner) dumpExpectedCmds(w io.Writer) error {
+	if _, err := fmt.Fprint(w,"\n\nExpected commands:\n\n"); err != nil {
+		return err
 	}
+	for i, ec := range m.expectedCommands {
+		if err := m.dumpExpectedCmd(w, i, ec); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-func (m *MockRunner) dumpExpectedCmd(index int, expected expectedCommand) {
-	// TODO respect verbosity
+func (m *MockRunner) dumpExpectedCmd(w io.Writer, index int, expected expectedCommand) error {
 	cmd := expected.cmd
 	switch m.options.DumpStyle {
 	case Default:
-		fmt.Printf("\t%d: %#v\n", index, cmd)
-		fmt.Println()
+		if _, err := fmt.Fprintf(w,"\t%d: %#v\n\n", index, cmd); err != nil {
+			return err
+		}
 	case Pretty:
-		fmt.Printf("\t%d: %s\n", index, cmd.PrettyFormat())
-		fmt.Println()
+		if _, err := fmt.Fprintf(w, "\t%d: %s\n\n", index, cmd.PrettyFormat()); err != nil {
+			return err
+		}
 	case Spew:
-		fmt.Printf("\t%d: %s\n", index, cmd.PrettyFormat())
-		fmt.Println()
+		if _, err := fmt.Fprintf(w, "\t%d: %s\n\n", index, cmd.PrettyFormat()); err != nil {
+			return err
+		}
 
 		scs := spew.ConfigState{
 			Indent:                  "\t",
@@ -182,10 +192,16 @@ func (m *MockRunner) dumpExpectedCmd(index int, expected expectedCommand) {
 			DisablePointerAddresses: true,
 		}
 
-		scs.Dump(cmd)
+		scs.Fdump(w, cmd)
+
+		if _, err := fmt.Fprintln(w); err != nil {
+			return err
+		}
 
 		fmt.Println()
 	}
+
+	return nil
 }
 
 func (m *MockRunner) panicOrFailNow(err error) {

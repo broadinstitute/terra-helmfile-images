@@ -1,6 +1,7 @@
 package shellmock
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shellmock/matchers"
@@ -94,4 +95,106 @@ func TestMockRunnerCanMockErrors(t *testing.T) {
 	e := m.RunWithArgs("echo", "1")
 	assert.Error(t, e, "error should not be nil")
 	assert.Errorf(t, e, "my error", "mock runner should return the mocked error")
+}
+
+// Verify our mock runner can be used to set expectations on mocks with raw shell.Command objects,
+// not just matchers
+func TestMockRunnerCanMockRawCmds(t *testing.T) {
+	m := DefaultMockRunner()
+	m.Test(t)
+
+	m.OnCmd(shell.Command{Prog: "echo", Args: []string{"1"}})
+
+	e := m.RunWithArgs("echo", "1")
+	assert.Nil(t, e, "mock runner should not return an error")
+}
+
+
+// Check cmd dumps
+func TestMockRunnerCanDumpCmdsDefault(t *testing.T) {
+	m := NewMockRunner(Options{DumpStyle: Default})
+
+	m.OnCmd(matchers.CmdWithArgs("echo", "foo"))
+	m.OnCmd(shell.Command{Prog: "echo", Args: []string{"bar"}})
+
+	w := bytes.NewBufferString("")
+	e := m.dumpExpectedCmds(w)
+	assert.Nil(t, e, "dumpExpectedCmds() should not return an error")
+	expected := `
+
+Expected commands:
+
+	0: shell.Command{Prog:"echo", Args:[]string{"foo"}, Env:[]string{}, Dir:"<any>", PristineEnv:false}
+
+	1: shell.Command{Prog:"echo", Args:[]string{"bar"}, Env:[]string(nil), Dir:"", PristineEnv:false}
+
+`
+
+	assert.Equal(t, expected, w.String())
+}
+
+// Check cmd dumps
+func TestMockRunnerCanDumpCmdsPretty(t *testing.T) {
+	m := NewMockRunner(Options{DumpStyle: Pretty})
+
+	m.OnCmd(matchers.CmdWithArgs("echo", "foo"))
+	m.OnCmd(shell.Command{Prog: "echo", Args: []string{"bar"}})
+
+	w := bytes.NewBufferString("")
+	e := m.dumpExpectedCmds(w)
+	assert.Nil(t, e, "dumpExpectedCmds() should not return an error")
+
+	expected :=  `
+
+Expected commands:
+
+	0: echo foo
+
+	1: echo bar
+
+`
+	assert.Equal(t, expected, w.String())
+}
+
+// Check cmd dumps
+func TestMockRunnerCanDumpCmdsSpew(t *testing.T) {
+	m := NewMockRunner(Options{DumpStyle: Spew})
+
+	m.OnCmd(matchers.CmdWithArgs("echo", "foo"))
+	m.OnCmd(shell.Command{Prog: "echo", Args: []string{"bar"}})
+
+	w := bytes.NewBufferString("")
+	e := m.dumpExpectedCmds(w)
+	assert.Nil(t, e, "dumpExpectedCmds() should not return an error")
+	expected := `
+
+Expected commands:
+
+	0: echo foo
+
+(shell.Command) {
+	Prog: (string) (len=4) "echo",
+	Args: ([]string) (len=1) {
+		(string) (len=3) "foo"
+	},
+	Env: ([]string) {
+	},
+	Dir: (string) (len=5) "<any>",
+	PristineEnv: (bool) false
+}
+
+	1: echo bar
+
+(shell.Command) {
+	Prog: (string) (len=4) "echo",
+	Args: ([]string) (len=1) {
+		(string) (len=3) "bar"
+	},
+	Env: ([]string) <nil>,
+	Dir: (string) "",
+	PristineEnv: (bool) false
+}
+
+`
+	assert.Equal(t, expected, w.String())
 }

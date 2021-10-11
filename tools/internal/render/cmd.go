@@ -93,7 +93,21 @@ render -e alpha -a cromwell --argocd
 			}
 			adjustLoggingVerbosity(options.Verbose)
 
-			return DoRender(*options)
+			render, err := NewRender(options)
+			if err != nil {
+				return err
+			}
+			if err = render.CleanOutputDirectory(); err != nil {
+				return err
+			}
+			if err = render.HelmUpdate(); err != nil {
+				return err
+			}
+			if err = render.RenderAll(); err != nil {
+				return err
+			}
+
+			return nil
 		},
 	}
 
@@ -107,7 +121,6 @@ render -e alpha -a cromwell --argocd
 	cobraCommand.Flags().StringSliceVar(&options.ValuesFiles, "values-file", []string{}, "Path to chart values file. Can be specified multiple times with ascending precedence (last wins)")
 	cobraCommand.Flags().BoolVar(&options.ArgocdMode, "argocd", false, "Render ArgoCD manifests instead of application manifests")
 	cobraCommand.Flags().StringVarP(&options.OutputDir, "output-dir", "d", optionUnset, "Render manifests to custom output directory")
-	cobraCommand.Flags().StringVar(&options.ScratchDir, "scratch-dir", optionUnset, "Use a pre-defined scratch directory instead of creating and deleting a tmp dir (useful for debugging")
 	cobraCommand.Flags().BoolVar(&options.Stdout, "stdout", false, "Render manifests to stdout instead of output directory")
 	cobraCommand.Flags().CountVarP(&options.Verbose, "verbose", "v", "Verbose logging. Can be specified multiple times")
 
@@ -179,12 +192,6 @@ func normalizePaths(options *Options) error {
 		}
 	}
 
-	if isSet(options.ScratchDir) {
-		if err := normalizeScratchDir(options); err != nil {
-			return err
-		}
-	}
-
 	if len(options.ValuesFiles) > 0 {
 		if err := normalizeValuesFiles(options); err != nil {
 			return err
@@ -226,16 +233,6 @@ func normalizeChartDir(options *Options) error {
 		return err
 	}
 	options.ChartDir = *expanded
-	return nil
-}
-
-// Validate scratch dir, expand it
-func normalizeScratchDir(options *Options) error {
-	expanded, err := expandAndVerifyExists(options.ScratchDir, "scratch directory")
-	if err != nil {
-		return err
-	}
-	options.ScratchDir = *expanded
 	return nil
 }
 

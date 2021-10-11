@@ -486,3 +486,21 @@ func TestAsCmd(t *testing.T) {
 		})
 	}
 }
+
+func TestCmdFromFmt(t *testing.T) {
+	matcher := CmdFromFmt("HOME=%s FOO=BAR ls -al %s", "/root", "/tmp")
+	cmd := shell.Command{
+		Prog: "ls",
+		Args: []string{"-al", "/tmp"},
+		Env: []string{"HOME=/root", "FOO=BAR"},
+	}
+	assert.True(t, matcher.Matches(cmd))
+
+	expected := shell.Command{
+		Prog: "ls",
+		Args: []string{"-al", "/tmp"},
+		Env: []string{"HOME=/root", "FOO=BAR"},
+		Dir: "<any>",
+	}
+	assert.Equal(t, expected, matcher.AsCmd())
+}

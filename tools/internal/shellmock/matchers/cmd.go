@@ -97,6 +97,35 @@ func CmdWithEnv(args ...string) *CmdMatcher {
 	return matcher
 }
 
+// CmdFromString returns a new command matcher that will match the given command, supplied as a string
+// and parsed
+//
+// Eg. CmdFromString("FOO=BAR HOME=/tmp ls -al ~")
+// will match
+// shell.Command{
+//   Env: []string{"FOO=BAR", "HOME=/tmp"},
+//   Prog: "ls",
+//   Args: []string{"-al", "~"},
+// }
+func CmdFromString(cmd string) *CmdMatcher {
+	return CmdWithEnv(strings.Fields(cmd)...)
+}
+
+// CmdFromFmt returns a new command matcher that will match the given command, supplied as a format
+// string with arguments.
+//
+// Eg. CmdFromFmt("FOO=BAR HOME=%s ls -al %s", "/root", "/")
+// will match
+// shell.Command{
+//   Env: []string{"FOO=BAR", "HOME=/root"},
+//   Prog: "ls",
+//   Args: []string{"-al", "/"},
+// }
+func CmdFromFmt(cmdFmt string, args... interface{}) *CmdMatcher {
+	formatted := fmt.Sprintf(cmdFmt, args...)
+	return CmdFromString(formatted)
+}
+
 // WithProg configures the matcher to expect a prog matching
 // the given argument matcher
 //

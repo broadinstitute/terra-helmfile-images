@@ -26,7 +26,7 @@ func Equals(expected string) StringMatcher {
 			return actual == expected
 		},
 		stringer: func() string {
-			return fmt.Sprintf("%s", expected)
+			return expected
 		},
 	}
 }
@@ -47,7 +47,7 @@ func MatchesRegexp(expected *regexp.Regexp) StringMatcher {
 func MatchesPredicate(description string, predicate func(string) bool) StringMatcher {
 	return StringMatcher{
 		predicate: predicate,
-		stringer:  func() string {
+		stringer: func() string {
 			return fmt.Sprintf("<%s>", description)
 		},
 	}
@@ -72,7 +72,7 @@ func AnyString() StringMatcher {
 			return true
 		},
 		stringer: func() string {
-			return fmt.Sprintf("<any>")
+			return "<any>"
 		},
 	}
 }
@@ -84,7 +84,7 @@ func None() StringMatcher {
 			return false
 		},
 		stringer: func() string {
-			return fmt.Sprintf("<none>")
+			return "<none>"
 		},
 	}
 }

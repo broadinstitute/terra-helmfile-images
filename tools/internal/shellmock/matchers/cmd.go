@@ -7,7 +7,7 @@ import (
 )
 
 type envConstraint struct {
-	name string // name of the environment variable this constraint matches
+	name         string        // name of the environment variable this constraint matches
 	valueMatcher StringMatcher // valueMatcher matches the value of hte environment variable
 }
 
@@ -141,7 +141,7 @@ func (m *CmdMatcher) WithExactEnvVars(pairs ...string) *CmdMatcher {
 	for i, pair := range pairs {
 		name, value := splitEnvPair(pair)
 		constraint := envConstraint{
-			name: name,
+			name:         name,
 			valueMatcher: Equals(value),
 		}
 		envConstraints[i] = constraint
@@ -157,7 +157,7 @@ func (m *CmdMatcher) WithExactEnvVars(pairs ...string) *CmdMatcher {
 // eg. matcher.WithEnvVar("FOO", "BAR").WithEnvVar("BAZ", HasPrefix("FOO_"))
 func (m *CmdMatcher) WithEnvVar(name string, matcher interface{}) *CmdMatcher {
 	constraint := envConstraint{
-		name: name,
+		name:         name,
 		valueMatcher: toStringMatcher(matcher),
 	}
 	m.envConstraints = append(m.envConstraints, constraint)

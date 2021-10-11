@@ -158,7 +158,7 @@ func (m *MockRunner) Test(t *testing.T) {
 }
 
 func (m *MockRunner) dumpExpectedCmds(w io.Writer) error {
-	if _, err := fmt.Fprint(w,"\n\nExpected commands:\n\n"); err != nil {
+	if _, err := fmt.Fprint(w, "\n\nExpected commands:\n\n"); err != nil {
 		return err
 	}
 	for i, ec := range m.expectedCommands {
@@ -174,7 +174,7 @@ func (m *MockRunner) dumpExpectedCmd(w io.Writer, index int, expected expectedCo
 	cmd := expected.cmd
 	switch m.options.DumpStyle {
 	case Default:
-		if _, err := fmt.Fprintf(w,"\t%d: %#v\n\n", index, cmd); err != nil {
+		if _, err := fmt.Fprintf(w, "\t%d: %#v\n\n", index, cmd); err != nil {
 			return err
 		}
 	case Pretty:

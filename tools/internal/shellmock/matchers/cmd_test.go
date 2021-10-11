@@ -288,7 +288,7 @@ func TestCmdMatches(t *testing.T) {
 			matcherName: "firstArgContainsADashAndSecondIsTmp",
 			matcher:     AnyCmd().WithArg(Contains("-")).WithArg("/tmp"),
 			expectedResults: map[string]bool{
-				"lsWithTwoArgs":                       true,
+				"lsWithTwoArgs": true,
 			},
 		},
 		{
@@ -341,7 +341,7 @@ func TestCmdMatches(t *testing.T) {
 			matcherName: "cmdWithArgsLsNoArgs",
 			matcher:     CmdWithArgs("ls"),
 			expectedResults: map[string]bool{
-				"ls": true,
+				"ls":           true,
 				"lsWithTmpDir": true,
 			},
 		},
@@ -356,7 +356,7 @@ func TestCmdMatches(t *testing.T) {
 			matcherName: "cmdWithEnvLs",
 			matcher:     CmdWithEnv("ls"),
 			expectedResults: map[string]bool{
-				"ls": true,
+				"ls":           true,
 				"lsWithTmpDir": true,
 			},
 		},
@@ -382,8 +382,8 @@ func TestCmdMatches(t *testing.T) {
 			},
 		},
 		{
-			matcherName: "cmdWithEnvNoProg",
-			matcher:     CmdWithEnv("FOO=BAR"),
+			matcherName:     "cmdWithEnvNoProg",
+			matcher:         CmdWithEnv("FOO=BAR"),
 			expectedResults: map[string]bool{
 				// should match nothing
 			},
@@ -426,57 +426,57 @@ func TestCmdMatches(t *testing.T) {
 
 func TestAsCmd(t *testing.T) {
 	type testCase struct {
-		name string
+		name     string
 		expected shell.Command
-		actual shell.Command
+		actual   shell.Command
 	}
 
 	testCases := []testCase{{
-		name: "any",
+		name:   "any",
 		actual: AnyCmd().AsCmd(),
 		expected: shell.Command{
 			Prog: "<any>",
-			Args:[]string{"<...>"},
-			Env:[]string{"<...>"},
-			Dir: "<any>",
+			Args: []string{"<...>"},
+			Env:  []string{"<...>"},
+			Dir:  "<any>",
 		},
-	},{
-		name: "prog only",
+	}, {
+		name:   "prog only",
 		actual: CmdWithArgs("ls").AsCmd(),
 		expected: shell.Command{
 			Prog: "ls",
-			Args:[]string{},
-			Env:[]string{},
-			Dir: "<any>",
+			Args: []string{},
+			Env:  []string{},
+			Dir:  "<any>",
 		},
-	},{
-		name: "prog env and arg",
+	}, {
+		name:   "prog env and arg",
 		actual: CmdWithEnv("FOO=BAR", "ls", "/home").AsCmd(),
 		expected: shell.Command{
 			Prog: "ls",
-			Args:[]string{"/home"},
-			Env:[]string{"FOO=BAR"},
-			Dir: "<any>",
+			Args: []string{"/home"},
+			Env:  []string{"FOO=BAR"},
+			Dir:  "<any>",
 		},
-	},{
+	}, {
 		name: "prog flexible env and args",
 		actual: AnyCmd().
-					WithProg("echo").
-					WithArg(Contains("ello")).
-					WithArg(regexp.MustCompile("^wo")).
-					WithEnvVar("TMP", AnyString()).
-					WithEnvVar("HOME",
-					MatchesPredicate("ends with slash",
-						func (dir string) bool {
-							return strings.HasSuffix(dir, "/")
-						},
-					)).
-					AsCmd(),
+			WithProg("echo").
+			WithArg(Contains("ello")).
+			WithArg(regexp.MustCompile("^wo")).
+			WithEnvVar("TMP", AnyString()).
+			WithEnvVar("HOME",
+				MatchesPredicate("ends with slash",
+					func(dir string) bool {
+						return strings.HasSuffix(dir, "/")
+					},
+				)).
+			AsCmd(),
 		expected: shell.Command{
 			Prog: "echo",
 			Args: []string{"contains(ello)", "match(/^wo/)", "<...>"},
-			Env: []string{"TMP=<any>", "HOME=<ends with slash>", "<...>"},
-			Dir: "<any>",
+			Env:  []string{"TMP=<any>", "HOME=<ends with slash>", "<...>"},
+			Dir:  "<any>",
 		},
 	}}
 

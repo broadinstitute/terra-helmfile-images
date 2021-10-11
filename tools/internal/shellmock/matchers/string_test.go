@@ -9,21 +9,21 @@ import (
 
 func TestStringMatchers(t *testing.T) {
 	type testCase struct {
-		name string
-		matcher StringMatcher
+		name           string
+		matcher        StringMatcher
 		expectedString string
-		matches map[string]bool
+		matches        map[string]bool
 	}
 
-	testCases := []testCase {{
-		name: "equalsFoo",
-		matcher: Equals("foo"),
+	testCases := []testCase{{
+		name:           "equalsFoo",
+		matcher:        Equals("foo"),
 		expectedString: "foo",
 		matches: map[string]bool{
 			"foo": true,
 			"bar": false,
 		},
-	},{
+	}, {
 		name:           "startsWithFRegexp",
 		matcher:        MatchesRegexp(regexp.MustCompile("^f")),
 		expectedString: "match(/^f/)",
@@ -31,17 +31,17 @@ func TestStringMatchers(t *testing.T) {
 			"foo": true,
 			"bar": false,
 		},
-	},{
+	}, {
 		name: "endsWithOPredicate",
 		matcher: MatchesPredicate("ends with o", func(s string) bool {
-			return strings.HasSuffix(s,"o")
+			return strings.HasSuffix(s, "o")
 		}),
 		expectedString: "<ends with o>",
 		matches: map[string]bool{
 			"foo": true,
 			"bar": false,
 		},
-	},{
+	}, {
 		name:           "containsOO",
 		matcher:        Contains("oo"),
 		expectedString: "contains(oo)",
@@ -49,7 +49,7 @@ func TestStringMatchers(t *testing.T) {
 			"foo": true,
 			"bar": false,
 		},
-	},{
+	}, {
 		name:           "any",
 		matcher:        AnyString(),
 		expectedString: "<any>",
@@ -57,7 +57,7 @@ func TestStringMatchers(t *testing.T) {
 			"foo": true,
 			"bar": true,
 		},
-	},{
+	}, {
 		name:           "none",
 		matcher:        None(),
 		expectedString: "<none>",
@@ -65,7 +65,7 @@ func TestStringMatchers(t *testing.T) {
 			"foo": false,
 			"bar": false,
 		},
-	},{
+	}, {
 		name:           "not",
 		matcher:        Not(Equals("foo")),
 		expectedString: "not(foo)",

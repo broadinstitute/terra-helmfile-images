@@ -109,7 +109,6 @@ func TestMockRunnerCanMockRawCmds(t *testing.T) {
 	assert.Nil(t, e, "mock runner should not return an error")
 }
 
-
 // Check cmd dumps
 func TestMockRunnerCanDumpCmdsDefault(t *testing.T) {
 	m := NewMockRunner(Options{DumpStyle: Default})
@@ -144,7 +143,7 @@ func TestMockRunnerCanDumpCmdsPretty(t *testing.T) {
 	e := m.dumpExpectedCmds(w)
 	assert.Nil(t, e, "dumpExpectedCmds() should not return an error")
 
-	expected :=  `
+	expected := `
 
 Expected commands:
 

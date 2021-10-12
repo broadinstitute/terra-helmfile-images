@@ -8,7 +8,7 @@ import (
 
 type envConstraint struct {
 	name         string        // name of the environment variable this constraint matches
-	valueMatcher StringMatcher // valueMatcher matches the value of hte environment variable
+	valueMatcher StringMatcher // valueMatcher matches the value of the environment variable
 }
 
 // CmdMatcher is for evaluating whether a shell.Command matches configured
@@ -48,10 +48,10 @@ func AnyCmd() *CmdMatcher {
 //   Prog: "ls",
 //   Args: []string{"-al", "/tmp"}
 // }
-func CmdWithArgs(prog string, args ...string) *CmdMatcher {
+func CmdWithArgs(prog interface{}, args ...interface{}) *CmdMatcher {
 	matcher := newCmdMatcher()
 	matcher.WithProg(prog)
-	matcher.WithExactArgs(toGeneric(args)...)
+	matcher.WithExactArgs(args...)
 	matcher.FailIfExtraArgs()
 	matcher.FailIfExtraEnvVars()
 	return matcher
@@ -150,14 +150,26 @@ func (m *CmdMatcher) WithExactArgs(matchers ...interface{}) *CmdMatcher {
 	return m
 }
 
-// WithArg configures the matcher to expect an argument matching the given matcher.
-// May be called multiple times to match arguments at sequential indexes.
+// WithArgAt configures the matcher to expect an argument matching the given matcher.
 //
-// eg. matcher.WithArg(AnyString()).
-//       WithArg("exact string").
-//       WithArg(MatchesRegexp(Regexp.MustCompile("foo.*")))
-func (m *CmdMatcher) WithArg(matcher interface{}) *CmdMatcher {
-	m.argConstraints = append(m.argConstraints, toStringMatcher(matcher))
+// Subseq
+//
+// eg. matcher.WithArgAt(0, AnyString()).
+//       WithArgAt(1, "exact string").
+//       WithArgAt(2, MatchesRegexp(Regexp.MustCompile("foo.*")))
+func (m *CmdMatcher) WithArgAt(index int, matcher interface{}) *CmdMatcher {
+	// Pad argconstraints up to index with AnyString() matchers
+	for len(m.argConstraints) < index {
+		m.argConstraints = append(m.argConstraints, AnyString())
+	}
+
+	sm := toStringMatcher(matcher)
+	if len(m.argConstraints) > index {
+		m.argConstraints[index] = sm
+	} else {
+		m.argConstraints = append(m.argConstraints, sm)
+	}
+
 	return m
 }
 

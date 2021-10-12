@@ -272,7 +272,7 @@ func TestCmdMatches(t *testing.T) {
 		},
 		{
 			matcherName: "firstArgContainsADash",
-			matcher:     AnyCmd().WithArg(Contains("-")),
+			matcher:     AnyCmd().WithArgAt(0, Contains("-")),
 			expectedResults: map[string]bool{
 				"lsWithTwoArgs":                       true,
 				"lsWithFourArgs":                      true,
@@ -286,7 +286,7 @@ func TestCmdMatches(t *testing.T) {
 		},
 		{
 			matcherName: "firstArgContainsADashAndSecondIsTmp",
-			matcher:     AnyCmd().WithArg(Contains("-")).WithArg("/tmp"),
+			matcher:     AnyCmd().WithArgAt(0, Contains("-")).WithArgAt(1, "/tmp"),
 			expectedResults: map[string]bool{
 				"lsWithTwoArgs": true,
 			},
@@ -402,6 +402,13 @@ func TestCmdMatches(t *testing.T) {
 				"lsWithFourArgs": true,
 			},
 		},
+		{
+			matcherName: "cmdWithOutOfOrderArgMatchers",
+			matcher:     AnyCmd().WithArgAt(3, Contains("tmp")).WithArgAt(0, "-l"),
+			expectedResults: map[string]bool{
+				"lsWithFourArgs": true,
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -462,8 +469,8 @@ func TestAsCmd(t *testing.T) {
 		name: "prog flexible env and args",
 		actual: AnyCmd().
 			WithProg("echo").
-			WithArg(Contains("ello")).
-			WithArg(regexp.MustCompile("^wo")).
+			WithArgAt(0, Contains("ello")).
+			WithArgAt(1, regexp.MustCompile("^wo")).
 			WithEnvVar("TMP", AnyString()).
 			WithEnvVar("HOME",
 				MatchesPredicate("ends with slash",

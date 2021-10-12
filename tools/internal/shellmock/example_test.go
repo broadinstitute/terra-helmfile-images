@@ -42,6 +42,12 @@ func SayHello(runner shell.Runner) {
 		Dir:  "/tmp",
 	})
 
+	_ = runner.Run(shell.Command{
+		Prog: "git-ls",
+		Args: []string{"good"},
+		Env: []string{"HOME=/Users/nobody"},
+		Dir:  "/tmp",
+	})
 }
 
 // The test:
@@ -62,9 +68,7 @@ func TestHello(t *testing.T) {
 
 	// MatchesRegexp() can be used to check that an attribute matches a regular expression.
 	// Eg. This requires the command to have an argument at index 0 that starts with "h"
-	runner.OnCmd(CmdWithArgs("echo").
-		WithArg(MatchesRegexp(regexp.MustCompile("^h"))),
-	)
+	runner.OnCmd(CmdWithArgs("echo", MatchesRegexp(regexp.MustCompile("^h"))))
 
 	// AnyString() can be used to match any string.
 	// Eg. This requires an env var to exist, but we don't care what the value is
@@ -73,6 +77,12 @@ func TestHello(t *testing.T) {
 
 	// Directories can be matched using the same matchers as other attributes
 	runner.OnCmd(CmdWithArgs("ls").WithDir("/tmp"))
+
+	// The generic AnyCmd() can be used to match anything with specific restrictions
+	runner.OnCmd(AnyCmd().
+		WithProg(MatchesRegexp(regexp.MustCompile("^git"))). // Prog starts with "git"
+		WithEnvVar("HOME", Contains("Users")).    // HOME includes the substring Users
+		WithArgAt(0, Not(Equals("bad"))))         // Must have first arg that does not contain \"bad\"
 
 	// ok ok, let's test the code already
 	SayHello(runner)

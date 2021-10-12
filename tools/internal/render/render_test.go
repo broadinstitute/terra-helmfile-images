@@ -390,12 +390,17 @@ func TestRender(t *testing.T) {
 				}
 			}
 
-			// Set up expectations for this test case's commands
-			mockRunner, originalRunner := shellmock.DefaultMockRunner(), shellRunner
+			// Create mock shell command runner
+			mockRunner := shellmock.DefaultMockRunner()
+			mockRunner.Test(t)
+
+			// Replace real runner with mocker runner during this test; restore original when this test completes
+			originalRunner := shellRunner
 			shellRunner = mockRunner
 			defer func() { shellRunner = originalRunner }()
 			mockRunner.Test(t)
 
+			// Set up expectations for this test case's commands
 			for _, expectedCmd := range testCase.expectedCommands {
 				mockRunner.OnCmd(expectedCmd.Command).Return(expectedCmd.Error)
 			}

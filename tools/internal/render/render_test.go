@@ -28,12 +28,13 @@ var fakeReleaseTargets = []ReleaseTarget{
 
 // Struct for tracking global state that is mocked when a test executes and restored/cleaned up after
 type TestState struct {
-	mockRunner *shellmock.MockRunner // mock shell.Runner, used for mocking shell commmands
+	mockRunner *shellmock.MockRunner // mock shell.Runner, used for mocking shell commands
+	originalRunner shell.Runner // real shell.Runner, saved before test starts and restored after they finish
 	mockConfigRepoPath     string // mock terra-helmfile, created once before all test cases
+	originalConfigRepoPath string // real config repo path, saved before tests start and restored after they finish
 	mockChartDir           string // mock chart directory, created once before all test cases
 	scratchDir             string // scratch directory, cleaned out before each test case
 	rootDir                string // root/parent directory for all test files
-	originalConfigRepoPath string // real config repo path, saved before tests start and restored after they finish
 }
 
 // A table-driven integration test for the render tool.
@@ -49,7 +50,7 @@ func TestRender(t *testing.T) {
 		arguments        []string                                          // Fake user-supplied CLI arguments to pass to `render`
 		argumentsFn      func(ts *TestState) ([]string, error)              // Callback function returning fake user-supplied CLI arguments to pass to `render`. Will override `arguments` field if given
 		expectedError    *regexp.Regexp                                    // Optional error we expect to be returned when we execute the Cobra command
-		setupMocks       func(m *shellmock.MockRunner, ts *TestState) error // Optional hook mocking expected shell commands
+		setupMocks       func(ts *TestState) error // Optional hook mocking expected shell commands
 	}{
 		{
 			description:   "invalid argument",
@@ -149,7 +150,7 @@ func TestRender(t *testing.T) {
 		{
 			description: "unknown environment should return error",
 			arguments:   args("-e foo"),
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos")
 				return nil
 			},
@@ -158,7 +159,7 @@ func TestRender(t *testing.T) {
 		{
 			description: "unknown cluster should return error",
 			arguments:   args("-c blargh"),
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos")
 				return nil
 			},
@@ -166,7 +167,7 @@ func TestRender(t *testing.T) {
 		},
 		{
 			description: "no arguments should render for all targets",
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos")
 				ts.cmd("THF_TARGET_TYPE=cluster     THF_TARGET_BASE=tdr      THF_TARGET_NAME=tdr-staging helmfile --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/tdr-staging", ts.mockConfigRepoPath)
 				ts.cmd("THF_TARGET_TYPE=cluster     THF_TARGET_BASE=terra    THF_TARGET_NAME=terra-perf  helmfile --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/terra-perf", ts.mockConfigRepoPath)
@@ -179,7 +180,7 @@ func TestRender(t *testing.T) {
 		{
 			description: "--argocd without -e or -a should render Argo manifests for all environments",
 			arguments:   args("--argocd"),
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos")
 				ts.cmd("THF_TARGET_TYPE=cluster     THF_TARGET_BASE=tdr      THF_TARGET_NAME=tdr-staging helmfile --log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/tdr-staging", ts.mockConfigRepoPath)
 				ts.cmd("THF_TARGET_TYPE=cluster     THF_TARGET_BASE=terra    THF_TARGET_NAME=terra-perf  helmfile --log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/terra-perf", ts.mockConfigRepoPath)
@@ -192,7 +193,7 @@ func TestRender(t *testing.T) {
 		{
 			description: "-e should render for specific environment",
 			arguments:   args("-e dev"),
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos")
 				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live THF_TARGET_NAME=dev helmfile --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath)
 				return nil
@@ -201,7 +202,7 @@ func TestRender(t *testing.T) {
 		{
 			description: "-c should render for specific cluster",
 			arguments:   args("-c terra-perf"),
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos")
 				ts.cmd("THF_TARGET_TYPE=cluster THF_TARGET_BASE=terra THF_TARGET_NAME=terra-perf helmfile --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/terra-perf", ts.mockConfigRepoPath)
 				return nil
@@ -210,7 +211,7 @@ func TestRender(t *testing.T) {
 		{
 			description: "-e with --argocd should render ArgoCD manifests for specific environment",
 			arguments:   args("-e dev --argocd"),
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos")
 				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live THF_TARGET_NAME=dev helmfile --log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath)
 				return nil
@@ -219,7 +220,7 @@ func TestRender(t *testing.T) {
 		{
 			description: "-c with --argocd should render ArgoCD manifests for specific cluster",
 			arguments:   args("-c tdr-staging --argocd"),
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos")
 				ts.cmd("THF_TARGET_TYPE=cluster THF_TARGET_BASE=tdr THF_TARGET_NAME=tdr-staging helmfile --log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/tdr-staging", ts.mockConfigRepoPath)
 				return nil
@@ -228,7 +229,7 @@ func TestRender(t *testing.T) {
 		{
 			description: "-r should render for specific service",
 			arguments:   args("-e dev -r leonardo"),
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos")
 				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live THF_TARGET_NAME=dev helmfile --log-level=info --selector=mode=release,release=leonardo template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath)
 				return nil
@@ -237,7 +238,7 @@ func TestRender(t *testing.T) {
 		{
 			description: "-r with --argocd should render ArgoCD manifests for specific service",
 			arguments:   args("--argocd -e dev -a leonardo"),
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos")
 				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live THF_TARGET_NAME=dev helmfile --log-level=info --selector=mode=argocd,release=leonardo template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath)
 				return nil
@@ -246,7 +247,7 @@ func TestRender(t *testing.T) {
 		{
 			description: "-r with --app-version should set app version",
 			arguments:   args("-e dev -r leonardo --app-version 1.2.3"),
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos")
 				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live THF_TARGET_NAME=dev helmfile --log-level=info --selector=mode=release,release=leonardo --state-values-set=releases.leonardo.appVersion=1.2.3 template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath)
 				return nil
@@ -257,7 +258,7 @@ func TestRender(t *testing.T) {
 			argumentsFn: func(ts *TestState) ([]string, error) {
 				return args("-e dev -r leonardo --chart-dir=%s", ts.mockChartDir), nil
 			},
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos")
 				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live THF_TARGET_NAME=dev helmfile --log-level=info --selector=mode=release,release=leonardo --state-values-set=releases.leonardo.repo=%s template --output-dir=%s/output/dev", ts.mockChartDir, ts.mockConfigRepoPath)
 				return nil
@@ -266,7 +267,7 @@ func TestRender(t *testing.T) {
 		{
 			description: "-r with --app-version and --chart-version should set both",
 			arguments:   args("-e dev -r leonardo --app-version 1.2.3 --chart-version 4.5.6"),
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos")
 				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live THF_TARGET_NAME=dev helmfile --log-level=info --selector=mode=release,release=leonardo --state-values-set=releases.leonardo.appVersion=1.2.3,releases.leonardo.chartVersion=4.5.6 template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath)
 				return nil
@@ -281,7 +282,7 @@ func TestRender(t *testing.T) {
 				}
 				return args(" -e dev -r leonardo --values-file %s", valuesFile), nil
 			},
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos")
 				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live THF_TARGET_NAME=dev helmfile --log-level=info --selector=mode=release,release=leonardo template --skip-deps --values=%s/v.yaml --output-dir=%s/output/dev", ts.scratchDir, ts.mockConfigRepoPath)
 				return nil
@@ -296,7 +297,7 @@ func TestRender(t *testing.T) {
 				}
 				return args("-e dev -r leonardo --values-file %s --values-file %s --values-file %s", valuesFiles[0], valuesFiles[1], valuesFiles[2]), nil
 			},
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos")
 				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live THF_TARGET_NAME=dev helmfile --log-level=info --selector=mode=release,release=leonardo template --skip-deps --values=%s/v1.yaml,%s/v2.yaml,%s/v3.yaml --output-dir=%s/output/dev", ts.scratchDir, ts.scratchDir, ts.scratchDir, ts.mockConfigRepoPath)
 				return nil
@@ -304,7 +305,7 @@ func TestRender(t *testing.T) {
 		},
 		{
 			description: "should fail if repo update fails",
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				ts.failCmd("dieee", "helmfile --log-level=info --allow-no-matching-release repos")
 				return nil
 			},
@@ -313,7 +314,7 @@ func TestRender(t *testing.T) {
 		{
 			description: "should fail if helmfile template fails",
 			arguments:   args("-e dev"),
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos")
 				ts.failCmd("dieee", "THF_TARGET_TYPE=environment THF_TARGET_BASE=live THF_TARGET_NAME=dev helmfile --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath)
 				return nil
@@ -323,7 +324,7 @@ func TestRender(t *testing.T) {
 		{
 			description: "should run helmfile with --log-level=debug if run with -v -v",
 			arguments:   args("-e dev -v -v"),
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				ts.cmd("helmfile --log-level=debug --allow-no-matching-release repos")
 				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live THF_TARGET_NAME=dev helmfile --log-level=debug --selector=mode=release template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath)
 				return nil
@@ -332,7 +333,7 @@ func TestRender(t *testing.T) {
 		{
 			description: "--stdout should not render to output directory",
 			arguments:   args("--env=alpha --stdout"),
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos")
 				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=live THF_TARGET_NAME=alpha helmfile --log-level=info --selector=mode=release template --skip-deps")
 				return nil
@@ -341,7 +342,7 @@ func TestRender(t *testing.T) {
 		{
 			description: "-d should render to custom output directory",
 			arguments:   args("-e jdoe -d path/to/nowhere"),
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				ts.cmd("helmfile --log-level=info --allow-no-matching-release repos")
 				ts.cmd("THF_TARGET_TYPE=environment THF_TARGET_BASE=personal THF_TARGET_NAME=jdoe helmfile --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/path/to/nowhere/jdoe", cwd())
 				return nil
@@ -349,42 +350,42 @@ func TestRender(t *testing.T) {
 		},
 		{
 			description: "two environments with the same name should raise an error",
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				return createFakeTargetFiles(ts.mockConfigRepoPath, []ReleaseTarget{NewEnvironmentGeneric("dev", "personal")})
 			},
 			expectedError: regexp.MustCompile(`environment name conflict dev \(personal\) and dev \(live\)`),
 		},
 		{
 			description: "two clusters with the same name should raise an error",
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				return createFakeTargetFiles(ts.mockConfigRepoPath, []ReleaseTarget{NewClusterGeneric("terra-perf", "tdr")})
 			},
 			expectedError: regexp.MustCompile(`cluster name conflict terra-perf \(terra\) and terra-perf \(tdr\)`),
 		},
 		{
 			description: "environment and cluster with the same name should raise an error",
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				return createFakeTargetFiles(ts.mockConfigRepoPath, []ReleaseTarget{NewClusterGeneric("dev", "terra")})
 			},
 			expectedError: regexp.MustCompile("cluster name dev conflicts with environment name dev"),
 		},
 		{
 			description: "missing config directory should raise an error",
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				return os.RemoveAll(ts.mockConfigRepoPath)
 			},
 			expectedError: regexp.MustCompile("does not exist, is it a terra-helmfile clone"),
 		},
 		{
 			description: "missing environments directory should raise an error",
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				return os.RemoveAll(path.Join(ts.mockConfigRepoPath, "environments"))
 			},
 			expectedError: regexp.MustCompile("does not exist, is it a terra-helmfile clone"),
 		},
 		{
 			description: "no environment definitions should raise an error",
-			setupMocks: func(m *shellmock.MockRunner, ts *TestState) error {
+			setupMocks: func(ts *TestState) error {
 				envDir := path.Join(ts.mockConfigRepoPath, "environments")
 				if err := os.RemoveAll(envDir); err != nil {
 					return err
@@ -398,51 +399,27 @@ func TestRender(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			// TODO collapse setup() and setupTestCase() functions
-			// Set up mocked state
-			ts, err := setup()
+			// Run pre test-case setup
+			ts, err := setup(t)
 			if err != nil {
 				t.Error(err)
 				return
 			}
 
-			// Add cleanup hook to restore global state after tests complete
-			t.Cleanup(func() {
-				err := cleanup(ts)
-				if err != nil {
-					t.Error(err)
-				}
-			})
-
-			if err := ts.setupTestCase(); err != nil {
-				t.Error(err)
-				return
-			}
-
-			// Create a mock runner for executing shell commands
-			mockRunner := shellmock.DefaultMockRunner()
-			mockRunner.Test(t)
-			ts.mockRunner = mockRunner
-
-			// Set up expectations for this test case's commands
+			// Set up mocks for this test case's commands
 			if testCase.setupMocks != nil {
-				if err := testCase.setupMocks(mockRunner, ts); err != nil {
+				if err := testCase.setupMocks(ts); err != nil {
 					t.Errorf("setupMocks error: %v", err)
 				}
 			}
 
-			// Replace real shell runner with mock runner and then restore when this test completes
-			originalRunner := shellRunner
-			shellRunner = mockRunner
-			defer func() { shellRunner = originalRunner }()
-
 			// Get arguments to pass to Cobra command
 			cobraArgs := testCase.arguments
 			if testCase.argumentsFn != nil {
-				var err error
 				cobraArgs, err = testCase.argumentsFn(ts)
 				if err != nil {
 					t.Errorf("argumentsFn error: %v", err)
+					return
 				}
 			}
 
@@ -462,7 +439,7 @@ func TestRender(t *testing.T) {
 			}
 
 			// Verify all expected commands were run
-			mockRunner.AssertExpectations(t)
+			ts.mockRunner.AssertExpectations(t)
 		})
 	}
 }
@@ -574,33 +551,8 @@ func (ts *TestState) failCmd(err string, format string, a ...interface{}) *mock.
 	return call.Return(errors.New(err))
 }
 
-// Per-test case setup
-func (ts *TestState) setupTestCase() error {
-	// Delete and re-create scratch directory
-	if err := os.RemoveAll(ts.scratchDir); err != nil {
-		return err
-	}
-	if err := os.MkdirAll(ts.scratchDir, 0755); err != nil {
-		return err
-	}
-
-	// Create fake environment files
-	if err := os.RemoveAll(ts.mockConfigRepoPath); err != nil {
-		return err
-	}
-	if err := os.MkdirAll(ts.mockConfigRepoPath, 0755); err != nil {
-		return err
-	}
-
-	if err := createFakeTargetFiles(ts.mockConfigRepoPath, fakeReleaseTargets); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// One-time setup, run before all TestRender test cases
-func setup() (*TestState, error) {
+// Per-test setup, run before each TestRender test case
+func setup(t *testing.T) (*TestState, error) {
 	// Create a mock config repo clone in a tmp dir
 	originalConfigRepoPath := os.Getenv(configRepoPathEnvVar)
 
@@ -629,16 +581,41 @@ func setup() (*TestState, error) {
 		return nil, err
 	}
 
+	// Create mock environment and cluster target files
+	if err := createFakeTargetFiles(mockConfigRepoPath, fakeReleaseTargets); err != nil {
+		return nil, err
+	}
+
 	// Create scratch directory, cleaned after every test case.
 	scratchDir := path.Join(tmpDir, "scratch")
 
-	return &TestState{
+	// Create a mock runner for executing shell commands
+	mockRunner := shellmock.DefaultMockRunner()
+	mockRunner.Test(t)
+
+	// Replace real shell runner with mock runner; will be restored by cleanup() when this test completes
+	originalRunner := shellRunner
+	shellRunner = mockRunner
+
+	ts := &TestState{
 		originalConfigRepoPath: originalConfigRepoPath,
 		mockConfigRepoPath:     mockConfigRepoPath,
+		originalRunner:			originalRunner,
+		mockRunner: 			mockRunner,
 		mockChartDir:           mockChartDir,
 		scratchDir:             scratchDir,
 		rootDir:                tmpDir,
-	}, nil
+	}
+
+	// Add cleanup hook to clean up tmp directories & restore global state after tests complete
+	t.Cleanup(func() {
+		err := cleanup(ts)
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
+	return ts, nil
 }
 
 // One-time cleanup, run after all TestCases have run
@@ -649,6 +626,9 @@ func cleanup(state *TestState) error {
 	if err != nil {
 		return err
 	}
+
+	// Restore real shell runner
+	shellRunner = state.originalRunner
 
 	// Clean up temp dir
 	return os.RemoveAll(state.rootDir)

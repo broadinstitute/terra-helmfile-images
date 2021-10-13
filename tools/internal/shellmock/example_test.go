@@ -59,27 +59,27 @@ func TestHello(t *testing.T) {
 	//  * additional debugging output will be dumped on test failure
 	runner.Test(t)
 
-	// use OnCmd() to tell the mock that we expect a specific command to be run
-	runner.OnCmd(CmdWithArgs("echo", "hello", "friend"))
-	runner.OnCmd(CmdWithArgs("echo", "hello", "bud"))
-	runner.OnCmd(CmdWithArgs("echo", "hello", "stranger"))
-	runner.OnCmd(CmdWithArgs("echo", "hello", "$TITLE").WithEnvVar("TITLE", "pal"))
-	runner.OnCmd(CmdWithArgs("ls", "~/.ssh").WithExactEnvVars("HOME=/root"))
+	// use ExpectCmd() to tell the mock that we expect a specific command to be run
+	runner.ExpectCmd(CmdWithArgs("echo", "hello", "friend"))
+	runner.ExpectCmd(CmdWithArgs("echo", "hello", "bud"))
+	runner.ExpectCmd(CmdWithArgs("echo", "hello", "stranger"))
+	runner.ExpectCmd(CmdWithArgs("echo", "hello", "$TITLE").WithEnvVar("TITLE", "pal"))
+	runner.ExpectCmd(CmdWithArgs("ls", "~/.ssh").WithExactEnvVars("HOME=/root"))
 
 	// MatchesRegexp() can be used to check that an attribute matches a regular expression.
 	// Eg. This requires the command to have an argument at index 0 that starts with "h"
-	runner.OnCmd(CmdWithProg("echo").WithArg(regexp.MustCompile("^h")))
+	runner.ExpectCmd(CmdWithProg("echo").WithArg(regexp.MustCompile("^h")))
 
 	// AnyString() can be used to match any string.
 	// Eg. This requires an env var to exist, but we don't care what the value is
-	runner.OnCmd(CmdWithArgs("echo").
+	runner.ExpectCmd(CmdWithArgs("echo").
 		WithEnvVar("FOO", AnyString()))
 
 	// Directories can be matched using the same matchers as other attributes
-	runner.OnCmd(CmdWithArgs("ls").WithDir("/tmp"))
+	runner.ExpectCmd(CmdWithArgs("ls").WithDir("/tmp"))
 
 	// The generic AnyCmd() can be used to match anything with specific restrictions
-	runner.OnCmd(AnyCmd().
+	runner.ExpectCmd(AnyCmd().
 		WithProg(MatchesRegexp(regexp.MustCompile("^git"))). // Prog starts with "git"
 		WithEnvVar("HOME", Contains("Users")).               // HOME includes the substring Users
 		WithArgAt(0, Not(Equals("bad"))))                    // Must have first arg that does not contain \"bad\"

@@ -6,15 +6,18 @@ import (
 	"strings"
 )
 
+// StringMatcher is used for flexible matching of command attributes.
 type StringMatcher struct {
 	predicate func(string) bool
 	stringer  func() string
 }
 
+// Matches returns true if the the given string matches this matcher, false otherwise
 func (sm StringMatcher) Matches(actual string) bool {
 	return sm.predicate(actual)
 }
 
+// String returns a string representation of this matcher, useful for debugging
 func (sm StringMatcher) String() string {
 	return sm.stringer()
 }

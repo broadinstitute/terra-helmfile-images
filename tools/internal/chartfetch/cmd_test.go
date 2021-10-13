@@ -50,7 +50,7 @@ func TestFetch(t *testing.T) {
 			args:        args("terra-helm/leonardo -v 1.2.3 -d %s/my/nested/download-dir", testDir),
 			setupMocks: func(t *testing.T, m *shellmock.MockRunner) {
 				cmd := matchers.CmdFromFmt("helm fetch terra-helm/leonardo --untar -d %s/my/nested/.download-dir.tmp", testDir)
-				m.OnCmd(cmd).Run(func(args mock.Arguments) {
+				m.ExpectCmd(cmd).Run(func(args mock.Arguments) {
 					chartDir := path.Join(testDir, "my", "nested", ".download-dir.tmp", "leonardo")
 					if err := os.MkdirAll(chartDir, 0755); err != nil {
 						t.Fatalf("Error creating fake downloaded chart directory %s: %v", chartDir, err)
@@ -70,7 +70,7 @@ func TestFetch(t *testing.T) {
 			args:        args("terra-helm/leonardo -v 1.2.3 -d %s/download-dir", testDir),
 			setupMocks: func(t *testing.T, m *shellmock.MockRunner) {
 				cmd := matchers.CmdFromFmt("helm fetch terra-helm/leonardo --untar -d %s/.download-dir.tmp", testDir)
-				m.OnCmd(cmd).Return(errors.New("command failed because reasons"))
+				m.ExpectCmd(cmd).Return(errors.New("command failed because reasons"))
 			},
 			expectedError: regexp.MustCompile("command failed because reasons"),
 		},

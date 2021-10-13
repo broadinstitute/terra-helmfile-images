@@ -15,7 +15,7 @@ func TestMockRunnerPassesSingleCommand(t *testing.T) {
 	m := DefaultMockRunner()
 	m.Test(t)
 
-	m.OnCmd(matchers.CmdWithEnv("FOO=BAR", "echo", "hello", "world"))
+	m.ExpectCmd(matchers.CmdWithEnv("FOO=BAR", "echo", "hello", "world"))
 
 	assert.Nil(t, m.Run(shell.Command{
 		Prog: "echo",
@@ -32,8 +32,8 @@ func TestMockRunnerPassesMultipleCommandsInOrder(t *testing.T) {
 	m := DefaultMockRunner()
 	m.Test(t)
 
-	m.OnCmd(matchers.CmdWithArgs("echo", "1"))
-	m.OnCmd(matchers.CmdWithArgs("echo", "2"))
+	m.ExpectCmd(matchers.CmdWithArgs("echo", "1"))
+	m.ExpectCmd(matchers.CmdWithArgs("echo", "2"))
 
 	assert.Nil(t, m.RunWithArgs("echo", "1"))
 	assert.Nil(t, m.RunWithArgs("echo", "2"))
@@ -63,8 +63,8 @@ func TestMockRunnerFailsWhenOutOfOrder(t *testing.T) {
 	// DON'T pass in the test. We want to panic on failure we can detect whether the error happened with recover()
 	// m.Test(t) // <- Don't do this
 
-	m.OnCmd(matchers.CmdWithArgs("echo", "1"))
-	m.OnCmd(matchers.CmdWithArgs("echo", "2"))
+	m.ExpectCmd(matchers.CmdWithArgs("echo", "1"))
+	m.ExpectCmd(matchers.CmdWithArgs("echo", "2"))
 
 	_ = m.RunWithArgs("echo", "2") // this will trigger a panic
 	t.Errorf("This line of code should never be reached")
@@ -75,8 +75,8 @@ func TestMockRunnerOutOfOrderPassesWithNoVerify(t *testing.T) {
 	m := NewMockRunner(Options{VerifyOrder: false})
 	m.Test(t)
 
-	m.OnCmd(matchers.CmdWithArgs("echo", "1"))
-	m.OnCmd(matchers.CmdWithArgs("echo", "2"))
+	m.ExpectCmd(matchers.CmdWithArgs("echo", "1"))
+	m.ExpectCmd(matchers.CmdWithArgs("echo", "2"))
 
 	assert.Nil(t, m.RunWithArgs("echo", "2"))
 	assert.Nil(t, m.RunWithArgs("echo", "1"))
@@ -90,7 +90,7 @@ func TestMockRunnerCanMockErrors(t *testing.T) {
 	m := DefaultMockRunner()
 	m.Test(t)
 
-	m.OnCmd(matchers.CmdWithArgs("echo", "1")).Return(fmt.Errorf("my error"))
+	m.ExpectCmd(matchers.CmdWithArgs("echo", "1")).Return(fmt.Errorf("my error"))
 
 	e := m.RunWithArgs("echo", "1")
 	assert.Error(t, e, "error should not be nil")
@@ -103,7 +103,7 @@ func TestMockRunnerCanMockRawCmds(t *testing.T) {
 	m := DefaultMockRunner()
 	m.Test(t)
 
-	m.OnCmd(shell.Command{Prog: "echo", Args: []string{"1"}})
+	m.ExpectCmd(shell.Command{Prog: "echo", Args: []string{"1"}})
 
 	e := m.RunWithArgs("echo", "1")
 	assert.Nil(t, e, "mock runner should not return an error")
@@ -113,8 +113,8 @@ func TestMockRunnerCanMockRawCmds(t *testing.T) {
 func TestMockRunnerCanDumpCmdsDefault(t *testing.T) {
 	m := NewMockRunner(Options{DumpStyle: Default})
 
-	m.OnCmd(matchers.CmdWithArgs("echo", "foo"))
-	m.OnCmd(shell.Command{Prog: "echo", Args: []string{"bar"}})
+	m.ExpectCmd(matchers.CmdWithArgs("echo", "foo"))
+	m.ExpectCmd(shell.Command{Prog: "echo", Args: []string{"bar"}})
 
 	w := bytes.NewBufferString("")
 	e := m.dumpExpectedCmds(w)
@@ -136,8 +136,8 @@ Expected commands:
 func TestMockRunnerCanDumpCmdsPretty(t *testing.T) {
 	m := NewMockRunner(Options{DumpStyle: Pretty})
 
-	m.OnCmd(matchers.CmdWithArgs("echo", "foo"))
-	m.OnCmd(shell.Command{Prog: "echo", Args: []string{"bar"}})
+	m.ExpectCmd(matchers.CmdWithArgs("echo", "foo"))
+	m.ExpectCmd(shell.Command{Prog: "echo", Args: []string{"bar"}})
 
 	w := bytes.NewBufferString("")
 	e := m.dumpExpectedCmds(w)
@@ -159,8 +159,8 @@ Expected commands:
 func TestMockRunnerCanDumpCmdsSpew(t *testing.T) {
 	m := NewMockRunner(Options{DumpStyle: Spew})
 
-	m.OnCmd(matchers.CmdWithArgs("echo", "foo"))
-	m.OnCmd(shell.Command{Prog: "echo", Args: []string{"bar"}})
+	m.ExpectCmd(matchers.CmdWithArgs("echo", "foo"))
+	m.ExpectCmd(shell.Command{Prog: "echo", Args: []string{"bar"}})
 
 	w := bytes.NewBufferString("")
 	e := m.dumpExpectedCmds(w)

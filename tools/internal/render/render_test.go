@@ -374,7 +374,7 @@ func TestRender(t *testing.T) {
 
 				matcher := helmfileCmdMatcher(devEnv, "--log-level=info --selector=mode=release,release=leonardo template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath)
 				matcher.WithEnvVar(helmfileChartCacheDirEnvVar, matchers.Equals(path.Join(ts.scratchDir, "user-supplied", "chart-cache")))
-				ts.mockRunner.OnCmd(matcher)
+				ts.mockRunner.ExpectCmd(matcher)
 
 				return nil
 			},
@@ -547,7 +547,7 @@ func (ts *TestState) expectHelmfileUpdateCmd() *mock.Call {
 // Convenience function for setting up an expectation for a helmfile template command
 func (ts *TestState) expectHelmfileCmd(target ReleaseTarget, format string, a ...interface{}) *mock.Call {
 	matcher := helmfileCmdMatcher(target, format, a...)
-	return ts.mockRunner.OnCmd(matcher)
+	return ts.mockRunner.ExpectCmd(matcher)
 }
 
 // Given a release target, and CLI arguments to `helmfile` in the form of a format string and arguments,
@@ -601,9 +601,9 @@ func (ts *TestState) cmd(format string, a ...interface{}) *mock.Call {
 		Dir:  ts.mockConfigRepoPath,
 	}
 
-	return ts.mockRunner.OnCmd(cmd)
+	return ts.mockRunner.ExpectCmd(cmd)
 }
-git
+
 // Per-test setup, run before each TestRender test case
 func setup(t *testing.T) (*TestState, error) {
 	// Create a mock config repo clone in a tmp dir

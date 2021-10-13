@@ -22,12 +22,16 @@ import (
 // commands are run in a specific order.
 //
 
+// CmdDumpStyle how to style commands when they are printed to the console
 type CmdDumpStyle int
 
+// Default prints the command using "%v"
+// Pretty formats commands using PrettyFormat
+// Spew uses the spew library to spew the entire struct
 const (
-	Default CmdDumpStyle = iota // Default prints the command using "%v"
-	Pretty                      // Pretty formats commands using PrettyFormat
-	Spew                        // Spew uses the spew library to spew the entire struct
+	Default CmdDumpStyle = iota
+	Pretty
+	Spew
 )
 
 // Options for a MockRunner
@@ -65,7 +69,7 @@ func NewMockRunner(options Options) *MockRunner {
 	return m
 }
 
-// RunS Converts string arguments to a Command and delegates to Run
+// RunWithArgs delegates to Run
 func (m *MockRunner) RunWithArgs(prog string, args ...string) error {
 	return m.Run(shell.Command{
 		Prog: prog,
@@ -83,21 +87,8 @@ func (m *MockRunner) Run(cmd shell.Command) error {
 	return nil
 }
 
-// T
-
-// Do we want On to have magic handling?
-// m.OnCmd() allows us more freedom. Clients don't need to know whether RunS or Run or RunFn is being called.
-// We aren't doing
-// special string matching.
-// Okay, and what do we accept?
-// Answer: Could be a set of arguments.
-// constraints: Exists(), Equals(value string), MatchesRegexp(r expected)
-// m.OnCmd(shell.Cmd{Prog:"echo"}).Return(CmdFailedError(2)) // &shell.Error{}Errors.New("error"))
-// m.OnCmd(AnyCmd())
-// m.OnCmd(EmptyCmd().WithProg("echo"))
-// m.OnCmd(AnyCmd().WithEnvVarMatching(""))
-// m.OnCmd(MatchCmd(cmd).IgnoreEnvVar("HOME").RequireEnvVarIs("","").RequireArgMatches(0, expected).AllowExtraEnvVars().AllowExtraArgs()
-func (m *MockRunner) OnCmd(cmdOrMatcher interface{}) *mock.Call {
+// ExpectCmd sets an expectation for a command that should be run. It accepts either a shell.Command or a CmdMatcher
+func (m *MockRunner) ExpectCmd(cmdOrMatcher interface{}) *mock.Call {
 	var call *mock.Call
 	var cmd shell.Command
 
@@ -111,7 +102,7 @@ func (m *MockRunner) OnCmd(cmdOrMatcher interface{}) *mock.Call {
 		cmd = c
 		call = m.Mock.On("Run", c)
 	default:
-		m.panicOrFailNow(fmt.Errorf("OnCmd only supports shell.Command or matchers.CmdMatcher arguments, got %v (type %T)", cmdOrMatcher, cmdOrMatcher))
+		m.panicOrFailNow(fmt.Errorf("ExpectCmd only supports shell.Command or matchers.CmdMatcher arguments, got %v (type %T)", cmdOrMatcher, cmdOrMatcher))
 		return nil
 	}
 

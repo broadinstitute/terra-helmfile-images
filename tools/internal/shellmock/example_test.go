@@ -68,7 +68,7 @@ func TestHello(t *testing.T) {
 
 	// MatchesRegexp() can be used to check that an attribute matches a regular expression.
 	// Eg. This requires the command to have an argument at index 0 that starts with "h"
-	runner.OnCmd(CmdWithArgs("echo", MatchesRegexp(regexp.MustCompile("^h"))))
+	runner.OnCmd(CmdWithProg("echo").WithArg(regexp.MustCompile("^h")))
 
 	// AnyString() can be used to match any string.
 	// Eg. This requires an env var to exist, but we don't care what the value is

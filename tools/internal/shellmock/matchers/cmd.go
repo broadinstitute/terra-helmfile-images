@@ -40,6 +40,22 @@ func AnyCmd() *CmdMatcher {
 	return matcher
 }
 
+// CmdWithProg returns a new command matcher that will the given prog + args.
+//
+// Eg. CmdWithProg("ls")
+// will match
+// shell.Command{
+//   Prog: "ls",
+// }
+func CmdWithProg(prog string) *CmdMatcher {
+	matcher := newCmdMatcher()
+	matcher.WithProg(prog)
+	matcher.FailIfExtraArgs()
+	matcher.FailIfExtraEnvVars()
+	return matcher
+}
+
+
 // CmdWithArgs returns a new command matcher that will the given prog + args.
 //
 // Eg. CmdWithArgs("ls", "-al", "/tmp")
@@ -48,7 +64,7 @@ func AnyCmd() *CmdMatcher {
 //   Prog: "ls",
 //   Args: []string{"-al", "/tmp"}
 // }
-func CmdWithArgs(prog interface{}, args ...interface{}) *CmdMatcher {
+func CmdWithArgs(prog string, args ...string) *CmdMatcher {
 	matcher := newCmdMatcher()
 	matcher.WithProg(prog)
 	matcher.WithExactArgs(args...)
@@ -91,7 +107,7 @@ func CmdWithEnv(args ...string) *CmdMatcher {
 	}
 	if numArgs > 0 {
 		cmdArgs := args[progIndex+1:]
-		matcher.WithExactArgs(toGeneric(cmdArgs)...)
+		matcher.WithExactArgs(cmdArgs...)
 	}
 
 	return matcher
@@ -136,23 +152,33 @@ func (m *CmdMatcher) WithProg(matcher interface{}) *CmdMatcher {
 }
 
 // WithExactArgs configures the matcher to expect the exact given
-// set of argument matchers
+// set of arguments
 //
 // eg. matcher.WithExactArgs("-al", "/tmp")
-//     matcher.WithExactArgs("-al", Contains("/tmp"))
-func (m *CmdMatcher) WithExactArgs(matchers ...interface{}) *CmdMatcher {
-	args := make([]StringMatcher, len(matchers))
-	for i, matcher := range matchers {
-		args[i] = toStringMatcher(matcher)
+func (m *CmdMatcher) WithExactArgs(args ...string) *CmdMatcher {
+	matchers := make([]StringMatcher, len(args))
+	for i, arg := range args {
+		matchers[i] = Equals(arg)
 	}
-	m.argConstraints = args
+	m.argConstraints = matchers
 	m.FailIfExtraArgs()
 	return m
 }
 
-// WithArgAt configures the matcher to expect an argument matching the given matcher.
+// WithArg configures the command matcher to expect a new argument matcher that matches the given constraint.
 //
-// Subseq
+// If there are no argument constraints, the new constraint will apply to a command's first argument.
+// If there are 2 constraints, the new constraint will apply to a command's third argument, etc.
+//
+// eg. matcher.WithArg(AnyString()).
+//       WithArg("exact string").
+//       WithArg(MatchesRegexp(Regexp.MustCompile("foo.*")))
+func (m *CmdMatcher) WithArg(matcher interface{}) *CmdMatcher {
+	m.argConstraints = append(m.argConstraints, toStringMatcher(matcher))
+	return m
+}
+
+// WithArgAt configures the command matcher to expect an argument at the given index that matches the given constraint.
 //
 // eg. matcher.WithArgAt(0, AnyString()).
 //       WithArgAt(1, "exact string").
@@ -325,12 +351,23 @@ func (m *CmdMatcher) matchesEnvVars(cmd shell.Command) bool {
 		cmdVars[name] = value
 	}
 
-	if len(cmdVars) < len(m.envConstraints) {
+	// convert env constraints to map as well
+	constraintsByVar := make(map[string][]envConstraint)
+	for _, constraint := range m.envConstraints {
+		constraints, exists := constraintsByVar[constraint.name]
+		if !exists {
+			constraintsByVar[constraint.name]= []envConstraint{constraint}
+		} else {
+			constraintsByVar[constraint.name] = append(constraints, constraint)
+		}
+	}
+
+	if len(cmdVars) < len(constraintsByVar) {
 		// not enough env vars to satisfy our constraints
 		return false
 	}
 
-	if len(cmdVars) > len(m.envConstraints) {
+	if len(cmdVars) > len(constraintsByVar) {
 		// more variables than constraints...
 		if !m.allowExtraEnvVars {
 			// and we don't allow extras, so fail the match
@@ -340,15 +377,17 @@ func (m *CmdMatcher) matchesEnvVars(cmd shell.Command) bool {
 
 	// iterate through our constraints and check that each one is matched
 	// by the corresponding env var
-	for _, constraint := range m.envConstraints {
-		value, existsInMap := cmdVars[constraint.name]
-		if !existsInMap {
+	for name, constraints := range constraintsByVar {
+		value, cmdHasVar := cmdVars[name]
+		if !cmdHasVar {
 			// there's no env var that matches this constraint
 			return false
 		}
-		if !constraint.valueMatcher.Matches(value) {
-			// we have an env var but the value doesn't match the constraint
-			return false
+		for _, constraint := range constraints {
+			if !constraint.valueMatcher.Matches(value) {
+				// we have an env var but the value doesn't match the constraint
+				return false
+			}
 		}
 	}
 
@@ -370,13 +409,4 @@ func splitEnvPair(pair string) (name string, value string) {
 		value = tokens[1]
 	}
 	return
-}
-
-// toGeneric converts a slice of strings to a slice of interface{}
-func toGeneric(a []string) []interface{} {
-	generic := make([]interface{}, len(a))
-	for i := range a {
-		generic[i] = a[i]
-	}
-	return generic
 }

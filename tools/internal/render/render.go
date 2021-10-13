@@ -21,8 +21,8 @@ const helmfileCommand = "helmfile"
 // helmfileTargetTypeEnvVar is the name of the environment variable used to pass target type to helmfile
 const helmfileTargetTypeEnvVar = "THF_TARGET_TYPE"
 
-// hemfileTargetBaseEnvVar is the name of the environment variable used to pass target base to helmfile
-const hemfileTargetBaseEnvVar = "THF_TARGET_BASE"
+// helmfileTargetBaseEnvVar is the name of the environment variable used to pass target base to helmfile
+const helmfileTargetBaseEnvVar = "THF_TARGET_BASE"
 
 // helmfileTargetNameEnvVar is the name of the environment variable used to pass target name to helmfile
 const helmfileTargetNameEnvVar = "THF_TARGET_NAME"
@@ -57,9 +57,9 @@ type render struct {
 
 // scratchDir struct containing paths for temporary/scratch work
 type scratchDir struct {
-	root              string // root directory for all scratch files
-	cleanupOnTeardown bool   // cleanUpOnExit if true, scratch files will be deleted on exit
-	helmfileDir       string // scratch directory that helmfile.yaml should use
+	root                  string // root directory for all scratch files
+	cleanupOnTeardown     bool   // cleanUpOnExit if true, scratch files will be deleted on exit
+	helmfileChartCacheDir string // scratch directory that helmfile.yaml should use for caching charts
 }
 
 // Global/package-level variable, used for executing commands. Replaced with a mock in tests.
@@ -159,7 +159,7 @@ func createScratchDir(options Options) (*scratchDir, error) {
 		scratchDir.root = options.ScratchDir
 		scratchDir.cleanupOnTeardown = false
 	} else {
-		root, err := os.MkdirTemp("", "render-unpack-*")
+		root, err := os.MkdirTemp("", "render-scratch-*")
 		if err != nil {
 			return nil, err
 		}
@@ -168,9 +168,9 @@ func createScratchDir(options Options) (*scratchDir, error) {
 		scratchDir.cleanupOnTeardown = true
 	}
 
-	scratchDir.helmfileDir = path.Join(scratchDir.root, "helmfile")
+	scratchDir.helmfileChartCacheDir = path.Join(scratchDir.root, "chart-cache")
 
-	dirs := []string{ scratchDir.helmfileDir }
+	dirs := []string{ scratchDir.helmfileChartCacheDir}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return nil, err
@@ -387,10 +387,9 @@ func (r *render) runHelmfile(envVars []string, args ...string) error {
 func (r *render) getEnvVarsForTarget(t ReleaseTarget) []string {
 	return []string{
 		fmt.Sprintf("%s=%s", helmfileTargetTypeEnvVar, t.Type()),
-		fmt.Sprintf("%s=%s", hemfileTargetBaseEnvVar, t.Base()),
+		fmt.Sprintf("%s=%s", helmfileTargetBaseEnvVar, t.Base()),
 		fmt.Sprintf("%s=%s", helmfileTargetNameEnvVar, t.Name()),
-		// TODO re-enable this before merging!
-		// fmt.Sprintf("%s=%s", helmfileChartCacheDirEnvVar, r.scratchDir.helmfileDir),
+		fmt.Sprintf("%s=%s", helmfileChartCacheDirEnvVar, r.scratchDir.helmfileChartCacheDir),
 	}
 }
 

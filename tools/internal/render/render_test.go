@@ -603,16 +603,7 @@ func (ts *TestState) cmd(format string, a ...interface{}) *mock.Call {
 
 	return ts.mockRunner.OnCmd(cmd)
 }
-
-// Convenience function to create a failing ExpectedCommand with an error
-// a format string _for_ the command.
-//
-// Eg. cmd("helmfile -e %s template", "alpha")
-func (ts *TestState) failCmd(err string, format string, a ...interface{}) *mock.Call {
-	call := ts.cmd(format, a...)
-	return call.Return(errors.New(err))
-}
-
+git
 // Per-test setup, run before each TestRender test case
 func setup(t *testing.T) (*TestState, error) {
 	// Create a mock config repo clone in a tmp dir

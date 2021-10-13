@@ -45,7 +45,7 @@ func SayHello(runner shell.Runner) {
 	_ = runner.Run(shell.Command{
 		Prog: "git-ls",
 		Args: []string{"good"},
-		Env: []string{"HOME=/Users/nobody"},
+		Env:  []string{"HOME=/Users/nobody"},
 		Dir:  "/tmp",
 	})
 }
@@ -81,8 +81,8 @@ func TestHello(t *testing.T) {
 	// The generic AnyCmd() can be used to match anything with specific restrictions
 	runner.OnCmd(AnyCmd().
 		WithProg(MatchesRegexp(regexp.MustCompile("^git"))). // Prog starts with "git"
-		WithEnvVar("HOME", Contains("Users")).    // HOME includes the substring Users
-		WithArgAt(0, Not(Equals("bad"))))         // Must have first arg that does not contain \"bad\"
+		WithEnvVar("HOME", Contains("Users")).               // HOME includes the substring Users
+		WithArgAt(0, Not(Equals("bad"))))                    // Must have first arg that does not contain \"bad\"
 
 	// ok ok, let's test the code already
 	SayHello(runner)

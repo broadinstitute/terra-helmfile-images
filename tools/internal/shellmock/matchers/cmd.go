@@ -55,7 +55,6 @@ func CmdWithProg(prog string) *CmdMatcher {
 	return matcher
 }
 
-
 // CmdWithArgs returns a new command matcher that will the given prog + args.
 //
 // Eg. CmdWithArgs("ls", "-al", "/tmp")
@@ -137,7 +136,7 @@ func CmdFromString(cmd string) *CmdMatcher {
 //   Prog: "ls",
 //   Args: []string{"-al", "/"},
 // }
-func CmdFromFmt(cmdFmt string, args... interface{}) *CmdMatcher {
+func CmdFromFmt(cmdFmt string, args ...interface{}) *CmdMatcher {
 	formatted := fmt.Sprintf(cmdFmt, args...)
 	return CmdFromString(formatted)
 }
@@ -356,7 +355,7 @@ func (m *CmdMatcher) matchesEnvVars(cmd shell.Command) bool {
 	for _, constraint := range m.envConstraints {
 		constraints, exists := constraintsByVar[constraint.name]
 		if !exists {
-			constraintsByVar[constraint.name]= []envConstraint{constraint}
+			constraintsByVar[constraint.name] = []envConstraint{constraint}
 		} else {
 			constraintsByVar[constraint.name] = append(constraints, constraint)
 		}

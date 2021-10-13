@@ -170,7 +170,7 @@ func createScratchDir(options Options) (*scratchDir, error) {
 
 	scratchDir.helmfileChartCacheDir = path.Join(scratchDir.root, "chart-cache")
 
-	dirs := []string{ scratchDir.helmfileChartCacheDir}
+	dirs := []string{scratchDir.helmfileChartCacheDir}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return nil, err

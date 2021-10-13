@@ -51,14 +51,14 @@ func TestFetch(t *testing.T) {
 			setupMocks: func(t *testing.T, m *shellmock.MockRunner) {
 				cmd := matchers.CmdFromFmt("helm fetch terra-helm/leonardo --untar -d %s/my/nested/.download-dir.tmp", testDir)
 				m.OnCmd(cmd).Run(func(args mock.Arguments) {
-						chartDir := path.Join(testDir, "my", "nested", ".download-dir.tmp", "leonardo")
-						if err := os.MkdirAll(chartDir, 0755); err != nil {
-							t.Fatalf("Error creating fake downloaded chart directory %s: %v", chartDir, err)
-						}
-						if err := os.WriteFile(path.Join(chartDir, "Chart.yaml"), []byte("# fake"), 0644); err != nil {
-							t.Fatalf("Error writing fake Chart.yaml file: %v", err)
-						}
-					})
+					chartDir := path.Join(testDir, "my", "nested", ".download-dir.tmp", "leonardo")
+					if err := os.MkdirAll(chartDir, 0755); err != nil {
+						t.Fatalf("Error creating fake downloaded chart directory %s: %v", chartDir, err)
+					}
+					if err := os.WriteFile(path.Join(chartDir, "Chart.yaml"), []byte("# fake"), 0644); err != nil {
+						t.Fatalf("Error writing fake Chart.yaml file: %v", err)
+					}
+				})
 			},
 			extraVerification: func(t *testing.T) {
 				assert.FileExists(t, path.Join(testDir, "my", "nested", "download-dir", "Chart.yaml"), "all chart files should exist in download dir")

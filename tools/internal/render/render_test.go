@@ -35,13 +35,13 @@ var fakeReleaseTargets = []ReleaseTarget{
 
 // Struct for tracking global state that is mocked when a test executes and restored/cleaned up after
 type TestState struct {
-	mockRunner *shellmock.MockRunner // mock shell.Runner, used for mocking shell commands
-	originalRunner shell.Runner // real shell.Runner, saved before test starts and restored after they finish
-	mockConfigRepoPath     string // mock terra-helmfile, created once before all test cases
-	originalConfigRepoPath string // real config repo path, saved before tests start and restored after they finish
-	mockChartDir           string // mock chart directory, created once before all test cases
-	scratchDir             string // scratch directory, cleaned out before each test case
-	rootDir                string // root/parent directory for all test files
+	mockRunner             *shellmock.MockRunner // mock shell.Runner, used for mocking shell commands
+	originalRunner         shell.Runner          // real shell.Runner, saved before test starts and restored after they finish
+	mockConfigRepoPath     string                // mock terra-helmfile, created once before all test cases
+	originalConfigRepoPath string                // real config repo path, saved before tests start and restored after they finish
+	mockChartDir           string                // mock chart directory, created once before all test cases
+	scratchDir             string                // scratch directory, cleaned out before each test case
+	rootDir                string                // root/parent directory for all test files
 }
 
 // A table-driven integration test for the render tool.
@@ -53,11 +53,11 @@ type TestState struct {
 // https://gianarb.it/blog/golang-mockmania-cli-command-with-cobra
 func TestRender(t *testing.T) {
 	var testCases = []struct {
-		description      string                                            // Testcase description
-		arguments        []string                                          // Fake user-supplied CLI arguments to pass to `render`
-		argumentsFn      func(ts *TestState) ([]string, error)              // Callback function returning fake user-supplied CLI arguments to pass to `render`. Will override `arguments` field if given
-		expectedError    *regexp.Regexp                                    // Optional error we expect to be returned when we execute the Cobra command
-		setupMocks       func(ts *TestState) error // Optional hook mocking expected shell commands
+		description   string                                // Testcase description
+		arguments     []string                              // Fake user-supplied CLI arguments to pass to `render`
+		argumentsFn   func(ts *TestState) ([]string, error) // Callback function returning fake user-supplied CLI arguments to pass to `render`. Will override `arguments` field if given
+		expectedError *regexp.Regexp                        // Optional error we expect to be returned when we execute the Cobra command
+		setupMocks    func(ts *TestState) error             // Optional hook mocking expected shell commands
 	}{
 		{
 			description:   "invalid argument",
@@ -90,29 +90,29 @@ func TestRender(t *testing.T) {
 			expectedError: regexp.MustCompile("--chart-version requires a release be specified with -r"),
 		},
 		{
-			description:   "--chart-dir should require -r",
+			description: "--chart-dir should require -r",
 			argumentsFn: func(ts *TestState) ([]string, error) {
 				return args("--chart-dir %s", ts.mockChartDir), nil
 			},
 			expectedError: regexp.MustCompile("--chart-dir requires a release be specified with -r"),
 		},
 		{
-			description:   "--values-file should require -r",
+			description: "--values-file should require -r",
 			argumentsFn: func(ts *TestState) ([]string, error) {
 				return args("--values-file %s", path.Join(ts.rootDir, "missing.yaml")), nil
 			},
 			expectedError: regexp.MustCompile("--values-file requires a release be specified with -r"),
 		},
 		{
-			description:   "--values-file must exist",
-			argumentsFn: func (ts *TestState) ([]string, error) {
+			description: "--values-file must exist",
+			argumentsFn: func(ts *TestState) ([]string, error) {
 				return args("-e dev -r leonardo --values-file %s", path.Join(ts.rootDir, "missing.yaml")), nil
 			},
 			expectedError: regexp.MustCompile("values file does not exist: .*/missing.yaml"),
 		},
 		{
-			description:   "--chart-dir and --chart-version incompatible",
-			argumentsFn: func (ts *TestState) ([]string, error) {
+			description: "--chart-dir and --chart-version incompatible",
+			argumentsFn: func(ts *TestState) ([]string, error) {
 				return args("-e dev -r leonardo --chart-dir %s --chart-version 1.0.0", ts.mockChartDir), nil
 			},
 			expectedError: regexp.MustCompile("only one of --chart-dir or --chart-version may be specified"),
@@ -133,7 +133,7 @@ func TestRender(t *testing.T) {
 			expectedError: regexp.MustCompile("--argocd cannot be used with.*--chart-version"),
 		},
 		{
-			description:   "--argocd and --chart-dir incompatible",
+			description: "--argocd and --chart-dir incompatible",
 			argumentsFn: func(ts *TestState) ([]string, error) {
 				return args("-e dev -r leonardo --chart-dir=%s --argocd", ts.mockChartDir), nil
 			},
@@ -176,11 +176,11 @@ func TestRender(t *testing.T) {
 			description: "no arguments should render for all targets",
 			setupMocks: func(ts *TestState) error {
 				ts.expectHelmfileUpdateCmd()
-				ts.expectHelmfileCmd(tdrStagingCluster,"--log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/tdr-staging", ts.mockConfigRepoPath)
-				ts.expectHelmfileCmd(perfCluster,"--log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/terra-perf", ts.mockConfigRepoPath)
-				ts.expectHelmfileCmd(alphaEnv,"--log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/alpha", ts.mockConfigRepoPath)
-				ts.expectHelmfileCmd(devEnv," --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath)
-				ts.expectHelmfileCmd(jdoeEnv,"--log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/jdoe", ts.mockConfigRepoPath)
+				ts.expectHelmfileCmd(tdrStagingCluster, "--log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/tdr-staging", ts.mockConfigRepoPath)
+				ts.expectHelmfileCmd(perfCluster, "--log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/terra-perf", ts.mockConfigRepoPath)
+				ts.expectHelmfileCmd(alphaEnv, "--log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/alpha", ts.mockConfigRepoPath)
+				ts.expectHelmfileCmd(devEnv, " --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath)
+				ts.expectHelmfileCmd(jdoeEnv, "--log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/jdoe", ts.mockConfigRepoPath)
 				return nil
 			},
 		},
@@ -189,11 +189,11 @@ func TestRender(t *testing.T) {
 			arguments:   args("--argocd"),
 			setupMocks: func(ts *TestState) error {
 				ts.expectHelmfileUpdateCmd()
-				ts.expectHelmfileCmd(tdrStagingCluster,"--log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/tdr-staging", ts.mockConfigRepoPath)
-				ts.expectHelmfileCmd(perfCluster,"--log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/terra-perf", ts.mockConfigRepoPath)
-				ts.expectHelmfileCmd(alphaEnv,"--log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/alpha", ts.mockConfigRepoPath)
-				ts.expectHelmfileCmd(devEnv,"--log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath)
-				ts.expectHelmfileCmd(jdoeEnv,"--log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/jdoe", ts.mockConfigRepoPath)
+				ts.expectHelmfileCmd(tdrStagingCluster, "--log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/tdr-staging", ts.mockConfigRepoPath)
+				ts.expectHelmfileCmd(perfCluster, "--log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/terra-perf", ts.mockConfigRepoPath)
+				ts.expectHelmfileCmd(alphaEnv, "--log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/alpha", ts.mockConfigRepoPath)
+				ts.expectHelmfileCmd(devEnv, "--log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath)
+				ts.expectHelmfileCmd(jdoeEnv, "--log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/jdoe", ts.mockConfigRepoPath)
 				return nil
 			},
 		},
@@ -211,7 +211,7 @@ func TestRender(t *testing.T) {
 			arguments:   args("-c terra-perf"),
 			setupMocks: func(ts *TestState) error {
 				ts.expectHelmfileUpdateCmd()
-				ts.expectHelmfileCmd(perfCluster,"--log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/terra-perf", ts.mockConfigRepoPath)
+				ts.expectHelmfileCmd(perfCluster, "--log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/terra-perf", ts.mockConfigRepoPath)
 				return nil
 			},
 		},
@@ -220,7 +220,7 @@ func TestRender(t *testing.T) {
 			arguments:   args("-e dev --argocd"),
 			setupMocks: func(ts *TestState) error {
 				ts.expectHelmfileUpdateCmd()
-				ts.expectHelmfileCmd(devEnv,"--log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath)
+				ts.expectHelmfileCmd(devEnv, "--log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath)
 				return nil
 			},
 		},
@@ -229,7 +229,7 @@ func TestRender(t *testing.T) {
 			arguments:   args("-c tdr-staging --argocd"),
 			setupMocks: func(ts *TestState) error {
 				ts.expectHelmfileUpdateCmd()
-				ts.expectHelmfileCmd(tdrStagingCluster,"--log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/tdr-staging", ts.mockConfigRepoPath)
+				ts.expectHelmfileCmd(tdrStagingCluster, "--log-level=info --selector=mode=argocd template --skip-deps --output-dir=%s/output/tdr-staging", ts.mockConfigRepoPath)
 				return nil
 			},
 		},
@@ -238,7 +238,7 @@ func TestRender(t *testing.T) {
 			arguments:   args("-e dev -r leonardo"),
 			setupMocks: func(ts *TestState) error {
 				ts.expectHelmfileUpdateCmd()
-				ts.expectHelmfileCmd(devEnv,"--log-level=info --selector=mode=release,release=leonardo template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath)
+				ts.expectHelmfileCmd(devEnv, "--log-level=info --selector=mode=release,release=leonardo template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath)
 				return nil
 			},
 		},
@@ -425,7 +425,6 @@ func TestRender(t *testing.T) {
 			},
 			expectedError: regexp.MustCompile("no environment configs found"),
 		},
-
 	}
 
 	for _, testCase := range testCases {
@@ -663,8 +662,8 @@ func setup(t *testing.T) (*TestState, error) {
 	ts := &TestState{
 		originalConfigRepoPath: originalConfigRepoPath,
 		mockConfigRepoPath:     mockConfigRepoPath,
-		originalRunner:			originalRunner,
-		mockRunner: 			mockRunner,
+		originalRunner:         originalRunner,
+		mockRunner:             mockRunner,
 		mockChartDir:           mockChartDir,
 		scratchDir:             scratchDir,
 		rootDir:                tmpDir,

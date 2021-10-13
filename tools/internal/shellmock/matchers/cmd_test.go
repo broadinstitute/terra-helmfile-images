@@ -499,15 +499,15 @@ func TestCmdFromFmt(t *testing.T) {
 	cmd := shell.Command{
 		Prog: "ls",
 		Args: []string{"-al", "/tmp"},
-		Env: []string{"HOME=/root", "FOO=BAR"},
+		Env:  []string{"HOME=/root", "FOO=BAR"},
 	}
 	assert.True(t, matcher.Matches(cmd))
 
 	expected := shell.Command{
 		Prog: "ls",
 		Args: []string{"-al", "/tmp"},
-		Env: []string{"HOME=/root", "FOO=BAR"},
-		Dir: "<any>",
+		Env:  []string{"HOME=/root", "FOO=BAR"},
+		Dir:  "<any>",
 	}
 	assert.Equal(t, expected, matcher.AsCmd())
 }

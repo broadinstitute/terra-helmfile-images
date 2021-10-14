@@ -16,7 +16,7 @@ import (
 // helmfileCommand is the name of the `helmfile` binary
 const helmfileCommand = "helmfile"
 
-// Environment variables -- prefixed with THF for "Terra Helmfile"
+// Environment variables -- prefixed with THF for "terra-helmfile"
 //
 // helmfileTargetTypeEnvVar is the name of the environment variable used to pass target type to helmfile
 const helmfileTargetTypeEnvVar = "THF_TARGET_TYPE"

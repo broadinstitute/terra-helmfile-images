@@ -123,9 +123,11 @@ func TestMockRunnerCanDumpCmdsDefault(t *testing.T) {
 
 Expected commands:
 
-	0: shell.Command{Prog:"echo", Args:[]string{"foo"}, Env:[]string{}, Dir:"<any>", PristineEnv:false}
+	0 (0 matches):
+	shell.Command{Prog:"echo", Args:[]string{"foo"}, Env:[]string{}, Dir:"<any>", PristineEnv:false}
 
-	1: shell.Command{Prog:"echo", Args:[]string{"bar"}, Env:[]string(nil), Dir:"", PristineEnv:false}
+	1 (0 matches):
+	shell.Command{Prog:"echo", Args:[]string{"bar"}, Env:[]string(nil), Dir:"", PristineEnv:false}
 
 `
 
@@ -147,9 +149,9 @@ func TestMockRunnerCanDumpCmdsPretty(t *testing.T) {
 
 Expected commands:
 
-	0: echo foo
+	0 (0 matches): echo foo
 
-	1: echo bar
+	1 (0 matches): echo bar
 
 `
 	assert.Equal(t, expected, w.String())
@@ -169,7 +171,7 @@ func TestMockRunnerCanDumpCmdsSpew(t *testing.T) {
 
 Expected commands:
 
-	0: echo foo
+	0 (0 matches): echo foo
 
 (shell.Command) {
 	Prog: (string) (len=4) "echo",
@@ -182,7 +184,7 @@ Expected commands:
 	PristineEnv: (bool) false
 }
 
-	1: echo bar
+	1 (0 matches): echo bar
 
 (shell.Command) {
 	Prog: (string) (len=4) "echo",

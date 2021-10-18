@@ -42,9 +42,8 @@ func (r *RealRunner) Run(cmd Command) error {
 // Given a list of string arguments, RunWithArgs calls
 // CmdFromTokens() to create a command passes it to Run()
 //
-// Eg. RunWithArgs("FOO=BAR", "HOME=/tmp", "ls", "-al", "~")
+// Eg. RunWithArgs("ls", "-al", "~")
 // will create a new Command{
-//   Env: []string{"FOO=BAR", "HOME=/tmp"},
 //   Prog: "ls",
 //   Args: []string{"-al", "~"}
 // }

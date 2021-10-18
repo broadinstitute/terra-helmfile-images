@@ -2,57 +2,45 @@ package render
 
 import (
 	"fmt"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/render/helmfile"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/render/target"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
 	"github.com/rs/zerolog/log"
 	"io/ioutil"
 	"os"
 	"path"
-	"path/filepath"
-	"regexp"
-	"sort"
 	"strings"
+	"sync"
+	"time"
 )
 
-// helmfileCommand is the name of the `helmfile` binary
-const helmfileCommand = "helmfile"
-
-// Environment variables -- prefixed with THF for "terra-helmfile"
-//
-// helmfileTargetTypeEnvVar is the name of the environment variable used to pass target type to helmfile
-const helmfileTargetTypeEnvVar = "THF_TARGET_TYPE"
-
-// helmfileTargetBaseEnvVar is the name of the environment variable used to pass target base to helmfile
-const helmfileTargetBaseEnvVar = "THF_TARGET_BASE"
-
-// helmfileTargetNameEnvVar is the name of the environment variable used to pass target name to helmfile
-const helmfileTargetNameEnvVar = "THF_TARGET_NAME"
-
-// helmfileChartCacheDirEnvVar is the name of the environment variable used to pass unpack dir to helmfile
-const helmfileChartCacheDirEnvVar = "THF_CHART_CACHE_DIR"
+// multiRenderTimeout how long to wait before timing out a multi render
+const multiRenderTimeout = 5 * time.Minute
 
 // Options encapsulates CLI options for a render
 type Options struct {
-	Env            string   // If supplied, render for a single environment instead of all targets
-	Cluster        string   // If supplied, render for a single cluster instead of all targets
-	Release        string   // If supplied, render for specific release only instead of all releases in environment/cluster
-	ChartVersion   string   // Optionally override chart version
-	AppVersion     string   // Optionally override app version
-	ChartDir       string   // When supplied, render chart from local directory instead of released version
-	ValuesFiles    []string // Optionally list of files for overriding chart values
-	ArgocdMode     bool     // If true, render ArgoCD manifests instead of application manifests
-	OutputDir      string   // Render to custom output directory intead of terra-helmfile/output
-	Stdout         bool     // Render to stdout instead of output directory
-	Verbose        int      // Invoke `helmfile` with verbose logging
-	ConfigRepoPath string   // Path to terra-helmfile repo clone
-	ScratchDir     string   // Supply a specific scratch directory to Helmfile instead of creating & deleting a tmp dir
+	Env             *string // Env If supplied, render for a single environment instead of all targets
+	Cluster         *string // Cluster If supplied, render for a single cluster instead of all targets
+	OutputDir       string  // OutputDIr Output directory where manifests should be rendered
+	Stdout          bool    // Stdout Render to stdout instead of output directory
+	Verbosity       int     // Verbosity Invoke `helmfile` with verbose logging
+	ConfigRepoPath  string  // ConfigRepoPath Path to terra-helmfile repo clone
+	ScratchDir      *string // ScratchDir If supplied, use given scratch directory instead of creating & deleting tmp dir
+	ParallelWorkers int     // ParallelWorkers Number of parallel workers
 }
 
-// render generates manifests by invoking `helmfile` with the appropriate arguments
-type render struct {
-	options          Options                  // CLI options
-	scratchDir       scratchDir               // Scratch directory where charts may be downloaded and unpacked, etc.
-	releaseTargets   map[string]ReleaseTarget // Collection of release targets (environments and clusters) defined in the config repo, keyed by name
-	helmfileLogLevel string                   // --log-level argument to pass to `helmfile` command
+// multiRender renders manifests for multiple environments and clusters
+type multiRender struct {
+	options        *Options                        // Options global render options
+	scratchDir     scratchDir                      // Scratch directory where charts may be downloaded and unpacked, etc.
+	releaseTargets map[string]target.ReleaseTarget // Collection of release targets (environments and clusters) defined in the config repo, keyed by name
+	configRepo     *helmfile.ConfigRepo            // configRepo refernce to use for executing `helmfile template`
+}
+
+// renderError represents an error encountered while rendering for a particular target
+type renderError struct {
+	target target.ReleaseTarget // release target that resulted in this error
+	err error // error
 }
 
 // scratchDir struct containing paths for temporary/scratch work
@@ -60,106 +48,185 @@ type scratchDir struct {
 	root                  string // root directory for all scratch files
 	cleanupOnTeardown     bool   // cleanUpOnExit if true, scratch files will be deleted on exit
 	helmfileChartCacheDir string // scratch directory that helmfile.yaml should use for caching charts
+	tmpManifestsDir       string // tmp outputdir where manifests can be rendered
 }
 
 // Global/package-level variable, used for executing commands. Replaced with a mock in tests.
 var shellRunner shell.Runner = shell.NewRealRunner()
 
-// DoRender constructs a render and invokes all functions in correct order to perform a complete
+// DoRender constructs a multiRender and invokes all functions in correct order to perform a complete
 // render.
-func DoRender(options Options) error {
-	render, err := newRender(options)
+func DoRender(globalOptions *Options, helmfileArgs *helmfile.Args) error {
+	r, err := newRender(globalOptions)
 	if err != nil {
 		return err
 	}
-	if err = render.Setup(); err != nil {
+	if err = r.setup(); err != nil {
 		return err
 	}
-	if err = render.HelmUpdate(); err != nil {
+	if err = r.configRepo.HelmUpdate(); err != nil {
 		return err
 	}
-	if err = render.RenderAll(); err != nil {
+	if err = r.renderAll(helmfileArgs); err != nil {
 		return err
 	}
-	if err = render.Teardown(); err != nil {
+	if err = r.teardown(); err != nil {
 		return err
 	}
 	return nil
 }
 
-// newRender is a constructor
-func newRender(options Options) (*render, error) {
-	render := new(render)
-	render.options = options
+// SetRunner is for use in integration tests only!
+// It should be used like this:
+//   originalRunner = render.SetRunner(mockRunner)
+//   defer func() { render.SetRunner(originalRunner) }
+func SetRunner(runner shell.Runner) shell.Runner {
+	original := shellRunner
+	shellRunner = runner
+	return original
+}
 
-	targets, err := loadTargets(options.ConfigRepoPath)
+// newRender is a constructor for Render objects
+func newRender(options *Options) (*multiRender, error) {
+	r := new(multiRender)
+	r.options = options
+
+	targets, err := target.LoadReleaseTargets(options.ConfigRepoPath)
 	if err != nil {
 		return nil, err
 	}
-	render.releaseTargets = targets
-
-	render.helmfileLogLevel = "info"
-	if options.Verbose > 1 {
-		render.helmfileLogLevel = "debug"
-	}
+	r.releaseTargets = targets
 
 	scratchDir, err := createScratchDir(options)
 	if err != nil {
 		return nil, err
 	}
-	render.scratchDir = *scratchDir
+	r.scratchDir = *scratchDir
 
-	return render, nil
+	helmfileLogLevel := "info"
+	if options.Verbosity > 1 {
+		helmfileLogLevel = "debug"
+	}
+
+	r.configRepo = helmfile.NewConfigRepo(helmfile.Options{
+		Path:             options.ConfigRepoPath,
+		ChartCacheDir:    scratchDir.helmfileChartCacheDir,
+		HelmfileLogLevel: helmfileLogLevel,
+		ShellRunner:      shellRunner,
+	})
+
+	return r, nil
 }
 
-// Setup performs necessary setupMocks for a render
-func (r *render) Setup() error {
+// Setup performs necessary setup for a multiRender
+func (r *multiRender) setup() error {
 	return r.cleanOutputDirectory()
 }
 
-// Teardown cleans up resources, such as the Helmfile scratch directory, that are no longer needed
-// once the render is finished
-func (r *render) Teardown() error {
+// Teardown cleans up resources that are no longer needed once the renders are finished
+func (r *multiRender) teardown() error {
 	if r.scratchDir.cleanupOnTeardown {
 		return os.RemoveAll(r.scratchDir.root)
 	}
 	return nil
 }
 
-// HelmUpdate updates Helm repos
-func (r *render) HelmUpdate() error {
-	log.Debug().Msg("Updating Helm repos...")
-	return r.runHelmfile([]string{}, "--allow-no-matching-release", "repos")
-}
-
 // RenderAll renders manifests based on supplied arguments
-func (r *render) RenderAll() error {
-	targetEnvs, err := r.getTargets()
+func (r *multiRender) renderAll(helmfileArgs *helmfile.Args) error {
+	targets, err := r.getTargets()
 	if err != nil {
 		return err
 	}
 
-	log.Info().Msgf("Rendering manifests for %d environments...", len(targetEnvs))
+	log.Info().Msgf("Rendering manifests for %d target(s)...", len(targets))
 
-	for _, env := range targetEnvs {
-		err = r.renderSingleTarget(env)
-		if err != nil {
-			return err
-		}
+	numWorkers := 1
+	if r.options.ParallelWorkers >= 1 {
+		numWorkers = r.options.ParallelWorkers
+	}
+	if len(targets) < numWorkers {
+		// don't make more workers than we have items to process
+		numWorkers = len(targets)
 	}
 
-	return normalizeRenderDirectories(r.options.OutputDir)
+	queueCh := make(chan target.ReleaseTarget, len(targets))
+	for _, releaseTarget := range targets {
+		queueCh <- releaseTarget
+	}
+	close(queueCh)
+
+	errCh := make(chan renderError, len(targets))
+
+	var wg sync.WaitGroup
+	for i := 0; i < numWorkers; i++ {
+		id := i
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			for {
+				releaseTarget, ok := <-queueCh
+				if !ok {
+					log.Debug().Msgf("[worker-%d] queue channel closed, returning", id)
+					return
+				}
+
+				log.Debug().Msgf("[worker-%d] rendering target %s", id, releaseTarget.Name())
+				if err := r.renderSingleTarget(helmfileArgs, releaseTarget); err != nil {
+					log.Error().Msgf("[worker-%d] error rendering manifests for target %s:\n%v", id, releaseTarget.Name(), err)
+					errCh <- renderError{
+						target: releaseTarget,
+						err: err,
+					}
+				}
+			}
+		}()
+	}
+
+	// Wait for workers to finish in a separate goroutine so that we can implement
+	// a timeout
+	waitCh := make(chan struct{})
+	go func() {
+		log.Debug().Msgf("[wait] Waiting for render workers to finish")
+		wg.Wait()
+		log.Debug().Msgf("[wait] Render workers finished")
+		close(errCh)
+		close(waitCh)
+	}()
+
+	// Block until the wait group is done or we time out.
+	select {
+	case <-waitCh:
+		log.Debug().Msgf("[main] multi-render finished")
+	case <-time.After(multiRenderTimeout):
+		err := fmt.Errorf("[main] multi-render timed out after %s", multiRenderTimeout)
+		log.Error().Err(err)
+		return err
+	}
+
+	return readErrorsFromChannel(errCh)
+}
+
+// RenderAll renders manifests based on supplied arguments
+func (r *multiRender) renderSingleTarget(helmfileArgs *helmfile.Args, releaseTarget target.ReleaseTarget) error {
+	if r.options.Stdout {
+		return r.configRepo.RenderToStdout(releaseTarget, helmfileArgs)
+	}
+
+	outputDir := path.Join(r.options.OutputDir, releaseTarget.Name())
+	return  r.configRepo.RenderToDir(releaseTarget, outputDir, helmfileArgs)
 }
 
 // createScratchDir creates scratch directory structure, given user-supplied options
-func createScratchDir(options Options) (*scratchDir, error) {
+func createScratchDir(options *Options) (*scratchDir, error) {
 	scratchDir := scratchDir{}
-	if isSet(options.ScratchDir) {
+	if options.ScratchDir != nil {
 		// User supplied a scratch directory
-		scratchDir.root = options.ScratchDir
+		scratchDir.root = *options.ScratchDir
 		scratchDir.cleanupOnTeardown = false
 	} else {
-		root, err := os.MkdirTemp("", "render-scratch-*")
+		root, err := os.MkdirTemp("", "multiRender-scratch-*")
 		if err != nil {
 			return nil, err
 		}
@@ -169,8 +236,12 @@ func createScratchDir(options Options) (*scratchDir, error) {
 	}
 
 	scratchDir.helmfileChartCacheDir = path.Join(scratchDir.root, "chart-cache")
+	scratchDir.tmpManifestsDir = path.Join(scratchDir.root, "manifests")
 
-	dirs := []string{scratchDir.helmfileChartCacheDir}
+	dirs := []string{
+		scratchDir.helmfileChartCacheDir,
+		scratchDir.tmpManifestsDir,
+	}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return nil, err
@@ -181,7 +252,7 @@ func createScratchDir(options Options) (*scratchDir, error) {
 }
 
 // cleanOutputDirectory removes any old files from output directory
-func (r *render) cleanOutputDirectory() error {
+func (r *multiRender) cleanOutputDirectory() error {
 	if r.options.Stdout {
 		// No need to clean output directory if we're rendering to stdout
 		return nil
@@ -216,261 +287,58 @@ func (r *render) cleanOutputDirectory() error {
 	return nil
 }
 
-// loadTargets loads all environment and cluster release targets from the config repo
-func loadTargets(configRepoPath string) (map[string]ReleaseTarget, error) {
-	targets := make(map[string]ReleaseTarget)
-
-	environments, err := loadEnvironments(configRepoPath)
-	if err != nil {
-		return nil, err
-	}
-
-	clusters, err := loadClusters(configRepoPath)
-	if err != nil {
-		return nil, err
-	}
-
-	for key, env := range environments {
-		targets[key] = env
-	}
-
-	for key, cluster := range clusters {
-		if conflict, ok := targets[key]; ok {
-			return nil, fmt.Errorf("cluster name %s conflicts with environment name %s", cluster.Name(), conflict.Name())
-		}
-		targets[key] = cluster
-	}
-
-	return targets, nil
-}
-
-// loadEnvironments scans through the environments/ subdirectory and build a slice of defined environments
-func loadEnvironments(configRepoPath string) (map[string]ReleaseTarget, error) {
-	configDir := path.Join(configRepoPath, envConfigDir)
-
-	return loadTargetsFromDirectory(configDir, envTypeName, NewEnvironmentGeneric)
-}
-
-// loadClusters scans through the cluster/ subdirectory and build a slice of defined clusters
-func loadClusters(configRepoPath string) (map[string]ReleaseTarget, error) {
-	configDir := path.Join(configRepoPath, clusterConfigDir)
-
-	return loadTargetsFromDirectory(configDir, clusterTypeName, NewClusterGeneric)
-}
-
-// loadTargetsFromDirectory loads the set of configured clusters or environments from a config directory
-func loadTargetsFromDirectory(configDir string, targetType string, constructor func(string, string) ReleaseTarget) (map[string]ReleaseTarget, error) {
-	targets := make(map[string]ReleaseTarget)
-
-	if _, err := os.Stat(configDir); err != nil {
-		return nil, fmt.Errorf("%s directory %s does not exist, is it a %s clone?", targetType, configDir, configRepoName)
-	}
-
-	matches, err := filepath.Glob(path.Join(configDir, "*", "*.yaml"))
-	if err != nil {
-		return nil, fmt.Errorf("error loading %s configs from %s: %v", targetType, configDir, err)
-	}
-
-	if len(matches) == 0 {
-		return nil, fmt.Errorf("no %s configs found in %s, is it a %s clone?", targetType, configDir, configRepoName)
-	}
-
-	for _, filename := range matches {
-		base := path.Base(path.Dir(filename))
-		name := strings.TrimSuffix(path.Base(filename), ".yaml")
-
-		target := constructor(name, base)
-
-		if conflict, ok := targets[target.Name()]; ok {
-			return nil, fmt.Errorf("%s name conflict %s (%s) and %s (%s)", targetType, target.Name(), target.Base(), conflict.Name(), conflict.Base())
-		}
-
-		targets[target.Name()] = target
-	}
-
-	return targets, nil
-}
-
 // getTargets returns the set of release targets to render manifests for
-func (r *render) getTargets() ([]ReleaseTarget, error) {
-
-	if isSet(r.options.Env) {
+func (r *multiRender) getTargets() ([]target.ReleaseTarget, error) {
+	if r.options.Env != nil {
 		// User wants to render for a specific environment
-		env, ok := r.releaseTargets[r.options.Env]
+		env, ok := r.releaseTargets[*r.options.Env]
 		if !ok {
-			return nil, fmt.Errorf("unknown environment: %s", r.options.Env)
+			return nil, fmt.Errorf("unknown environment: %s", *r.options.Env)
 		}
-		return []ReleaseTarget{env}, nil
+		return []target.ReleaseTarget{env}, nil
 	}
 
-	if isSet(r.options.Cluster) {
+	if r.options.Cluster != nil {
 		// User wants to render for a specific cluster
-		cluster, ok := r.releaseTargets[r.options.Cluster]
+		cluster, ok := r.releaseTargets[*r.options.Cluster]
 		if !ok {
-			return nil, fmt.Errorf("unknown cluster: %s", r.options.Cluster)
+			return nil, fmt.Errorf("unknown cluster: %s", *r.options.Cluster)
 		}
-		return []ReleaseTarget{cluster}, nil
+		return []target.ReleaseTarget{cluster}, nil
 	}
 
 	// No target specified; render for _all_ targets
-	var targets []ReleaseTarget
-	for _, target := range r.releaseTargets {
-		targets = append(targets, target)
+	var targets []target.ReleaseTarget
+	for _, releaseTarget := range r.releaseTargets {
+		targets = append(targets, releaseTarget)
 	}
 
 	// Sort targets so they are rendered in a predictable order
-	sortReleaseTargets(targets)
+	target.SortReleaseTargets(targets)
 
 	return targets, nil
 }
 
-// renderSingleTarget renders manifests for a single environment or cluster
-func (r *render) renderSingleTarget(target ReleaseTarget) error {
-	log.Info().Msgf("Rendering manifests for %s %s", target.Type(), target.Name())
+// readErrorsFromChannel aggregate all errors into a single mega-error
+func readErrorsFromChannel(errCh <-chan renderError) error {
+	var count int
+	var sb strings.Builder
 
-	// Get environment variables for `helmfile`
-	envVars := r.getEnvVarsForTarget(target)
-
-	// Build list of CLI args to `helmfile`
-	var args []string
-
-	selectors := r.getSelectors()
-	if len(selectors) != 0 {
-		args = append(args, fmt.Sprintf("--selector=%s", joinKeyValuePairs(selectors)))
-	}
-
-	stateValues := r.getStateValues()
-	if len(stateValues) != 0 {
-		args = append(args, fmt.Sprintf("--state-values-set=%s", joinKeyValuePairs(stateValues)))
-	}
-
-	// Append Helmfile command we're running (template)
-	args = append(args, "template")
-
-	// Append arguments specific to template subcommand
-	if r.options.ChartDir == optionUnset {
-		// Skip dependencies unless we're rendering a local chart, to save time
-		args = append(args, "--skip-deps")
-	}
-
-	if len(r.options.ValuesFiles) > 0 {
-		args = append(args, fmt.Sprintf("--values=%s", strings.Join(r.options.ValuesFiles, ",")))
-	}
-
-	if !r.options.Stdout {
-		// Expand output dir to absolute path, because Helmfile assumes paths
-		// are relative to helmfile.yaml and we want to be relative to CWD
-		// filepath.Abs()
-		args = append(args, fmt.Sprintf("--output-dir=%s/%s", r.options.OutputDir, target.Name()))
-	}
-
-	return r.runHelmfile(envVars, args...)
-}
-
-func (r *render) runHelmfile(envVars []string, args ...string) error {
-	finalArgs := []string{
-		fmt.Sprintf("--log-level=%s", r.helmfileLogLevel),
-	}
-	finalArgs = append(finalArgs, args...)
-
-	cmd := shell.Command{}
-	cmd.Env = envVars
-	cmd.Prog = helmfileCommand
-	cmd.Args = finalArgs
-	cmd.Dir = r.options.ConfigRepoPath
-
-	return shellRunner.Run(cmd)
-}
-
-// getEnvVarsForTarget returns a slice of environment variables that are needed for a helmfile render, . Eg.
-// []string{"TARGET_TYPE": "environment", "TARGET_NAME": "dev", "TARGET_BASE": "live" }
-func (r *render) getEnvVarsForTarget(t ReleaseTarget) []string {
-	return []string{
-		fmt.Sprintf("%s=%s", helmfileTargetTypeEnvVar, t.Type()),
-		fmt.Sprintf("%s=%s", helmfileTargetBaseEnvVar, t.Base()),
-		fmt.Sprintf("%s=%s", helmfileTargetNameEnvVar, t.Name()),
-		fmt.Sprintf("%s=%s", helmfileChartCacheDirEnvVar, r.scratchDir.helmfileChartCacheDir),
-	}
-}
-
-// getStateValues returns a map of state values that should be set on the command-line, given user-supplied options
-func (r *render) getStateValues() map[string]string {
-	stateValues := make(map[string]string)
-
-	if isSet(r.options.ChartDir) {
-		key := fmt.Sprintf("releases.%s.repo", r.options.Release)
-		stateValues[key] = r.options.ChartDir
-	} else if isSet(r.options.ChartVersion) {
-		key := fmt.Sprintf("releases.%s.chartVersion", r.options.Release)
-		stateValues[key] = r.options.ChartVersion
-	}
-
-	if isSet(r.options.AppVersion) {
-		key := fmt.Sprintf("releases.%s.appVersion", r.options.Release)
-		stateValues[key] = r.options.AppVersion
-	}
-
-	return stateValues
-}
-
-// getSelectors returns a map of Helmfile selectors that should be set on the command-line, given user-supplied options
-func (r *render) getSelectors() map[string]string {
-	selectors := make(map[string]string)
-	selectors["mode"] = "release"
-	if r.options.ArgocdMode {
-		// Render ArgoCD manifests instead of application manifests
-		selectors["mode"] = "argocd"
-	}
-
-	if isSet(r.options.Release) {
-		// Render manifests for the given app only
-		selectors["release"] = r.options.Release
-	}
-
-	return selectors
-}
-
-// normalizeRenderDirectories converts auto-generated template directory names like
-//   helmfile-b47efc70-workspacemanager
-// into
-//   workspacemanager
-// so that diff -r can be run on two sets of rendered templates.
-//
-// We enforce that all release names in an environment are unique,
-// so this should not cause conflicts.
-func normalizeRenderDirectories(outputDir string) error {
-	matches, err := filepath.Glob(path.Join(outputDir, "*", "helmfile-*"))
-	if err != nil {
-		return fmt.Errorf("error normalizing render directories in %s: %v", outputDir, err)
-	}
-
-	for _, oldPath := range matches {
-		baseName := path.Base(oldPath) // Eg. "helmfile-b47efc70-workspacemanager
-		parent := path.Dir(oldPath)
-
-		re := regexp.MustCompile("^helmfile-[^-]+-")
-		newName := re.ReplaceAllString(baseName, "")
-		newPath := path.Join(parent, newName)
-
-		log.Debug().Msgf("Renaming %s to %s", oldPath, newPath)
-		if err = os.Rename(oldPath, newPath); err != nil {
-			return fmt.Errorf("error renaming render directory %s to %s: %v", oldPath, newPath, err)
+	for {
+		renderErr, ok := <-errCh
+		if !ok {
+			// channel closed, no more results to read
+			break
 		}
+		count++
+		releaseTarget := renderErr.target
+		err := renderErr.err
+		sb.WriteString(fmt.Sprintf("%s %s: %v\n", releaseTarget.Type(), releaseTarget.Name(), err))
+	}
+
+	if count > 0 {
+		return fmt.Errorf("Failed to render manifests for %d targets:\n%s", count, sb.String())
 	}
 
 	return nil
-}
-
-// joinKeyValuePairs joins map[string]string to string containing comma-separated key-value pairs.
-// Eg. { "a": "b", "c": "d" } -> "a=b,c=d"
-func joinKeyValuePairs(pairs map[string]string) string {
-	var tokens []string
-	for k, v := range pairs {
-		tokens = append(tokens, fmt.Sprintf("%s=%s", k, v))
-	}
-
-	// Sort tokens so they are always supplied in predictable order
-	sort.Strings(tokens)
-
-	return strings.Join(tokens, ",")
 }

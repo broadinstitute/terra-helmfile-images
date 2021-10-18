@@ -23,6 +23,11 @@ if [[ -n "${TERRA_ENV}" ]]; then
   env="-e ${TERRA_ENV}"
 fi
 
+numWorkers=
+if [[ -n "${NUM_WORKERS}" ]]; then
+  numWorkers="--workers ${NUM_WORKERS}"
+fi
+
 set -x
 echo "Running render in $( pwd )"
-/tools/bin/render --output-dir="${OUTPUT_DIR}" $env $argocd
+/tools/bin/render $numWorkers --output-dir="${OUTPUT_DIR}" $env $argocd

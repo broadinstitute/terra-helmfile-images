@@ -3,49 +3,61 @@ package shellmock
 import (
 	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shellmock/matchers"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/mock"
-	"strings"
+	"io"
+	"os"
 	"testing"
 )
 
 //
 // The shellmock package makes it easy to mock shell commands in unit tests with testify/mock.
 //
-// It contains a mock implementation of the shell.Runner interface, called MockRunner.
+// See example_test.go for example usage.
+//
+// Shellmock contains a mock implementation of the shell.Runner interface, called MockRunner.
 // Unlike testify's out-of-the-box mock implementation, MockRunner can verify that shell
 // commands are run in a specific order.
 //
 
-// FailureMode what to do when there's an order verification failure (panic or fail the test)
-type FailureMode int
+// CmdDumpStyle how to style commands when they are printed to the console
+type CmdDumpStyle int
 
-// Panic when an order mismatch is found
-// FailTest will fail the test when an order mismatch is found
+// Default prints the command using "%v"
+// Pretty formats commands using PrettyFormat
+// Spew uses the spew library to spew the entire struct
 const (
-	Panic FailureMode = iota
-	FailTest
+	Default CmdDumpStyle = iota
+	Pretty
+	Spew
 )
 
 // Options for a MockRunner
 type Options struct {
-	VerifyOrder bool        // VerifyOrder If true, verify commands are run in the order they were declared
-	FailureMode FailureMode // FailureMode How to handle order verification failures
+	VerifyOrder bool         // VerifyOrder If true, verify commands are run in the order they were declared
+	DumpStyle   CmdDumpStyle // DumpStyle how to style the dump
+}
+
+type expectedCommand struct {
+	cmd  shell.Command
+	call *mock.Call
 }
 
 // MockRunner is an implementation of Runner interface for use with testify/mock.
 type MockRunner struct {
-	mock             mock.Mock // mock underlying testify mock object
 	options          Options
-	expectedCommands []shell.Command
-	receivedCounter  int
+	expectedCommands []expectedCommand
+	runCounter       int
+	t                *testing.T
+	mock.Mock
 }
 
 // DefaultMockRunner returns a new mock runner instance with default settings
 func DefaultMockRunner() *MockRunner {
 	options := Options{
 		VerifyOrder: true,
-		FailureMode: FailTest,
 	}
 	return NewMockRunner(options)
 }
@@ -57,116 +69,136 @@ func NewMockRunner(options Options) *MockRunner {
 	return m
 }
 
-// RunS Converts string arguments to a Command and delegates to Run
-func (m *MockRunner) RunS(args ...string) error {
-	return m.Run(shell.CmdFromTokens(args...))
+// RunWithArgs delegates to Run
+func (m *MockRunner) RunWithArgs(prog string, args ...string) error {
+	return m.Run(shell.Command{
+		Prog: prog,
+		Args: args,
+	})
 }
 
 // Run Instead of executing the command, logs an info message and registers the call with testify mock
 func (m *MockRunner) Run(cmd shell.Command) error {
 	log.Info().Msgf("[MockRunner] Run called: %q\n", cmd.PrettyFormat())
-	args := m.mock.Called(cmd)
-
-	// Return error if one was added to the mocked call
+	args := m.Mock.Called(cmd)
 	if len(args) > 0 {
 		return args.Error(0)
 	}
 	return nil
 }
 
-// ExpectCmd Updates mock runner with an expectation for a given command.
-// Unlike with vanilla testify mocks, an error is raised if a command is invoked out of order.
-func (m *MockRunner) ExpectCmd(t *testing.T, cmd shell.Command) *mock.Call {
-	// Register the mock with the testify mock object
-	call := m.mock.On("Run", cmd)
+// ExpectCmd sets an expectation for a command that should be run. It accepts either a shell.Command or a CmdMatcher
+func (m *MockRunner) ExpectCmd(cmdOrMatcher interface{}) *mock.Call {
+	var call *mock.Call
+	var cmd shell.Command
 
-	// If we aren't verifying call order, then there's nothing to do!
-	if !m.options.VerifyOrder {
-		return call
+	switch c := cmdOrMatcher.(type) {
+	case *matchers.CmdMatcher:
+		cmd = c.AsCmd()
+		call = m.Mock.On("Run", mock.MatchedBy(func(actual shell.Command) bool {
+			return c.Matches(actual)
+		}))
+	case shell.Command:
+		cmd = c
+		call = m.Mock.On("Run", c)
+	default:
+		m.panicOrFailNow(fmt.Errorf("ExpectCmd only supports shell.Command or matchers.CmdMatcher arguments, got %v (type %T)", cmdOrMatcher, cmdOrMatcher))
+		return nil
 	}
 
 	order := len(m.expectedCommands)
-	m.expectedCommands = append(m.expectedCommands, cmd)
+	m.expectedCommands = append(m.expectedCommands, expectedCommand{cmd: cmd, call: call})
 
 	return call.Run(func(args mock.Arguments) {
-		if m.receivedCounter != order {
-			if m.receivedCounter < len(m.expectedCommands) {
-				err := fmt.Errorf(
-					"Command received out of order (%d instead of %d). Expected:\n%q\nReceived:\n%q",
-					m.receivedCounter,
-					order,
-					m.expectedCommands[m.receivedCounter].PrettyFormat(),
-					cmd.PrettyFormat(),
-				)
+		if m.options.VerifyOrder {
+			if m.runCounter != order { // this command is out of order
+				if m.runCounter < len(m.expectedCommands) { // we have remaining expectations
+					err := fmt.Errorf(
+						"Command received out of order (%d instead of %d). Expected:\n%v\nReceived:\n%v",
+						m.runCounter,
+						order,
+						m.expectedCommands[m.runCounter].cmd,
+						cmd,
+					)
 
-				if m.options.FailureMode == FailTest {
-					t.Error(err)
-				} else {
-					panic(err)
+					m.panicOrFailNow(err)
 				}
 			}
 		}
 
-		m.receivedCounter++
+		m.runCounter++
 	})
 }
 
-// ExpectCmdS is a convenience function for generating a Command from a string and expecting it
-func (m *MockRunner) ExpectCmdS(t *testing.T, str string) *mock.Call {
-	cmd := CmdFromString(str)
-	return m.ExpectCmd(t, cmd)
+// Test decorates Testify's mock.Mock#Test() function by adding a cleanup hook to the test object
+// that dumps the set of expected command matchers to stderr in the event of a test failure.
+// This is useful because most command matchers are functions and so Testify can't generate
+// a pretty diff for them; you end up with:
+//   (shell.Command={...}) not matched by func(Command) bool
+//
+func (m *MockRunner) Test(t *testing.T) {
+	m.t = t
+	t.Cleanup(func() {
+		if t.Failed() {
+			if err := m.dumpExpectedCmds(os.Stderr); err != nil {
+				t.Error(err)
+			}
+		}
+	})
+	m.Mock.Test(t)
 }
 
-// ExpectCmdFmt is a convenience function combining CmdFromFmt and ExpectCmd
-func (m *MockRunner) ExpectCmdFmt(t *testing.T, fmt string, a ...interface{}) *mock.Call {
-	cmd := CmdFromFmt(fmt, a...)
-	return m.ExpectCmd(t, cmd)
+func (m *MockRunner) dumpExpectedCmds(w io.Writer) error {
+	if _, err := fmt.Fprint(w, "\n\nExpected commands:\n\n"); err != nil {
+		return err
+	}
+	for i, ec := range m.expectedCommands {
+		if err := m.dumpExpectedCmd(w, i, ec); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-// AssertExpectations delegates to testify/mock's AssertExpectations
-func (m *MockRunner) AssertExpectations(t *testing.T) bool {
-	return m.mock.AssertExpectations(t)
+func (m *MockRunner) dumpExpectedCmd(w io.Writer, index int, expected expectedCommand) error {
+	cmd := expected.cmd
+	switch m.options.DumpStyle {
+	case Default:
+		if _, err := fmt.Fprintf(w, "\t%d: %#v\n\n", index, cmd); err != nil {
+			return err
+		}
+	case Pretty:
+		if _, err := fmt.Fprintf(w, "\t%d: %s\n\n", index, cmd.PrettyFormat()); err != nil {
+			return err
+		}
+	case Spew:
+		if _, err := fmt.Fprintf(w, "\t%d: %s\n\n", index, cmd.PrettyFormat()); err != nil {
+			return err
+		}
+
+		scs := spew.ConfigState{
+			Indent:                  "\t",
+			DisableCapacities:       true,
+			DisablePointerAddresses: true,
+		}
+
+		scs.Fdump(w, cmd)
+
+		if _, err := fmt.Fprintln(w); err != nil {
+			return err
+		}
+
+		fmt.Println()
+	}
+
+	return nil
 }
 
-// CmdFromFmt is a convenience function for creating a Command, given a format string
-// and arguments.
-//
-// Eg. CmdFromFmt("HOME=%s FOO=%s ls -l %d", "/root", "BAR", "/tmp")
-// ->
-// Command{
-//   Env: []string{"HOME=/root", "FOO=BAR"},
-//   Prog: "ls",
-//   Args: []string{"-l", "/tmp"},
-//   ...
-// }
-//
-// Note: CmdFromFmt is NOT smart about shell quoting and escaping. I.e.
-// "echo hello\\ world" will be parsed as "echo", "hello\\", "world" instead
-// of "echo", "hello world". Similarly, "echo 'hello world'" will be parsed as
-// "echo", "'hello", "world'". If you need to test arguments with whitespace or other
-// special characters, create a shell.Command manually.
-//
-func CmdFromFmt(format string, a ...interface{}) shell.Command {
-	formatted := fmt.Sprintf(format, a...)
-	return CmdFromString(formatted)
-}
-
-// CmdFromString is a convenience function for creating a Command, given a string.
-// Eg. CmdFromString("HOME=/tmp ls -al ~")
-// ->
-// Command{
-//   Env: []string{"HOME=/tmp"},
-//   Prog: "ls",
-//   Args: []string{"-al", "~"},
-// }
-//
-// Note: CmdFromString is NOT smart about shell quoting and escaping. I.e.
-// "echo hello\\ world" will be parsed as "echo", "hello\\", "world" instead
-// of "echo", "hello world". Similarly, "echo 'hello world'" will be parsed as
-// "echo", "'hello", "world'". If you need to test arguments with whitespace or other
-// special characters, create a shell.Command manually.
-// and arguments.
-func CmdFromString(cmd string) shell.Command {
-	tokens := strings.Fields(cmd)
-	return shell.CmdFromTokens(tokens...)
+func (m *MockRunner) panicOrFailNow(err error) {
+	if m.t == nil {
+		panic(err)
+	}
+	m.t.Error(err)
+	m.t.FailNow()
 }

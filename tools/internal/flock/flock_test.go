@@ -7,6 +7,7 @@ import (
 	"path"
 	"regexp"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -27,7 +28,8 @@ func TestWithLockEnsuresConcurrentExecution(t *testing.T) {
 	var wg sync.WaitGroup
 	resultCh := make(chan result, numWorkers)
 	opts := testOptions(t, lockRetryInterval, lockTimeout)
-	lockOwner := -1
+
+	var lockOwner int32 = -1
 
 	for i := 0; i < numWorkers; i++ {
 		id := i // Copy to local variable to prevent leaks
@@ -35,16 +37,17 @@ func TestWithLockEnsuresConcurrentExecution(t *testing.T) {
 		go func() {
 			err := WithLock(opts, func() error {
 				log.Debug().Msgf("[%d] got lock", id)
-				if lockOwner != -1 {
-					return fmt.Errorf("[%d] another routine also owns the lock? %d", id, lockOwner)
+				owner := atomic.LoadInt32(&lockOwner)
+				if owner != -1 {
+					return fmt.Errorf("[%d] another routine also owns the lock? %d", id, owner)
 				}
-				lockOwner = id
+				atomic.StoreInt32(&lockOwner, int32(id))
 
 				log.Debug().Msgf("[%d] sleeping for %s", id, lockSleepTime)
 				time.Sleep(lockSleepTime)
 
 				log.Debug().Msgf("[%d] woke, releasing lock", id)
-				lockOwner = -1
+				atomic.StoreInt32(&lockOwner, -1)
 
 				return nil
 			})

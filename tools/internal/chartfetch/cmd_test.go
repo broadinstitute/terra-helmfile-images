@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shellmock"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shellmock/matchers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"os"
@@ -48,16 +49,16 @@ func TestFetch(t *testing.T) {
 			description: "should download if directory does not exist",
 			args:        args("terra-helm/leonardo -v 1.2.3 -d %s/my/nested/download-dir", testDir),
 			setupMocks: func(t *testing.T, m *shellmock.MockRunner) {
-				m.ExpectCmdFmt(t, "helm fetch terra-helm/leonardo --untar -d %s/my/nested/.download-dir.tmp", testDir).
-					Run(func(args mock.Arguments) {
-						chartDir := path.Join(testDir, "my", "nested", ".download-dir.tmp", "leonardo")
-						if err := os.MkdirAll(chartDir, 0755); err != nil {
-							t.Fatalf("Error creating fake downloaded chart directory %s: %v", chartDir, err)
-						}
-						if err := os.WriteFile(path.Join(chartDir, "Chart.yaml"), []byte("# fake"), 0644); err != nil {
-							t.Fatalf("Error writing fake Chart.yaml file: %v", err)
-						}
-					})
+				cmd := matchers.CmdFromFmt("helm fetch terra-helm/leonardo --version 1.2.3 --untar -d %s/my/nested/.download-dir.tmp", testDir)
+				m.ExpectCmd(cmd).Run(func(args mock.Arguments) {
+					chartDir := path.Join(testDir, "my", "nested", ".download-dir.tmp", "leonardo")
+					if err := os.MkdirAll(chartDir, 0755); err != nil {
+						t.Fatalf("Error creating fake downloaded chart directory %s: %v", chartDir, err)
+					}
+					if err := os.WriteFile(path.Join(chartDir, "Chart.yaml"), []byte("# fake"), 0644); err != nil {
+						t.Fatalf("Error writing fake Chart.yaml file: %v", err)
+					}
+				})
 			},
 			extraVerification: func(t *testing.T) {
 				assert.FileExists(t, path.Join(testDir, "my", "nested", "download-dir", "Chart.yaml"), "all chart files should exist in download dir")
@@ -68,8 +69,8 @@ func TestFetch(t *testing.T) {
 			description: "should return an error if the helm fetch command fails",
 			args:        args("terra-helm/leonardo -v 1.2.3 -d %s/download-dir", testDir),
 			setupMocks: func(t *testing.T, m *shellmock.MockRunner) {
-				m.ExpectCmdFmt(t, "helm fetch terra-helm/leonardo --untar -d %s/.download-dir.tmp", testDir).
-					Return(errors.New("command failed because reasons"))
+				cmd := matchers.CmdFromFmt("helm fetch terra-helm/leonardo --version 1.2.3 --untar -d %s/.download-dir.tmp", testDir)
+				m.ExpectCmd(cmd).Return(errors.New("command failed because reasons"))
 			},
 			expectedError: regexp.MustCompile("command failed because reasons"),
 		},
@@ -79,6 +80,7 @@ func TestFetch(t *testing.T) {
 		t.Run(testCase.description, func(t *testing.T) {
 			// Create a new mock runner and inject it by setting shellRunner package-level variable to mock
 			var mockRunner = shellmock.DefaultMockRunner()
+			mockRunner.Test(t)
 			var originalRunner = shellRunner
 			shellRunner = mockRunner
 			defer func() { shellRunner = originalRunner }()

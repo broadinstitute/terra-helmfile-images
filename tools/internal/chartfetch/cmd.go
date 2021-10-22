@@ -125,7 +125,7 @@ func fetchChart(chart string, options *Options) error {
 		// download chart into a temporary directory
 		tmpDir := siblingPath(options.DownloadDir, ".tmp", true)
 		log.Info().Msgf("Downloading chart to tmp dir %s", tmpDir)
-		if err := shellRunner.RunS("helm", "fetch", chart, "--untar", "-d", tmpDir); err != nil {
+		if err := shellRunner.RunWithArgs("helm", "fetch", chart, "--version", options.Version, "--untar", "-d", tmpDir); err != nil {
 			return err
 		}
 

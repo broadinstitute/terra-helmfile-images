@@ -14,7 +14,7 @@ import (
 //
 type Runner interface {
 	Run(cmd Command) error
-	RunS(args ...string) error
+	RunWithArgs(prog string, args ...string) error
 }
 
 // Error represents an error encountered running a shell command
@@ -27,8 +27,8 @@ type Error struct {
 type Command struct {
 	Prog        string   // Prog Main CLI program to execute
 	Args        []string // Args Arguments to pass to program
-	Dir         string   // Dir Directory where command should be run
 	Env         []string // Env List of environment variables, eg []string{ "FOO=BAR", "BAZ=QUUX" }, to set when executing
+	Dir         string   // Dir Directory where command should be run
 	PristineEnv bool     // PristineEnv When true, set only supplied Env vars without inheriting current process's env vars
 }
 

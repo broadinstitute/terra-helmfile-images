@@ -96,6 +96,19 @@ func TestRender(t *testing.T) {
 			},
 		},
 		{
+			description: "--parallel-workers=10 should render without errors",
+			arguments:   args("--parallel-workers=10"),
+			setupMocks: func(ts *TestState) error {
+				ts.expectHelmfileUpdateCmd()
+				ts.expectHelmfileCmd(tdrStagingCluster, "--log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/tdr-staging", ts.mockConfigRepoPath)
+				ts.expectHelmfileCmd(perfCluster, "--log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/terra-perf", ts.mockConfigRepoPath)
+				ts.expectHelmfileCmd(alphaEnv, "--log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/alpha", ts.mockConfigRepoPath)
+				ts.expectHelmfileCmd(devEnv, " --log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath)
+				ts.expectHelmfileCmd(jdoeEnv, "--log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/jdoe", ts.mockConfigRepoPath)
+				return nil
+			},
+		},
+		{
 			description: "--argocd without -e or -a should render Argo manifests for all targets",
 			arguments:   args("--argocd"),
 			setupMocks: func(ts *TestState) error {
@@ -510,7 +523,7 @@ func setup(t *testing.T) (*TestState, error) {
 	scratchDir := path.Join(tmpDir, "scratch")
 
 	// Create a mock runner for executing shell commands
-	mockRunner := shellmock.DefaultMockRunner()
+	mockRunner := shellmock.NewMockRunner(shellmock.Options{VerifyOrder: false})
 	mockRunner.Test(t)
 
 	// Replace real shell runner with mock runner; will be restored by cleanup() when this test completes

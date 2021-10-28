@@ -82,6 +82,7 @@ var flagNames = struct {
 	scratchDir      string
 	stdout          string
 	verbosity       string
+	parallelWorkers string
 }{
 	env:            "env",
 	cluster:        "cluster",
@@ -96,6 +97,7 @@ var flagNames = struct {
 	scratchDir:      "scratch-dir",
 	stdout:          "stdout",
 	verbosity:       "verbosity",
+	parallelWorkers: "parallel-workers",
 }
 
 // flagValues is a struct for capturing flag values that are parsed by Cobra.
@@ -113,6 +115,7 @@ type flagValues struct {
 	scratchDir      string
 	stdout          bool
 	verbosity       int
+	parallelWorkers int
 }
 
 // Execute is the main method/entrypoint for the render tool.
@@ -177,6 +180,7 @@ func newCLI(noop bool) *CLI {
 	cobraCommand.Flags().StringVar(&flagVals.scratchDir, flagNames.scratchDir, "path/to/scratch/dir", "Use a pre-defined scratch directory instead of creating and deleting a tmp dir (useful for debugging")
 	cobraCommand.Flags().BoolVar(&flagVals.stdout, flagNames.stdout, false, "Render manifests to stdout instead of output directory")
 	cobraCommand.Flags().CountVarP(&flagVals.verbosity, flagNames.verbosity, "v", "Verbose logging. Can be specified multiple times")
+	cobraCommand.Flags().IntVar(&flagVals.parallelWorkers, flagNames.parallelWorkers, 1, "Number of parallel workers to launch when rendering")
 
 	cli := &CLI{
 		cobraCommand: cobraCommand,
@@ -285,6 +289,9 @@ func (cli *CLI) fillRenderOptions() error {
 
 	// verbosity
 	renderOptions.Verbosity = flagVals.verbosity
+
+	// parallelWorkers
+	renderOptions.ParallelWorkers = flagVals.parallelWorkers
 
 	return nil
 }
@@ -407,6 +414,10 @@ func (cli *CLI) checkIncompatibleFlags() error {
 		return fmt.Errorf("--%s cannot be used with --%s", flagNames.stdout, flagNames.outputDir)
 	}
 
+	if flags.Changed(flagNames.parallelWorkers) && flags.Changed(flagNames.stdout) {
+		// --parallel-workers renders manifests in parallel. For now we only support it for directory renders
+		return fmt.Errorf("--%s cannot be used with --%s", flagNames.parallelWorkers, flagNames.stdout)
+	}
 	return nil
 }
 

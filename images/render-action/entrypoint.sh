@@ -23,6 +23,11 @@ if [[ -n "${TERRA_ENV}" ]]; then
   env="-e ${TERRA_ENV}"
 fi
 
+parallelWorkers=
+if [[ -n "${PARALLEL_WORKERS}" ]]; then
+  parallelWorkers="--parallel-workers ${PARALLEL_WORKERS}"
+fi
+
 set -x
 echo "Running render in $( pwd )"
-/tools/bin/render --output-dir="${OUTPUT_DIR}" $env $argocd
+/tools/bin/render $parallelWorkers --output-dir="${OUTPUT_DIR}" $env $argocd

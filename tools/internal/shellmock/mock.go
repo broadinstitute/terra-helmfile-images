@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"io"
 	"os"
+	"sync"
 	"testing"
 )
 
@@ -52,6 +53,7 @@ type MockRunner struct {
 	expectedCommands []*expectedCommand
 	runCounter       int
 	t                *testing.T
+	mutex            sync.Mutex
 	mock.Mock
 }
 
@@ -81,6 +83,12 @@ func (m *MockRunner) RunWithArgs(prog string, args ...string) error {
 // Run Instead of executing the command, logs an info message and registers the call with testify mock
 func (m *MockRunner) Run(cmd shell.Command) error {
 	log.Info().Msgf("[MockRunner] Run called: %q\n", cmd.PrettyFormat())
+
+	// we synchronize Run calls on the mock because testify mock isn't parallel-safe, and neither are our
+	// order verification callback hooks
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
 	args := m.Mock.Called(cmd)
 	if len(args) > 0 {
 		return args.Error(0)

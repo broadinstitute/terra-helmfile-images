@@ -9,7 +9,13 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strings"
+	"sync"
+	"time"
 )
+
+// multiRenderTimeout how long to wait before timing out a multi render
+const multiRenderTimeout = 5 * time.Minute
 
 // Options encapsulates CLI options for a render
 type Options struct {
@@ -20,6 +26,7 @@ type Options struct {
 	Verbosity       int     // Verbosity Invoke `helmfile` with verbose logging
 	ConfigRepoPath  string  // ConfigRepoPath Path to terra-helmfile repo clone
 	ScratchDir      *string // ScratchDir If supplied, use given scratch directory instead of creating & deleting tmp dir
+	ParallelWorkers int     // ParallelWorkers Number of parallel workers
 }
 
 // multiRender renders manifests for multiple environments and clusters
@@ -28,6 +35,12 @@ type multiRender struct {
 	scratchDir        scratchDir                      // Scratch directory where charts may be downloaded and unpacked, etc.
 	configuredTargets map[string]target.ReleaseTarget // Collection of release targets (environments and clusters) defined in the config repo, keyed by name
 	configRepo        *helmfile.ConfigRepo            // configRepo refernce to use for executing `helmfile template`
+}
+
+// renderError represents an error encountered while rendering for a particular target
+type renderError struct {
+	target target.ReleaseTarget // release target that resulted in this error
+	err error // error
 }
 
 // scratchDir struct containing paths for temporary/scratch work
@@ -125,13 +138,73 @@ func (r *multiRender) renderAll(helmfileArgs *helmfile.Args) error {
 	}
 
 	log.Info().Msgf("Rendering manifests for %d target(s)...", len(releaseTargets))
-	for _, releaseTarget := range releaseTargets {
-		if err := r.renderSingleTarget(helmfileArgs, releaseTarget); err != nil {
-			return err
-		}
+
+	numWorkers := 1
+	if r.options.ParallelWorkers >= 1 {
+		numWorkers = r.options.ParallelWorkers
+	}
+	if len(releaseTargets) < numWorkers {
+		// don't make more workers than we have items to process
+		numWorkers = len(releaseTargets)
 	}
 
-	return nil
+	queueCh := make(chan target.ReleaseTarget, len(releaseTargets))
+	for _, releaseTarget := range releaseTargets {
+		queueCh <- releaseTarget
+	}
+	close(queueCh)
+
+	errCh := make(chan renderError, len(releaseTargets))
+
+	var wg sync.WaitGroup
+	for i := 0; i < numWorkers; i++ {
+		id := i
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			for {
+				releaseTarget, ok := <-queueCh
+				if !ok {
+					log.Debug().Msgf("[worker-%d] queue channel closed, returning", id)
+					return
+				}
+
+				log.Debug().Msgf("[worker-%d] rendering target %s", id, releaseTarget.Name())
+				if err := r.renderSingleTarget(helmfileArgs, releaseTarget); err != nil {
+					log.Error().Msgf("[worker-%d] error rendering manifests for target %s:\n%v", id, releaseTarget.Name(), err)
+					errCh <- renderError{
+						target: releaseTarget,
+						err: err,
+					}
+				}
+			}
+		}()
+	}
+
+	// Wait for workers to finish in a separate goroutine so that we can implement
+	// a timeout
+	waitCh := make(chan struct{})
+	go func() {
+		log.Debug().Msgf("[wait] Waiting for render workers to finish")
+		wg.Wait()
+		log.Debug().Msgf("[wait] Render workers finished")
+		close(errCh)
+		close(waitCh)
+	}()
+
+	// Block until the wait group is done or we time out.
+	select {
+	case <-waitCh:
+		log.Debug().Msgf("[main] multi-render finished")
+	case <-time.After(multiRenderTimeout):
+		err := fmt.Errorf("[main] multi-render timed out after %s", multiRenderTimeout)
+		log.Error().Err(err)
+		return err
+	}
+
+	return readErrorsFromChannel(errCh)
 }
 
 // RenderAll renders manifests based on supplied arguments
@@ -241,4 +314,28 @@ func (r *multiRender) getTargets() ([]target.ReleaseTarget, error) {
 	target.SortReleaseTargets(targets)
 
 	return targets, nil
+}
+
+// readErrorsFromChannel aggregates all errors into a single mega-error
+func readErrorsFromChannel(errCh <-chan renderError) error {
+	var count int
+	var sb strings.Builder
+
+	for {
+		renderErr, ok := <-errCh
+		if !ok {
+			// channel closed, no more results to read
+			break
+		}
+		count++
+		releaseTarget := renderErr.target
+		err := renderErr.err
+		sb.WriteString(fmt.Sprintf("%s %s: %v\n", releaseTarget.Type(), releaseTarget.Name(), err))
+	}
+
+	if count > 0 {
+		return fmt.Errorf("Failed to render manifests for %d targets:\n%s", count, sb.String())
+	}
+
+	return nil
 }

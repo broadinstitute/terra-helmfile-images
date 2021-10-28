@@ -136,6 +136,11 @@ func TestArgumentParsing(t *testing.T) {
 			expectedError: regexp.MustCompile("--stdout cannot be used with --output-dir"),
 		},
 		{
+			description:   "--parallel-workers and --stdout incompatible",
+			arguments:     args("--parallel-workers 10 --stdout"),
+			expectedError: regexp.MustCompile("--parallel-workers cannot be used with --stdout"),
+		},
+		{
 			description:   "--cluster and --app-version incompatible",
 			arguments:     args("--cluster terra-perf -r leonardo --app-version=0.0.1"),
 			expectedError: regexp.MustCompile("--app-version cannot be used for cluster releases"),
@@ -224,6 +229,14 @@ func TestArgumentParsing(t *testing.T) {
 			arguments: args("-v -v"),
 			setupFn: func(tc *testConfig) error {
 				tc.expected.renderOptions.Verbosity = 2
+				return nil
+			},
+		},
+		{
+			description: "--parallel-workers should set workers",
+			arguments: args("--parallel-workers 32"),
+			setupFn: func(tc *testConfig) error {
+				tc.expected.renderOptions.ParallelWorkers = 32
 				return nil
 			},
 		},
@@ -342,6 +355,9 @@ func TestArgumentParsing(t *testing.T) {
 			// add path to expectedAttrs objects so that equals() comparisons succeed
 			expected.renderOptions.ConfigRepoPath = configRepoPath
 			expected.renderOptions.OutputDir = path.Join(configRepoPath, "output")
+
+			// set other defaults
+			expected.renderOptions.ParallelWorkers = 1
 
 			// set cli args
 			cli.setArgs(testCase.arguments)

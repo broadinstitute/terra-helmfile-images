@@ -29,6 +29,13 @@ const TargetNameEnvVar = "THF_TARGET_NAME"
 // ChartCacheDirEnvVar is the name of the environment variable used to pass unpack dir to helmfile
 const ChartCacheDirEnvVar = "THF_CHART_CACHE_DIR"
 
+// ChartSrcDirEnvVar is the name of the environment variable used to pass --chart-dir overrides to helmfile
+const ChartSrcDirEnvVar = "THF_CHART_SRC_DIR"
+
+// localChartVersion is what we set chart version to when rendering from a chart on the local filesystem
+// instead of the official, published chart version
+const localChartVersion = "local"
+
 // Args arguments for a helmfile render
 type Args struct {
 	ReleaseName  *string  // ReleaseName optionally render for specific release only instead of all releases in target environment/cluster
@@ -55,6 +62,13 @@ type ConfigRepo struct {
 	shellRunner      shell.Runner
 }
 
+// helmfileParams encapsulates low-level parameters for a `helmfile` command
+type helmfileParams struct {
+	envVars []string
+	stateValues map[string]string
+	selectors map[string]string
+}
+
 // NewConfigRepo constructs a new ConfigRepo object
 func NewConfigRepo(options Options) *ConfigRepo {
 	return &ConfigRepo{
@@ -62,6 +76,14 @@ func NewConfigRepo(options Options) *ConfigRepo {
 		chartCacheDir:    options.ChartCacheDir,
 		helmfileLogLevel: options.HelmfileLogLevel,
 		shellRunner:      options.ShellRunner,
+	}
+}
+
+// newHelmfileParams returns a new helmfileParams object with all fields initialized
+func newHelmfileParams() *helmfileParams{
+	return &helmfileParams{
+		stateValues: make(map[string]string),
+		selectors: make(map[string]string),
 	}
 }
 
@@ -91,20 +113,24 @@ func (r *ConfigRepo) RenderToDir(target target.ReleaseTarget, outputDir string, 
 func (r *ConfigRepo) renderSingleTarget(target target.ReleaseTarget, args *Args, extraArgs ...string) error {
 	log.Info().Msgf("Rendering manifests for %s %s", target.Type(), target.Name())
 
-	// Get environment variables to pass to `helmfile`
-	envVars := r.getEnvVarsForTarget(target)
+	// Take given helmfileArgs and translate them to helmfile parameters (selectors, state values & env vars)
+	params := newHelmfileParams()
+	params.setTargetEnvVars(target)
+	params.setChartCacheDirEnvVar(r.chartCacheDir)
+	params.applySelectorSettings(args)
+	params.applyVersionSettings(args)
 
-	// Build list of CLI args to `helmfile` from the given Args struct
+	// Convert helmfile parameters into cli arguments
 	var cliArgs []string
 
-	selectors := r.getSelectors(args)
-	if len(selectors) != 0 {
-		cliArgs = append(cliArgs, fmt.Sprintf("--selector=%s", joinKeyValuePairs(selectors)))
+	if len(params.selectors) != 0 {
+		selectorString := joinKeyValuePairs(params.selectors)
+		cliArgs = append(cliArgs, fmt.Sprintf("--selector=%s", selectorString))
 	}
 
-	stateValues := r.getStateValues(args)
-	if len(stateValues) != 0 {
-		cliArgs = append(cliArgs, fmt.Sprintf("--state-values-set=%s", joinKeyValuePairs(stateValues)))
+	if len(params.stateValues) != 0 {
+		stateValuesString := joinKeyValuePairs(params.stateValues)
+		cliArgs = append(cliArgs, fmt.Sprintf("--state-values-set=%s", stateValuesString))
 	}
 
 	// Append Helmfile command we're running (template)
@@ -121,7 +147,7 @@ func (r *ConfigRepo) renderSingleTarget(target target.ReleaseTarget, args *Args,
 
 	cliArgs = append(cliArgs, extraArgs...)
 
-	return r.runHelmfile(envVars, cliArgs...)
+	return r.runHelmfile(params.envVars, cliArgs...)
 }
 
 func (r *ConfigRepo) runHelmfile(envVars []string, args ...string) error {
@@ -139,52 +165,56 @@ func (r *ConfigRepo) runHelmfile(envVars []string, args ...string) error {
 	return r.shellRunner.Run(cmd)
 }
 
-// getEnvVarsForTarget returns a slice of environment variables that are needed for a helmfile render, . Eg.
-// []string{"TARGET_TYPE": "environment", "TARGET_NAME": "dev", "TARGET_BASE": "live" }
-func (r *ConfigRepo) getEnvVarsForTarget(t target.ReleaseTarget) []string {
-	return []string{
-		fmt.Sprintf("%s=%s", TargetTypeEnvVar, t.Type()),
-		fmt.Sprintf("%s=%s", TargetBaseEnvVar, t.Base()),
-		fmt.Sprintf("%s=%s", TargetNameEnvVar, t.Name()),
-		fmt.Sprintf("%s=%s", ChartCacheDirEnvVar, r.chartCacheDir),
-	}
+// setTargetEnvVars sets environment variables for the given target of environment variables
+// Eg.
+// {"TARGET_TYPE=environment", "TARGET_BASE=live", "TARGET_NAME=dev"}
+func (params *helmfileParams) setTargetEnvVars(t target.ReleaseTarget) {
+	params.addEnvVar(TargetTypeEnvVar, t.Type())
+	params.addEnvVar(TargetBaseEnvVar, t.Base())
+	params.addEnvVar(TargetNameEnvVar, t.Name())
 }
 
-// getStateValues returns a map of state values that should be set on the command-line, given user-supplied options
-func (r *ConfigRepo) getStateValues(helmfileArgs *Args) map[string]string {
-	stateValues := make(map[string]string)
+// setChartCacheDirEnvVar sets the chart cache dir env var
+func (params *helmfileParams) setChartCacheDirEnvVar(chartCacheDir string) {
+	params.addEnvVar(ChartCacheDirEnvVar, chartCacheDir)
+}
 
+// applyVersionSettings updates params with necessary state values & environment variables, based on
+// the configured chart version, chart dir, & app version
+func (params *helmfileParams) applyVersionSettings(helmfileArgs *Args) {
 	if helmfileArgs.ChartDir != nil && helmfileArgs.ReleaseName != nil {
-		key := fmt.Sprintf("releases.%s.repo", *helmfileArgs.ReleaseName)
-		stateValues[key] = *helmfileArgs.ChartDir
+		params.addEnvVar(ChartSrcDirEnvVar, *helmfileArgs.ChartDir)
+
+		key := fmt.Sprintf("releases.%s.chartVersion", *helmfileArgs.ReleaseName)
+		params.stateValues[key] = localChartVersion
 	} else if helmfileArgs.ChartVersion != nil && helmfileArgs.ReleaseName != nil {
 		key := fmt.Sprintf("releases.%s.chartVersion", *helmfileArgs.ReleaseName)
-		stateValues[key] = *helmfileArgs.ChartVersion
+		params.stateValues[key] = *helmfileArgs.ChartVersion
 	}
 
 	if helmfileArgs.AppVersion != nil && helmfileArgs.ReleaseName != nil {
 		key := fmt.Sprintf("releases.%s.appVersion", *helmfileArgs.ReleaseName)
-		stateValues[key] = *helmfileArgs.AppVersion
+		params.stateValues[key] = *helmfileArgs.AppVersion
 	}
-
-	return stateValues
 }
 
-// getSelectors returns a map of Helmfile selectors that should be set on the command-line, given user-supplied options
-func (r *ConfigRepo) getSelectors(helmfileArgs *Args) map[string]string {
-	selectors := make(map[string]string)
-	selectors["mode"] = "release"
+// applySelectorSettings populates selectors with correct values based on the ArgocdMode and Release arguments.
+func (params *helmfileParams) applySelectorSettings(helmfileArgs *Args) {
+	params.selectors["mode"] = "release"
 	if helmfileArgs.ArgocdMode {
 		// Render ArgoCD manifests instead of application manifests
-		selectors["mode"] = "argocd"
+		params.selectors["mode"] = "argocd"
 	}
 
 	if helmfileArgs.ReleaseName != nil {
 		// Render manifests for the given app only
-		selectors["release"] = *helmfileArgs.ReleaseName
+		params.selectors["release"] = *helmfileArgs.ReleaseName
 	}
+}
 
-	return selectors
+// addEnvVar adds an env var key/value pair to the given params instance
+func (params *helmfileParams) addEnvVar(name string, value string) {
+	params.envVars = append(params.envVars, fmt.Sprintf("%s=%s", name, value))
 }
 
 // normalizeOutputDir removes "helmfile-.*" directories from helmfile output paths.

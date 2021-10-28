@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/render"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/render/cli"
 )
 
 func main() {
-	render.Execute()
+	cli.Execute()
 }

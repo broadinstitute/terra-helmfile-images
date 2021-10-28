@@ -1,8 +1,11 @@
-package render
+package cli
 
 import (
 	"errors"
 	"fmt"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/render"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/render/helmfile"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/render/target"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shellmock"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shellmock/matchers"
@@ -16,16 +19,18 @@ import (
 	"testing"
 )
 
-// This file contains an integration test for the render utility
+// This file contains an integration test for the render utility.
+// It executes `render` with specific CLI arguments and verifies that the expected
+// `helmfile` commands are executed under the hood.
 
 // Fake environments and clusters, mocked for integration test
-var devEnv = NewEnvironment("dev", "live")
-var alphaEnv = NewEnvironment("alpha", "live")
-var jdoeEnv = NewEnvironment("jdoe", "personal")
-var perfCluster = NewCluster("terra-perf", "terra")
-var tdrStagingCluster = NewCluster("tdr-staging", "tdr")
+var devEnv = target.NewEnvironment("dev", "live")
+var alphaEnv = target.NewEnvironment("alpha", "live")
+var jdoeEnv = target.NewEnvironment("jdoe", "personal")
+var perfCluster = target.NewCluster("terra-perf", "terra")
+var tdrStagingCluster = target.NewCluster("tdr-staging", "tdr")
 
-var fakeReleaseTargets = []ReleaseTarget{
+var fakeReleaseTargets = []target.ReleaseTarget{
 	devEnv,
 	alphaEnv,
 	jdoeEnv,
@@ -57,103 +62,9 @@ func TestRender(t *testing.T) {
 		arguments     []string                              // Fake user-supplied CLI arguments to pass to `render`
 		argumentsFn   func(ts *TestState) ([]string, error) // Callback function returning fake user-supplied CLI arguments to pass to `render`. Will override `arguments` field if given
 		expectedError *regexp.Regexp                        // Optional error we expect to be returned when we execute the Cobra command
-		setupMocks    func(ts *TestState) error             // Optional hook mocking expected shell commands
+		setupMocks    func(ts *TestState) error             // Optional hook mocking expectedAttrs shell commands
+		verifyFn      func(ts *TestState, t *testing.T)     // Optional hook for verifying results are as expectedAttrs
 	}{
-		{
-			description:   "invalid argument",
-			arguments:     args("--foo"),
-			expectedError: regexp.MustCompile("unknown flag"),
-		},
-		{
-			description:   "-a should require -e or -c",
-			arguments:     args("-a foo"),
-			expectedError: regexp.MustCompile(`an environment \(-e\) or cluster \(-c\) must be specified when a release is specified with -r`),
-		},
-		{
-			description:   "-r should require -e or -c",
-			arguments:     args("-r foo"),
-			expectedError: regexp.MustCompile(`an environment \(-e\) or cluster \(-c\) must be specified when a release is specified with -r`),
-		},
-		{
-			description:   "-e and -c incompatible",
-			arguments:     args("-c terra-perf -e dev"),
-			expectedError: regexp.MustCompile("only one of -e/--environment and -c/--cluster may be specified"),
-		},
-		{
-			description:   "--app-version should require -r",
-			arguments:     args("--app-version 1.0.0"),
-			expectedError: regexp.MustCompile("--app-version requires a release be specified with -r"),
-		},
-		{
-			description:   "--chart-version should require -r",
-			arguments:     args("--chart-version 1.0.0"),
-			expectedError: regexp.MustCompile("--chart-version requires a release be specified with -r"),
-		},
-		{
-			description: "--chart-dir should require -r",
-			argumentsFn: func(ts *TestState) ([]string, error) {
-				return args("--chart-dir %s", ts.mockChartDir), nil
-			},
-			expectedError: regexp.MustCompile("--chart-dir requires a release be specified with -r"),
-		},
-		{
-			description: "--values-file should require -r",
-			argumentsFn: func(ts *TestState) ([]string, error) {
-				return args("--values-file %s", path.Join(ts.rootDir, "missing.yaml")), nil
-			},
-			expectedError: regexp.MustCompile("--values-file requires a release be specified with -r"),
-		},
-		{
-			description: "--values-file must exist",
-			argumentsFn: func(ts *TestState) ([]string, error) {
-				return args("-e dev -r leonardo --values-file %s", path.Join(ts.rootDir, "missing.yaml")), nil
-			},
-			expectedError: regexp.MustCompile("values file does not exist: .*/missing.yaml"),
-		},
-		{
-			description: "--chart-dir and --chart-version incompatible",
-			argumentsFn: func(ts *TestState) ([]string, error) {
-				return args("-e dev -r leonardo --chart-dir %s --chart-version 1.0.0", ts.mockChartDir), nil
-			},
-			expectedError: regexp.MustCompile("only one of --chart-dir or --chart-version may be specified"),
-		},
-		{
-			description:   "--chart-dir must exist",
-			arguments:     args("-e dev -r leonardo --chart-dir path/to/nowhere"),
-			expectedError: regexp.MustCompile("chart directory does not exist: .*/path/to/nowhere"),
-		},
-		{
-			description:   "--argocd and --app-version incompatible",
-			arguments:     args("-e dev -r leonardo --app-version 1.0.0 --argocd"),
-			expectedError: regexp.MustCompile("--argocd cannot be used with.*--app-version"),
-		},
-		{
-			description:   "--argocd and --chart-version incompatible",
-			arguments:     args("-e dev -r leonardo --chart-version 1.0.0 --argocd"),
-			expectedError: regexp.MustCompile("--argocd cannot be used with.*--chart-version"),
-		},
-		{
-			description: "--argocd and --chart-dir incompatible",
-			argumentsFn: func(ts *TestState) ([]string, error) {
-				return args("-e dev -r leonardo --chart-dir=%s --argocd", ts.mockChartDir), nil
-			},
-			expectedError: regexp.MustCompile("--argocd cannot be used with.*--chart-dir"),
-		},
-		{
-			description:   "--argocd and --values-file incompatible",
-			arguments:     args("-e dev -r leonardo --values-file=%s --argocd", "missing.yaml"),
-			expectedError: regexp.MustCompile("--argocd cannot be used with.*--values-file"),
-		},
-		{
-			description:   "--stdout and --output-dir incompatible",
-			arguments:     args("-e dev -r leonardo -d /tmp/output --stdout"),
-			expectedError: regexp.MustCompile("--stdout cannot be used with -d/--output-dir"),
-		},
-		{
-			description:   "--cluster and --app-version incompatible",
-			arguments:     args("--cluster terra-perf -r leonardo --app-version=0.0.1"),
-			expectedError: regexp.MustCompile("--app-version cannot be used for cluster releases"),
-		},
 		{
 			description: "unknown environment should return error",
 			arguments:   args("-e foo"),
@@ -356,11 +267,6 @@ func TestRender(t *testing.T) {
 			},
 		},
 		{
-			description:   "--scratch-dir should return error if directory does not exist",
-			arguments:     args("-e dev -a leonardo --scratch-dir path/to/nowhere"),
-			expectedError: regexp.MustCompile("scratch directory does not exist: .*path/to/nowhere"),
-		},
-		{
 			description: "--scratch-dir should be passed to helmfile if it does exist",
 			argumentsFn: func(ts *TestState) ([]string, error) {
 				dir := path.Join(ts.scratchDir, "user-supplied")
@@ -373,7 +279,7 @@ func TestRender(t *testing.T) {
 				ts.expectHelmfileUpdateCmd()
 
 				matcher := helmfileCmdMatcher(devEnv, "--log-level=info --selector=mode=release,release=leonardo template --skip-deps --output-dir=%s/output/dev", ts.mockConfigRepoPath)
-				matcher.WithEnvVar(helmfileChartCacheDirEnvVar, matchers.Equals(path.Join(ts.scratchDir, "user-supplied", "chart-cache")))
+				matcher.WithEnvVar(helmfile.ChartCacheDirEnvVar, matchers.Equals(path.Join(ts.scratchDir, "user-supplied", "chart-cache")))
 				ts.mockRunner.ExpectCmd(matcher)
 
 				return nil
@@ -382,21 +288,21 @@ func TestRender(t *testing.T) {
 		{
 			description: "two environments with the same name should raise an error",
 			setupMocks: func(ts *TestState) error {
-				return createFakeTargetFiles(ts.mockConfigRepoPath, []ReleaseTarget{NewEnvironmentGeneric("dev", "personal")})
+				return createFakeTargetFiles(ts.mockConfigRepoPath, []target.ReleaseTarget{target.NewEnvironmentGeneric("dev", "personal")})
 			},
 			expectedError: regexp.MustCompile(`environment name conflict dev \(personal\) and dev \(live\)`),
 		},
 		{
 			description: "two clusters with the same name should raise an error",
 			setupMocks: func(ts *TestState) error {
-				return createFakeTargetFiles(ts.mockConfigRepoPath, []ReleaseTarget{NewClusterGeneric("terra-perf", "tdr")})
+				return createFakeTargetFiles(ts.mockConfigRepoPath, []target.ReleaseTarget{target.NewClusterGeneric("terra-perf", "tdr")})
 			},
 			expectedError: regexp.MustCompile(`cluster name conflict terra-perf \(terra\) and terra-perf \(tdr\)`),
 		},
 		{
 			description: "environment and cluster with the same name should raise an error",
 			setupMocks: func(ts *TestState) error {
-				return createFakeTargetFiles(ts.mockConfigRepoPath, []ReleaseTarget{NewClusterGeneric("dev", "terra")})
+				return createFakeTargetFiles(ts.mockConfigRepoPath, []target.ReleaseTarget{target.NewClusterGeneric("dev", "terra")})
 			},
 			expectedError: regexp.MustCompile("cluster name dev conflicts with environment name dev"),
 		},
@@ -405,14 +311,21 @@ func TestRender(t *testing.T) {
 			setupMocks: func(ts *TestState) error {
 				return os.RemoveAll(ts.mockConfigRepoPath)
 			},
-			expectedError: regexp.MustCompile("does not exist, is it a terra-helmfile clone"),
+			expectedError: regexp.MustCompile("config repo clone does not exist"),
 		},
 		{
 			description: "missing environments directory should raise an error",
 			setupMocks: func(ts *TestState) error {
 				return os.RemoveAll(path.Join(ts.mockConfigRepoPath, "environments"))
 			},
-			expectedError: regexp.MustCompile("does not exist, is it a terra-helmfile clone"),
+			expectedError: regexp.MustCompile("environment config directory does not exist"),
+		},
+		{
+			description: "missing clusters directory should raise an error",
+			setupMocks: func(ts *TestState) error {
+				return os.RemoveAll(path.Join(ts.mockConfigRepoPath, "clusters"))
+			},
+			expectedError: regexp.MustCompile("cluster config directory does not exist"),
 		},
 		{
 			description: "no environment definitions should raise an error",
@@ -444,9 +357,9 @@ func TestRender(t *testing.T) {
 			}
 
 			// Get arguments to pass to Cobra command
-			cobraArgs := testCase.arguments
+			cliArgs := testCase.arguments
 			if testCase.argumentsFn != nil {
-				cobraArgs, err = testCase.argumentsFn(ts)
+				cliArgs, err = testCase.argumentsFn(ts)
 				if err != nil {
 					t.Errorf("argumentsFn error: %v", err)
 					return
@@ -454,13 +367,15 @@ func TestRender(t *testing.T) {
 			}
 
 			// Run the Cobra command
-			cobraCmd := newCobraCommand()
-			cobraCmd.SetArgs(cobraArgs)
-			err = cobraCmd.Execute()
+			cli := newCLI(false)
+			cli.setArgs(cliArgs)
+			err = cli.execute()
 
 			// Verify error matches expectations
 			if testCase.expectedError == nil {
-				assert.Nil(t, err, "Unexpected error returned: %v", err)
+				if !assert.NoError(t, err, "Unexpected error returned: %v", err) {
+					return
+				}
 			} else {
 				if !assert.Error(t, err, "Expected command execution to return an error, but it did not") {
 					return
@@ -468,58 +383,10 @@ func TestRender(t *testing.T) {
 				assert.Regexp(t, testCase.expectedError, err.Error(), "Error mismatch")
 			}
 
-			// Verify all expected commands were run
+			// Verify all expectedAttrs commands were run
 			ts.mockRunner.AssertExpectations(t)
 		})
 	}
-}
-
-// Integration test does not exercise normalizeRenderDirectories(), so add a unit test here
-func TestNormalizeRenderDirectories(t *testing.T) {
-	t.Run("test directories are normalized", func(t *testing.T) {
-		// Create tmpdir
-		tmpDir, err := ioutil.TempDir(os.TempDir(), "render-test")
-		if err != nil {
-			t.Error(err)
-			return
-		}
-
-		// Create some fake helmfile output directories
-		manifestDirs := []string{
-			path.Join(tmpDir, "dev", "helmfile-b47efc70-leonardo"),
-			path.Join(tmpDir, "perf", "helmfile-b47efc70-leonardo"),
-			path.Join(tmpDir, "alpha", "helmfile-b47efc70-cromwell"),
-			path.Join(tmpDir, "alpha", "this-should-not-match"),
-		}
-
-		for _, dir := range manifestDirs {
-			if err = os.MkdirAll(dir, 0755); err != nil {
-				t.Error(err)
-				return
-			}
-		}
-
-		err = normalizeRenderDirectories(tmpDir)
-		if err != nil {
-			t.Error(err)
-			return
-		}
-
-		// Paths above should have been renamed
-		renamedDirs := []string{
-			path.Join(tmpDir, "dev", "leonardo"),
-			path.Join(tmpDir, "perf", "leonardo"),
-			path.Join(tmpDir, "alpha", "cromwell"),
-			path.Join(tmpDir, "alpha", "this-should-not-match"),
-		}
-
-		for _, dir := range renamedDirs {
-			if _, err := os.Stat(dir); err != nil {
-				t.Errorf("Expected path %s to exist: %v", dir, err)
-				return
-			}
-		}
-	})
 }
 
 // Convenience function to generate tokenized argument list from format string w/ args
@@ -545,14 +412,14 @@ func (ts *TestState) expectHelmfileUpdateCmd() *mock.Call {
 }
 
 // Convenience function for setting up an expectation for a helmfile template command
-func (ts *TestState) expectHelmfileCmd(target ReleaseTarget, format string, a ...interface{}) *mock.Call {
+func (ts *TestState) expectHelmfileCmd(target target.ReleaseTarget, format string, a ...interface{}) *mock.Call {
 	matcher := helmfileCmdMatcher(target, format, a...)
 	return ts.mockRunner.ExpectCmd(matcher)
 }
 
 // Given a release target, and CLI arguments to `helmfile` in the form of a format string and arguments,
 // return a matcher for a `helmfile` command that matches the given target and CLI args
-func helmfileCmdMatcher(target ReleaseTarget, format string, a ...interface{}) *matchers.CmdMatcher {
+func helmfileCmdMatcher(target target.ReleaseTarget, format string, a ...interface{}) *matchers.CmdMatcher {
 	directoryExists := matchers.MatchesPredicate("directory exists", func(dir string) bool {
 		f, err := os.Stat(dir)
 		if err != nil {
@@ -561,11 +428,11 @@ func helmfileCmdMatcher(target ReleaseTarget, format string, a ...interface{}) *
 		return f.IsDir()
 	})
 
-	matcher := matchers.CmdWithProg("helmfile").
-		WithEnvVar(helmfileTargetTypeEnvVar, target.Type()).
-		WithEnvVar(helmfileTargetBaseEnvVar, target.Base()).
-		WithEnvVar(helmfileTargetNameEnvVar, target.Name()).
-		WithEnvVar(helmfileChartCacheDirEnvVar, directoryExists).
+	matcher := matchers.CmdWithProg(helmfile.Command).
+		WithEnvVar(helmfile.TargetTypeEnvVar, target.Type()).
+		WithEnvVar(helmfile.TargetBaseEnvVar, target.Base()).
+		WithEnvVar(helmfile.TargetNameEnvVar, target.Name()).
+		WithEnvVar(helmfile.ChartCacheDirEnvVar, directoryExists).
 		WithExactArgs(args(format, a...)...)
 
 	return matcher
@@ -647,8 +514,7 @@ func setup(t *testing.T) (*TestState, error) {
 	mockRunner.Test(t)
 
 	// Replace real shell runner with mock runner; will be restored by cleanup() when this test completes
-	originalRunner := shellRunner
-	shellRunner = mockRunner
+	originalRunner := render.SetRunner(mockRunner)
 
 	ts := &TestState{
 		originalConfigRepoPath: originalConfigRepoPath,
@@ -681,17 +547,17 @@ func cleanup(state *TestState) error {
 	}
 
 	// Restore real shell runner
-	shellRunner = state.originalRunner
+	render.SetRunner(state.originalRunner)
 
 	// Clean up temp dir
 	return os.RemoveAll(state.rootDir)
 }
 
 // Create fake target files like `environments/live/alpha.yaml` and `clusters/terra/terra-dev.yaml` in mock config dir
-func createFakeTargetFiles(mockConfigRepoPath string, targets []ReleaseTarget) error {
-	for _, target := range targets {
-		baseDir := path.Join(mockConfigRepoPath, target.ConfigDir(), target.Base())
-		configFile := path.Join(baseDir, fmt.Sprintf("%s.yaml", target.Name()))
+func createFakeTargetFiles(mockConfigRepoPath string, targets []target.ReleaseTarget) error {
+	for _, releaseTarget := range targets {
+		baseDir := path.Join(mockConfigRepoPath, releaseTarget.ConfigDir(), releaseTarget.Base())
+		configFile := path.Join(baseDir, fmt.Sprintf("%s.yaml", releaseTarget.Name()))
 
 		if err := createFile(configFile, "# Fake file for mock"); err != nil {
 			return err

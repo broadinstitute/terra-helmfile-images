@@ -41,14 +41,15 @@ type Options struct {
 }
 
 type expectedCommand struct {
-	cmd  shell.Command
-	call *mock.Call
+	cmd        shell.Command
+	call       *mock.Call
+	matchCount int
 }
 
 // MockRunner is an implementation of Runner interface for use with testify/mock.
 type MockRunner struct {
 	options          Options
-	expectedCommands []expectedCommand
+	expectedCommands []*expectedCommand
 	runCounter       int
 	t                *testing.T
 	mock.Mock
@@ -107,7 +108,8 @@ func (m *MockRunner) ExpectCmd(cmdOrMatcher interface{}) *mock.Call {
 	}
 
 	order := len(m.expectedCommands)
-	m.expectedCommands = append(m.expectedCommands, expectedCommand{cmd: cmd, call: call})
+	expected := &expectedCommand{cmd: cmd, call: call}
+	m.expectedCommands = append(m.expectedCommands, expected)
 
 	return call.Run(func(args mock.Arguments) {
 		if m.options.VerifyOrder {
@@ -126,8 +128,9 @@ func (m *MockRunner) ExpectCmd(cmdOrMatcher interface{}) *mock.Call {
 			}
 		}
 
+		expected.matchCount++
 		m.runCounter++
-	})
+	}).Once()
 }
 
 // Test decorates Testify's mock.Mock#Test() function by adding a cleanup hook to the test object
@@ -161,19 +164,19 @@ func (m *MockRunner) dumpExpectedCmds(w io.Writer) error {
 	return nil
 }
 
-func (m *MockRunner) dumpExpectedCmd(w io.Writer, index int, expected expectedCommand) error {
+func (m *MockRunner) dumpExpectedCmd(w io.Writer, index int, expected *expectedCommand) error {
 	cmd := expected.cmd
 	switch m.options.DumpStyle {
 	case Default:
-		if _, err := fmt.Fprintf(w, "\t%d: %#v\n\n", index, cmd); err != nil {
+		if _, err := fmt.Fprintf(w, "\t%d (%d matches):\n\t%#v\n\n", index, expected.matchCount, cmd); err != nil {
 			return err
 		}
 	case Pretty:
-		if _, err := fmt.Fprintf(w, "\t%d: %s\n\n", index, cmd.PrettyFormat()); err != nil {
+		if _, err := fmt.Fprintf(w, "\t%d (%d matches): %s\n\n", index, expected.matchCount, cmd.PrettyFormat()); err != nil {
 			return err
 		}
 	case Spew:
-		if _, err := fmt.Fprintf(w, "\t%d: %s\n\n", index, cmd.PrettyFormat()); err != nil {
+		if _, err := fmt.Fprintf(w, "\t%d (%d matches): %s\n\n", index, expected.matchCount, cmd.PrettyFormat()); err != nil {
 			return err
 		}
 

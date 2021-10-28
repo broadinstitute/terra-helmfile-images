@@ -191,7 +191,9 @@ func TestRender(t *testing.T) {
 			},
 			setupMocks: func(ts *TestState) error {
 				ts.expectHelmfileUpdateCmd()
-				ts.expectHelmfileCmd(devEnv, "--log-level=info --selector=mode=release,release=leonardo --state-values-set=releases.leonardo.repo=%s template --output-dir=%s/output/dev", ts.mockChartDir, ts.mockConfigRepoPath)
+				matcher := helmfileCmdMatcher(devEnv, "--log-level=info --selector=mode=release,release=leonardo --state-values-set=releases.leonardo.chartVersion=local template --output-dir=%s/output/dev", ts.mockConfigRepoPath)
+				matcher.WithEnvVar(helmfile.ChartSrcDirEnvVar, ts.mockChartDir)
+				ts.mockRunner.ExpectCmd(matcher)
 				return nil
 			},
 		},

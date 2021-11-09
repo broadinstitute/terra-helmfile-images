@@ -13,8 +13,8 @@ import (
 	"testing"
 )
 
-// TestArgumentParsing Given given a set of CLI args, verify that options structures are populated correctly
-func TestArgumentParsing(t *testing.T) {
+// TestRenderArgParsing Given given a set of CLI args, verify that options structures are populated correctly
+func TestRenderArgParsing(t *testing.T) {
 	type expectedAttrs struct {
 		renderOptions *render.Options
 		helmfileArgs  *helmfile.Args

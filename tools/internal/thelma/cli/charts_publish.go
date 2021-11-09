@@ -1,13 +1,27 @@
 package cli
 
-import "github.com/spf13/cobra"
+import (
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
+)
 
-const publishChartsHelpMessage = `Publishes Helm charts for Terra services`
+const chartsPublishHelpMessage = `Publishes Helm charts for Terra services`
 
-func newPublishChartsCommand(ctx *ThelmaContext) *cobra.Command {
-	return &cobra.Command{
-		Use:   "publish-charts [options]",
+type chartsPublishCLI struct {
+	cobraCommand *cobra.Command
+}
+
+func newChartsPublishCLI(ctx *ThelmaContext) *chartsPublishCLI {
+	cobraCommand := &cobra.Command{
+		Use:   "publish [options]",
 		Short: "Publishes Helm charts",
-		Long:  publishChartsHelpMessage,
+		Long:  chartsPublishHelpMessage,
+	}
+	cobraCommand.RunE = func(cmd *cobra.Command, args []string) error {
+		log.Info().Msgf("TODO")
+		return nil
+	}
+	return &chartsPublishCLI{
+		cobraCommand: cobraCommand,
 	}
 }

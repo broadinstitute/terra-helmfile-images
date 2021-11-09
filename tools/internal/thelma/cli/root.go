@@ -31,8 +31,6 @@ const globalUsage = `CLI tools for interacting with Terra's Helm charts
 
 Common actions for thelma:
 - thelma render:  render manifests for Terra environments
-- thelma diff:    diff manifests against master
-- thelma lint:    lint manifests
 
 Environment variables:
 | Name                               | Description                                                                       |
@@ -57,9 +55,10 @@ type ThelmaContext struct {
 type ThelmaCLI struct {
 	context         *ThelmaContext
 	rootCommand     *cobra.Command
-	renderCLI       *renderCLI
 	configOverrides map[string]interface{}
 	shellRunner     shell.Runner
+	chartsCLI       *chartsCLI
+	renderCLI       *renderCLI
 }
 
 // Execute is the main method/entrypoint for Thelma
@@ -112,13 +111,12 @@ func newThelmaCLI() *ThelmaCLI {
 		SilenceErrors: true, // Don't print errors, we do it ourselves using a logging library
 	}
 
-	render := newRenderCLI(ctx)
-
 	cli := ThelmaCLI{
 		context:         ctx,
-		rootCommand:     rootCommand,
-		renderCLI:       render,
 		configOverrides: cfgOverrides,
+		rootCommand:     rootCommand,
+		chartsCLI:       newChartsCLI(ctx),
+		renderCLI:       newRenderCLI(ctx),
 	}
 
 	// Use a PersistentPreRunE hook to initialize config, logging, etc before all child commands run.
@@ -148,8 +146,8 @@ func newThelmaCLI() *ThelmaCLI {
 
 	// Add subcommands
 	rootCommand.AddCommand(
-		render.cobraCommand,
-		newCiCommand(ctx),
+		cli.chartsCLI.cobraCommand,
+		cli.renderCLI.cobraCommand,
 	)
 
 	return &cli

@@ -4,10 +4,27 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newCiCommand(ctx *ThelmaContext) *cobra.Command {
-	cmd := &cobra.Command{}
+
+const chartsHelpMessage = `Tools for interacting with Terra Helm charts`
+
+type chartsCLI struct {
+	cobraCommand *cobra.Command
+	publishCLI *chartsPublishCLI
+}
+
+func newChartsCLI(ctx *ThelmaContext) *chartsCLI {
+	publishCLI := newChartsPublishCLI(ctx)
+
+	cmd := &cobra.Command{
+		Use:   "charts [action]",
+		Short: chartsHelpMessage,
+		Long:  chartsHelpMessage,
+	}
 	cmd.AddCommand(
-		newPublishChartsCommand(ctx),
+		publishCLI.cobraCommand,
 	)
-	return cmd
+	return &chartsCLI{
+		cobraCommand: cmd,
+		publishCLI: publishCLI,
+	}
 }

@@ -53,7 +53,7 @@ type TestState struct {
 //
 // Reference:
 // https://gianarb.it/blog/golang-mockmania-cli-command-with-cobra
-func TestRender(t *testing.T) {
+func TestRenderIntegration(t *testing.T) {
 	var testCases = []struct {
 		description   string                                // Testcase description
 		arguments     []string                              // Fake user-supplied CLI arguments to pass to `render`
@@ -464,7 +464,7 @@ func (ts *TestState) cmd(format string, a ...interface{}) *mock.Call {
 	return ts.mockRunner.ExpectCmd(cmd)
 }
 
-// Per-test setup, run before each TestRender test case
+// Per-test setup, run before each TestRenderIntegration test case
 func setup(t *testing.T) (*TestState, error) {
 	var err error
 

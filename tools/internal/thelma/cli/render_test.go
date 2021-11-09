@@ -303,7 +303,6 @@ func TestArgumentParsing(t *testing.T) {
 
 			// Replace render's RunE with a noop function,
 			// since we don't want to actually run any renders during this test.
-			// How do I test this now? noop mode? Meh.
 			thelmaCLI.renderCLI.cobraCommand.RunE = func(cmd *cobra.Command, args []string) error {
 				return nil
 			}

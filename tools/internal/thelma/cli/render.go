@@ -55,7 +55,6 @@ type renderCLI struct {
 	helmfileArgs  *helmfile.Args
 	renderOptions *render.Options
 	flagVals      *flagValues
-	noop          bool
 }
 
 // Names of all the CLI flags are kept in a struct so they can be easily referenced in error messages
@@ -104,9 +103,6 @@ type flagValues struct {
 }
 
 // newRenderCLI constructs a new renderCLI
-//
-// set `noop` to true to construct a CLI object that will parse arguments but not actually do anything
-// when Execute() is called
 func newRenderCLI(ctx *ThelmaContext) *renderCLI {
 	flagVals := &flagValues{}
 	helmfileArgs := &helmfile.Args{}

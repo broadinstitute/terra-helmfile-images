@@ -14,7 +14,7 @@ if [[ "$1" == 'init' ]]; then
 elif [[ "$1" == 'generate' ]]; then
   # Delegate to render script
   export TERRA_HELMFILE_PATH=$( pwd )
-  render --stdout --argocd
+  thelma render --stdout --argocd
 else
   echo "Usage: ${0} (init|generate)" >&2
   exit 1

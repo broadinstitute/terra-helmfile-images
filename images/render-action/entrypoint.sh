@@ -30,4 +30,4 @@ fi
 
 set -x
 echo "Running render in $( pwd )"
-/tools/bin/render $parallelWorkers --output-dir="${OUTPUT_DIR}" $env $argocd
+/tools/bin/thelma render $parallelWorkers --output-dir="${OUTPUT_DIR}" $env $argocd

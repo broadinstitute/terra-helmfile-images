@@ -45,7 +45,7 @@ elif [[ "$1" == 'generate' ]]; then
   fi
 
   export TERRA_HELMFILE_PATH=$( pwd )
-  render --stdout $target -r "${TERRA_RELEASE}" "${args[@]}"
+  thelma render --stdout $target -r "${TERRA_RELEASE}" "${args[@]}"
 else
   echo "Usage: ${0} (init|generate)" >&2
   exit 1

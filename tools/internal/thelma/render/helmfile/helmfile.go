@@ -2,8 +2,8 @@ package helmfile
 
 import (
 	"fmt"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/render/target"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render/target"
 	"github.com/rs/zerolog/log"
 	"os"
 	"path"

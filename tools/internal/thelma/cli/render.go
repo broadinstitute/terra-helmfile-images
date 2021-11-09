@@ -2,20 +2,17 @@ package cli
 
 import (
 	"fmt"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/render"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/render/helmfile"
-	"github.com/rs/zerolog"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render/helmfile"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"os"
 	"path"
 	"path/filepath"
 )
 
-// This file handles CLI option parsing the render utility. It uses Cobra in accordance with the
-// documentation here: https://github.com/spf13/cobra/blob/master/user_guide.md
+// This file handles option parsing for the `render` subcommand.
 
-const helpMessage = `Renders Terra Kubernetes manifests
+const renderHelpMessage = `Renders Terra Kubernetes manifests
 
 Examples:
 
@@ -48,23 +45,17 @@ render --argocd
 render -e alpha -a cromwell --argocd
 `
 
-// configRepoName name of the Helmfile configuration repo
-const configRepoName = "terra-helmfile"
+// defaultRenderOutputDir name of default output directory
+const defaultRenderOutputDir = "output"
 
-// configRepoPathEnvVar Environment variable used to set path to config repo clone
-const configRepoPathEnvVar = "TERRA_HELMFILE_PATH"
-
-// defaultOutputDirName name of default output directory
-const defaultOutputDirName = "output"
-
-// CLI captures necessary state and configuration for executing a render from the command-line
-type CLI struct {
-	cobraCommand *cobra.Command
-	helmfileArgs *helmfile.Args
+// renderCLI contains state and configuration for executing a render from the command-line
+type renderCLI struct {
+	ctx *ThelmaContext
+	cobraCommand  *cobra.Command
+	helmfileArgs  *helmfile.Args
 	renderOptions *render.Options
-	flagVals *flagValues
-	envVarOverrides map[string]string
-	noop bool
+	flagVals      *flagValues
+	noop          bool
 }
 
 // Names of all the CLI flags are kept in a struct so they can be easily referenced in error messages
@@ -79,9 +70,7 @@ var flagNames = struct {
 	valuesFile      string
 	argocd          string
 	outputDir       string
-	scratchDir      string
 	stdout          string
-	verbosity       string
 	parallelWorkers string
 }{
 	env:            "env",
@@ -94,9 +83,7 @@ var flagNames = struct {
 	valuesFile:      "values-file",
 	argocd:          "argocd",
 	outputDir:       "output-dir",
-	scratchDir:      "scratch-dir",
 	stdout:          "stdout",
-	verbosity:       "verbosity",
 	parallelWorkers: "parallel-workers",
 }
 
@@ -112,57 +99,24 @@ type flagValues struct {
 	valuesFile      []string
 	argocd          bool
 	outputDir       string
-	scratchDir      string
 	stdout          bool
-	verbosity       int
 	parallelWorkers int
 }
 
-// Execute is the main method/entrypoint for the render tool.
-func Execute() {
-	cli := newCLI(false)
-
-	if err := cli.execute(); err != nil {
-		log.Error().Msgf("%v", err)
-		os.Exit(1)
-	}
-}
-
-// execute executes a CLI command
-func (cli *CLI) execute() error {
-	return cli.cobraCommand.Execute()
-}
-
-// setArgs sets cli args on the cobra command. Used in testing.
-func (cli *CLI) setArgs(args []string) {
-	cli.cobraCommand.SetArgs(args)
-}
-
-// setEnvVar overrides process environment variables for this CLI instance. Used in testing.
-func (cli *CLI) setEnvVar(name string, value string) {
-	cli.envVarOverrides[name] = value
-}
-
-// unsetEnvVar removes an environment variable override for this CLI instance. Used in testing.
-func (cli *CLI) unsetEnvVar(name string) {
-	delete(cli.envVarOverrides, name)
-}
-
-// newCLI is a package-private constructor for CLI objects that exposes more configuration options than the
-// public constructor.
+// newRenderCLI constructs a new renderCLI
 //
 // set `noop` to true to construct a CLI object that will parse arguments but not actually do anything
 // when Execute() is called
-func newCLI(noop bool) *CLI {
+func newRenderCLI(ctx *ThelmaContext) *renderCLI {
 	flagVals := &flagValues{}
 	helmfileArgs := &helmfile.Args{}
 	renderOptions := &render.Options{}
 
 	cobraCommand := &cobra.Command{
-		Use:   "render [options]",
-		Short: "Renders Terra Kubernetes manifests",
-		Long: helpMessage,
-		SilenceUsage: true, // Only print out usage error when user supplies -h/--help
+		Use:           "render [options]",
+		Short:         "Renders Terra Kubernetes manifests",
+		Long:          renderHelpMessage,
+		SilenceUsage:  true, // Only print out usage error when user supplies -h/--help
 		SilenceErrors: true, // Don't print errors, we do it ourselves using a logging library
 	}
 
@@ -177,81 +131,50 @@ func newCLI(noop bool) *CLI {
 	cobraCommand.Flags().StringSliceVar(&flagVals.valuesFile, flagNames.valuesFile, []string{}, "Path to chart values file. Can be specified multiple times with ascending precedence (last wins)")
 	cobraCommand.Flags().BoolVar(&flagVals.argocd, flagNames.argocd, false, "Render ArgoCD manifests instead of application manifests")
 	cobraCommand.Flags().StringVarP(&flagVals.outputDir, flagNames.outputDir, "d", "path/to/output/dir", "Render manifests to custom output directory")
-	cobraCommand.Flags().StringVar(&flagVals.scratchDir, flagNames.scratchDir, "path/to/scratch/dir", "Use a pre-defined scratch directory instead of creating and deleting a tmp dir (useful for debugging")
 	cobraCommand.Flags().BoolVar(&flagVals.stdout, flagNames.stdout, false, "Render manifests to stdout instead of output directory")
-	cobraCommand.Flags().CountVarP(&flagVals.verbosity, flagNames.verbosity, "v", "Verbose logging. Can be specified multiple times")
 	cobraCommand.Flags().IntVar(&flagVals.parallelWorkers, flagNames.parallelWorkers, 1, "Number of parallel workers to launch when rendering")
 
-	cli := &CLI{
-		cobraCommand: cobraCommand,
+	cli := &renderCLI{
+		cobraCommand:  cobraCommand,
 		renderOptions: renderOptions,
-		helmfileArgs: helmfileArgs,
-		flagVals: flagVals,
-		envVarOverrides: make(map[string]string),
-		noop: noop,
+		helmfileArgs:  helmfileArgs,
+		flagVals:      flagVals,
+		ctx: ctx,
 	}
 
-	// Configure main body of the cobra command. I sort of hate this mutual reference
-	// (cli object holds the cobra command, the cobra command now has a hook that references the cli)
-	// but it makes the argument processing code much simpler
-	cobraCommand.RunE = func(_ *cobra.Command, args []string) error {
-		return cli.runE(args)
+	cobraCommand.PreRunE = func(cmd *cobra.Command, args []string) error {
+		if len(args) != 0 {
+			return fmt.Errorf("expected no positional arguments, got %v", args)
+		}
+		if err := cli.handleFlagAliases(); err != nil {
+			return err
+		}
+		if err := cli.checkIncompatibleFlags(); err != nil {
+			return err
+		}
+		if err := cli.fillRenderOptions(); err != nil {
+			return err
+		}
+		if err := cli.fillHelmfileArgs(); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	cobraCommand.RunE = func(cmd *cobra.Command, args []string) error {
+		return render.DoRender(ctx.app, renderOptions, helmfileArgs)
+
 	}
 
 	return cli
 }
 
-func init() {
-	// Initialize logging
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-}
-
-// runE should be called from the cobra command's RunE hook
-func (cli *CLI) runE(args []string) error {
-	if len(args) != 0 {
-		return fmt.Errorf("expected no positional arguments, got %v", args)
-	}
-	if err := cli.handleAliases(); err != nil {
-		return err
-	}
-	if err := cli.checkIncompatibleFlags(); err != nil {
-		return err
-	}
-	if err := cli.fillRenderOptions(); err != nil {
-		return err
-	}
-	if err := cli.fillHelmfileArgs(); err != nil {
-		return err
-	}
-
-	if cli.noop {
-		// noop-mode! execute after parsing and validating arguments but before actually
-		// doing anything
-		return nil
-	}
-
-	adjustLoggingVerbosity(cli.renderOptions.Verbosity)
-
-	return render.DoRender(cli.renderOptions, cli.helmfileArgs)
-}
-
 // fillRenderOptions populates an empty render.Options struct in accordance with user-supplied CLI options
-func (cli *CLI) fillRenderOptions() error {
+func (cli *renderCLI) fillRenderOptions() error {
 	flags := cli.cobraCommand.Flags()
 	flagVals := cli.flagVals
 	renderOptions := cli.renderOptions
-
-	// config repo path (path to terra-helmfile clone)
-	configRepoPath, defined := cli.lookupEnvVar(configRepoPathEnvVar)
-	if !defined {
-		return fmt.Errorf("please specify path to %s clone via the environment variable %s", configRepoName, configRepoPathEnvVar)
-	}
-	configRepoPath, err := expandAndVerifyExists(configRepoPath, "config repo clone")
-	if err != nil {
-		return err
-	}
-	renderOptions.ConfigRepoPath = configRepoPath
 
 	// env
 	if flags.Changed(flagNames.env) {
@@ -271,24 +194,12 @@ func (cli *CLI) fillRenderOptions() error {
 		}
 		renderOptions.OutputDir = dir
 	} else {
-		renderOptions.OutputDir = path.Join(renderOptions.ConfigRepoPath, defaultOutputDirName)
+		renderOptions.OutputDir = path.Join(cli.ctx.app.Config.Home(), defaultRenderOutputDir)
 		log.Debug().Msgf("Using default output dir %s", renderOptions.OutputDir)
-	}
-
-	// scratch dir
-	if flags.Changed(flagNames.scratchDir) {
-		dir, err := expandAndVerifyExists(flagVals.scratchDir, "scratch dir")
-		if err != nil {
-			return err
-		}
-		renderOptions.ScratchDir = &dir
 	}
 
 	// stdout
 	renderOptions.Stdout = flagVals.stdout
-
-	// verbosity
-	renderOptions.Verbosity = flagVals.verbosity
 
 	// parallelWorkers
 	renderOptions.ParallelWorkers = flagVals.parallelWorkers
@@ -297,7 +208,7 @@ func (cli *CLI) fillRenderOptions() error {
 }
 
 // fillHelmfileArgs populates an empty helfile.Args struct in accordance with user-supplied CLI options
-func (cli *CLI) fillHelmfileArgs() error {
+func (cli *renderCLI) fillHelmfileArgs() error {
 	flags := cli.cobraCommand.Flags()
 	flagVals := cli.flagVals
 	helmfileArgs := cli.helmfileArgs
@@ -344,7 +255,7 @@ func (cli *CLI) fillHelmfileArgs() error {
 }
 
 // given a flagset, look for legacy aliases and update the new flag.
-func (cli *CLI) handleAliases() error {
+func (cli *renderCLI) handleFlagAliases() error {
 	flags := cli.cobraCommand.Flags()
 
 	// --app is a legacy alias for --release, so copy the user-supplied value over
@@ -352,17 +263,17 @@ func (cli *CLI) handleAliases() error {
 		if flags.Changed(flagNames.release) {
 			return fmt.Errorf("-a is a legacy alias for -r, please specify one or the other but not both")
 		}
-		app := flags.Lookup(flagNames.app).Value.String()
-		err := flags.Set(flagNames.release, app)
+		_app := flags.Lookup(flagNames.app).Value.String()
+		err := flags.Set(flagNames.release, _app)
 		if err != nil {
-			return fmt.Errorf("error setting --%s to --%s argument %q: %v", flagNames.release, flagNames.app, app, err)
+			return fmt.Errorf("error setting --%s to --%s argument %q: %v", flagNames.release, flagNames.app, _app, err)
 		}
 	}
 
 	return nil
 }
 
-func (cli *CLI) checkIncompatibleFlags() error {
+func (cli *renderCLI) checkIncompatibleFlags() error {
 	flags := cli.cobraCommand.Flags()
 
 	if flags.Changed(flagNames.env) && flags.Changed(flagNames.cluster) {
@@ -419,40 +330,4 @@ func (cli *CLI) checkIncompatibleFlags() error {
 		return fmt.Errorf("--%s cannot be used with --%s", flagNames.parallelWorkers, flagNames.stdout)
 	}
 	return nil
-}
-
-// Adjust logging verbosity based on CLI options
-func adjustLoggingVerbosity(verbosity int) {
-	if verbosity > 1 {
-		zerolog.SetGlobalLevel(zerolog.TraceLevel)
-	} else if verbosity > 0 {
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-	}
-}
-
-// Expand relative path to absolute.
-// This is necessary for many arguments because Helmfile assumes paths
-// are relative to helmfile.yaml and we want them to be relative to CWD.
-func expandAndVerifyExists(filePath string, description string) (string, error) {
-	expanded, err := filepath.Abs(filePath)
-	if err != nil {
-		return "", err
-	}
-
-	if _, err := os.Stat(expanded); os.IsNotExist(err) {
-		return "", fmt.Errorf("%s does not exist: %s", description, expanded)
-	} else if err != nil {
-		return "", fmt.Errorf("error reading %s %s: %v", description, expanded, err)
-	}
-
-	return expanded, nil
-}
-
-// Look up an nev var, first in this CLI instance's overrides, and then in the process env vars
-func (cli * CLI) lookupEnvVar(name string) (value string, defined bool) {
-	value, defined = cli.envVarOverrides[name]
-	if !defined {
-		value, defined = os.LookupEnv(name)
-	}
-	return
 }

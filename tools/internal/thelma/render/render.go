@@ -2,9 +2,10 @@ package render
 
 import (
 	"fmt"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/render/helmfile"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/render/target"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/app"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render/helmfile"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render/target"
 	"github.com/rs/zerolog/log"
 	"io/ioutil"
 	"os"
@@ -23,16 +24,13 @@ type Options struct {
 	Cluster         *string // Cluster If supplied, render for a single cluster instead of all targets
 	OutputDir       string  // OutputDir Output directory where manifests should be rendered
 	Stdout          bool    // Stdout Render to stdout instead of output directory
-	Verbosity       int     // Verbosity Invoke `helmfile` with verbose logging
-	ConfigRepoPath  string  // ConfigRepoPath Path to terra-helmfile repo clone
-	ScratchDir      *string // ScratchDir If supplied, use given scratch directory instead of creating & deleting tmp dir
 	ParallelWorkers int     // ParallelWorkers Number of parallel workers
 }
 
 // multiRender renders manifests for multiple environments and clusters
 type multiRender struct {
+	shellRunner       shell.Runner                    // shell runner instance to use for executing commands
 	options           *Options                        // Options global render options
-	scratchDir        scratchDir                      // Scratch directory where charts may be downloaded and unpacked, etc.
 	configuredTargets map[string]target.ReleaseTarget // Collection of release targets (environments and clusters) defined in the config repo, keyed by name
 	configRepo        *helmfile.ConfigRepo            // configRepo refernce to use for executing `helmfile template`
 }
@@ -43,24 +41,14 @@ type renderError struct {
 	err error // error
 }
 
-// scratchDir struct containing paths for temporary/scratch work
-type scratchDir struct {
-	root                  string // root directory for all scratch files
-	cleanupOnTeardown     bool   // cleanUpOnExit if true, scratch files will be deleted on exit
-	helmfileChartCacheDir string // scratch directory that helmfile.yaml should use for caching charts
-}
-
-// Global/package-level variable, used for executing commands. Replaced with a mock in tests.
-var shellRunner shell.Runner = shell.NewRealRunner()
-
 // DoRender constructs a multiRender and invokes all functions in correct order to perform a complete
 // render.
-func DoRender(globalOptions *Options, helmfileArgs *helmfile.Args) error {
-	r, err := newRender(globalOptions)
+func DoRender(app *app.ThelmaApp, globalOptions *Options, helmfileArgs *helmfile.Args) error {
+	r, err := newRender(app, globalOptions)
 	if err != nil {
 		return err
 	}
-	if err = r.setup(); err != nil {
+	if err = r.cleanOutputDirectory(); err != nil {
 		return err
 	}
 	if err = r.configRepo.HelmUpdate(); err != nil {
@@ -69,65 +57,33 @@ func DoRender(globalOptions *Options, helmfileArgs *helmfile.Args) error {
 	if err = r.renderAll(helmfileArgs); err != nil {
 		return err
 	}
-	if err = r.teardown(); err != nil {
-		return err
-	}
 	return nil
 }
 
-// SetRunner is for use in integration tests only!
-// It should be used like this:
-//   originalRunner = render.SetRunner(mockRunner)
-//   defer func() { render.SetRunner(originalRunner) }
-func SetRunner(runner shell.Runner) shell.Runner {
-	original := shellRunner
-	shellRunner = runner
-	return original
-}
-
 // newRender is a constructor for Render objects
-func newRender(options *Options) (*multiRender, error) {
+func newRender(app *app.ThelmaApp, options *Options) (*multiRender, error) {
 	r := new(multiRender)
 	r.options = options
 
-	targets, err := target.LoadReleaseTargets(options.ConfigRepoPath)
+	targets, err := target.LoadReleaseTargets(app.Config.Home())
 	if err != nil {
 		return nil, err
 	}
 	r.configuredTargets = targets
 
-	scratchDir, err := createScratchDir(options)
+	chartCacheDir, err := app.Paths.CreateScratchDir("chart-cache")
 	if err != nil {
 		return nil, err
 	}
-	r.scratchDir = *scratchDir
-
-	helmfileLogLevel := "info"
-	if options.Verbosity > 1 {
-		helmfileLogLevel = "debug"
-	}
 
 	r.configRepo = helmfile.NewConfigRepo(helmfile.Options{
-		Path:             options.ConfigRepoPath,
-		ChartCacheDir:    scratchDir.helmfileChartCacheDir,
-		HelmfileLogLevel: helmfileLogLevel,
-		ShellRunner:      shellRunner,
+		Path:             app.Config.Home(),
+		ChartCacheDir:    chartCacheDir,
+		HelmfileLogLevel: app.Config.LogLevel(),
+		ShellRunner:      app.ShellRunner,
 	})
 
 	return r, nil
-}
-
-// Setup performs necessary setup for a multiRender
-func (r *multiRender) setup() error {
-	return r.cleanOutputDirectory()
-}
-
-// Teardown cleans up resources that are no longer needed once the renders are finished
-func (r *multiRender) teardown() error {
-	if r.scratchDir.cleanupOnTeardown {
-		return os.RemoveAll(r.scratchDir.root)
-	}
-	return nil
 }
 
 // renderAll renders manifests based on supplied arguments
@@ -215,37 +171,6 @@ func (r *multiRender) renderSingleTarget(helmfileArgs *helmfile.Args, releaseTar
 
 	outputDir := path.Join(r.options.OutputDir, releaseTarget.Name())
 	return  r.configRepo.RenderToDir(releaseTarget, outputDir, helmfileArgs)
-}
-
-// createScratchDir creates scratch directory structure, given user-supplied options
-func createScratchDir(options *Options) (*scratchDir, error) {
-	scratch := scratchDir{}
-	if options.ScratchDir != nil {
-		// User supplied a scratch directory
-		scratch.root = *options.ScratchDir
-		scratch.cleanupOnTeardown = false
-	} else {
-		root, err := os.MkdirTemp("", "render-scratch-*")
-		if err != nil {
-			return nil, err
-		}
-		log.Debug().Msgf("Created new scratch directory: %s", root)
-		scratch.root = root
-		scratch.cleanupOnTeardown = true
-	}
-
-	scratch.helmfileChartCacheDir = path.Join(scratch.root, "chart-cache")
-
-	dirs := []string{
-		scratch.helmfileChartCacheDir,
-	}
-	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return nil, err
-		}
-	}
-
-	return &scratch, nil
 }
 
 // cleanOutputDirectory removes any old files from output directory

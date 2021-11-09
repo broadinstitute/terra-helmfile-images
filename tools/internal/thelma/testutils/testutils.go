@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Convenience function to generate tokenized argument list from format string w/ args
+// Args convenience function to generate tokenized argument list from format string w/ args
 //
 // Eg. args("-e   %s", "dev") -> []string{"-e", "dev"}
 func Args(format string, a ...interface{}) []string {
@@ -14,7 +14,7 @@ func Args(format string, a ...interface{}) []string {
 	return strings.Fields(formatted)
 }
 
-// Convenience function to return current working directory
+// Cwd convenience function to return current working directory
 func Cwd() string {
 	dir, err := os.Getwd()
 	if err != nil {

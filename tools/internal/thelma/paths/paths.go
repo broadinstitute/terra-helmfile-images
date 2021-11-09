@@ -6,13 +6,14 @@ import (
 	"os"
 )
 
+// Paths is a utility for interacting with terra-helmfile paths
 type Paths struct {
 	cfg            *config.Config
 	scratchRootDir string
 }
 
-/* Constructor for Paths object. */
-func NewPaths(cfg *config.Config) (*Paths, error) {
+// New constructor for Paths object.
+func New(cfg *config.Config) (*Paths, error) {
 	scratchDir, err := os.MkdirTemp(cfg.Tmpdir(), "thelma-scratch")
 	if err != nil {
 		return nil, err
@@ -24,6 +25,7 @@ func NewPaths(cfg *config.Config) (*Paths, error) {
 	return paths, nil
 }
 
+// CreateScratchDir creates a new temporary directory
 func (p *Paths) CreateScratchDir(nickname string) (string, error) {
 	dir, err := os.MkdirTemp(p.scratchRootDir, nickname)
 	if err != nil {
@@ -33,6 +35,7 @@ func (p *Paths) CreateScratchDir(nickname string) (string, error) {
 	return dir, nil
 }
 
+// Cleanup will clean up all temporary/scratch directories
 func (p *Paths) Cleanup() error {
 	log.Debug().Msgf("Deleting scratch root directory %s", p.scratchRootDir)
 	return os.RemoveAll(p.scratchRootDir)

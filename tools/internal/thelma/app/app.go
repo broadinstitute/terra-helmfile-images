@@ -6,11 +6,12 @@ import (
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/paths"
 )
 
+// Options for a ThelmaApp
 type Options struct {
 	Runner shell.Runner
 }
 
-// Cross-cutting dependencies for Thelma
+// ThelmaApp Cross-cutting dependencies for Thelma commands
 type ThelmaApp struct {
 	Config      *config.Config
 	ShellRunner shell.Runner
@@ -28,7 +29,7 @@ func NewWithOptions(cfg *config.Config, options Options) (*ThelmaApp, error) {
 	app.Config = cfg
 
 	// Initialize paths
-	_paths, err := paths.NewPaths(cfg)
+	_paths, err := paths.New(cfg)
 	if err != nil {
 		return nil, err
 	}

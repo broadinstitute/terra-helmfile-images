@@ -1,14 +1,14 @@
 package config
 
-// Mutable, serializable struct for building an immutable Config
-type ConfigData struct {
+// Data is a mutable, serializable struct for building an immutable Config
+type Data struct {
 	Home     string `yaml:"home"`
 	Tmpdir   string `yaml:"tmpdir"`
 	LogLevel string `yaml:"loglevel"`
 }
 
-// Make yaml serialization keys for ConfigData fields available without reflection.
-var ConfigKeys = struct {
+// Keys makes yaml serialization keys for Data fields available without reflection.
+var Keys = struct {
 	Home     string
 	Tmpdir   string
 	LogLevel string
@@ -18,23 +18,27 @@ var ConfigKeys = struct {
 	LogLevel: "loglevel",
 }
 
-// Immutable Config object
+// Config represents global config for Thelma
 type Config struct {
-	data ConfigData
+	data Data
 }
 
-func New(data ConfigData) *Config {
+// New constructs a new config
+func New(data Data) *Config {
 	return &Config{data: data}
 }
 
+// Home is the path to a terra-helmfile clone
 func (cfg *Config) Home() string {
 	return cfg.data.Home
 }
 
+// LogLevel is the level at which Thelma should log
 func (cfg *Config) LogLevel() string {
 	return cfg.data.LogLevel
 }
 
+// Tmpdir directory where Thelma should create temporary files
 func (cfg *Config) Tmpdir() string {
 	return cfg.data.Tmpdir
 }

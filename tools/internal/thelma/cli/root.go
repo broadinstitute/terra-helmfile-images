@@ -48,10 +48,12 @@ func init() {
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 }
 
+// ThelmaContext is used to share state with subcommands
 type ThelmaContext struct {
 	app *app.ThelmaApp
 }
 
+// ThelmaCLI represents a complete command-line interface for Thelma, including subcommands
 type ThelmaCLI struct {
 	context         *ThelmaContext
 	rootCommand     *cobra.Command
@@ -83,13 +85,13 @@ func (cli *ThelmaCLI) setArgs(args []string) {
 // setHome (for use in tests only) makes it possible to set THELMA_HOME to
 // a custom path for testing
 func (cli *ThelmaCLI) setHome(path string) {
-	cli.configOverrides[config.ConfigKeys.Home] = path
+	cli.configOverrides[config.Keys.Home] = path
 }
 
 // setLogLevel (for use in tests only) makes it possible to set THELMA_LOGLEVEL to
 // a custom value for testing
 func (cli *ThelmaCLI) setLogLevel(level string) {
-	cli.configOverrides[config.ConfigKeys.LogLevel] = level
+	cli.configOverrides[config.Keys.LogLevel] = level
 }
 
 // settShellRunner (for use in tests only) configures this CLI instance to use the given shell runner
@@ -155,9 +157,9 @@ func loadConfig(overrides map[string]interface{}) (*config.Config, error) {
 	viperCfg := viper.New()
 
 	// Set defaults
-	viperCfg.SetDefault(config.ConfigKeys.Home, "")
-	viperCfg.SetDefault(config.ConfigKeys.LogLevel, defaultLogLevel)
-	viperCfg.SetDefault(config.ConfigKeys.Tmpdir, os.TempDir())
+	viperCfg.SetDefault(config.Keys.Home, "")
+	viperCfg.SetDefault(config.Keys.LogLevel, defaultLogLevel)
+	viperCfg.SetDefault(config.Keys.Tmpdir, os.TempDir())
 
 	// Configure Viper:
 	// automatically interpret env vars prefixed with THELMA_ as config settings
@@ -174,25 +176,25 @@ func loadConfig(overrides map[string]interface{}) (*config.Config, error) {
 
 	// Validation
 	// Make sure home dir is configured and exists
-	homePath := viperCfg.GetString(config.ConfigKeys.Home)
+	homePath := viperCfg.GetString(config.Keys.Home)
 	if homePath == "" {
-		return nil, fmt.Errorf("please specify path to %s clone via the environment variable %s", configRepoName, configKeyToEnvVar(config.ConfigKeys.Home))
+		return nil, fmt.Errorf("please specify path to %s clone via the environment variable %s", configRepoName, configKeyToEnvVar(config.Keys.Home))
 	}
 	fullPath, err := expandAndVerifyExists(homePath, fmt.Sprintf("%s clone", configRepoName))
 	if err != nil {
 		return nil, err
 	}
-	viper.Set(config.ConfigKeys.Home, fullPath)
+	viper.Set(config.Keys.Home, fullPath)
 
 	// Make sure log level is valid
-	logLevel := viperCfg.GetString(config.ConfigKeys.LogLevel)
+	logLevel := viperCfg.GetString(config.Keys.LogLevel)
 	if _, err := zerolog.ParseLevel(logLevel); err != nil {
 		log.Warn().Msgf("Invalid log level %v, setting to %s", logLevel, defaultLogLevel)
-		viperCfg.Set(config.ConfigKeys.LogLevel, defaultLogLevel)
+		viperCfg.Set(config.Keys.LogLevel, defaultLogLevel)
 	}
 
 	// Convert viper config to a simple immutable config struct and return
-	cfg := config.ConfigData{}
+	cfg := config.Data{}
 	if err := viperCfg.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("error loading configuration: %v", err)
 	}

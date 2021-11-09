@@ -82,7 +82,7 @@ func TestRender(t *testing.T) {
 		},
 		{
 			description: "no arguments should render for all targets",
-			arguments: args("render"),
+			arguments:   args("render"),
 			setupMocks: func(ts *TestState) error {
 				ts.expectHelmfileUpdateCmd()
 				ts.expectHelmfileCmd(tdrStagingCluster, "--log-level=info --selector=mode=release template --skip-deps --output-dir=%s/output/tdr-staging", ts.mockHome)
@@ -283,7 +283,7 @@ func TestRender(t *testing.T) {
 		},
 		{
 			description: "two environments with the same name should raise an error",
-			arguments: args("render"),
+			arguments:   args("render"),
 			setupMocks: func(ts *TestState) error {
 				return createFakeTargetFiles(ts.mockHome, []target.ReleaseTarget{target.NewEnvironmentGeneric("dev", "personal")})
 			},
@@ -291,7 +291,7 @@ func TestRender(t *testing.T) {
 		},
 		{
 			description: "two clusters with the same name should raise an error",
-			arguments: args("render"),
+			arguments:   args("render"),
 			setupMocks: func(ts *TestState) error {
 				return createFakeTargetFiles(ts.mockHome, []target.ReleaseTarget{target.NewClusterGeneric("terra-perf", "tdr")})
 			},
@@ -299,7 +299,7 @@ func TestRender(t *testing.T) {
 		},
 		{
 			description: "environment and cluster with the same name should raise an error",
-			arguments: args("render"),
+			arguments:   args("render"),
 			setupMocks: func(ts *TestState) error {
 				return createFakeTargetFiles(ts.mockHome, []target.ReleaseTarget{target.NewClusterGeneric("dev", "terra")})
 			},
@@ -307,7 +307,7 @@ func TestRender(t *testing.T) {
 		},
 		{
 			description: "missing config directory should raise an error",
-			arguments: args("render"),
+			arguments:   args("render"),
 			setupMocks: func(ts *TestState) error {
 				return os.RemoveAll(ts.mockHome)
 			},
@@ -315,7 +315,7 @@ func TestRender(t *testing.T) {
 		},
 		{
 			description: "missing environments directory should raise an error",
-			arguments: args("render"),
+			arguments:   args("render"),
 			setupMocks: func(ts *TestState) error {
 				return os.RemoveAll(path.Join(ts.mockHome, "environments"))
 			},
@@ -323,7 +323,7 @@ func TestRender(t *testing.T) {
 		},
 		{
 			description: "missing clusters directory should raise an error",
-			arguments: args("render"),
+			arguments:   args("render"),
 			setupMocks: func(ts *TestState) error {
 				return os.RemoveAll(path.Join(ts.mockHome, "clusters"))
 			},
@@ -331,7 +331,7 @@ func TestRender(t *testing.T) {
 		},
 		{
 			description: "no environment definitions should raise an error",
-			arguments: args("render"),
+			arguments:   args("render"),
 			setupMocks: func(ts *TestState) error {
 				envDir := path.Join(ts.mockHome, "environments")
 				if err := os.RemoveAll(envDir); err != nil {

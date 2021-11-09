@@ -50,7 +50,7 @@ const defaultRenderOutputDir = "output"
 
 // renderCLI contains state and configuration for executing a render from the command-line
 type renderCLI struct {
-	ctx *ThelmaContext
+	ctx           *ThelmaContext
 	cobraCommand  *cobra.Command
 	helmfileArgs  *helmfile.Args
 	renderOptions *render.Options
@@ -73,9 +73,9 @@ var flagNames = struct {
 	stdout          string
 	parallelWorkers string
 }{
-	env:            "env",
-	cluster:        "cluster",
-	app:            "app",
+	env:             "env",
+	cluster:         "cluster",
+	app:             "app",
 	release:         "release",
 	chartDir:        "chart-dir",
 	chartVersion:    "chart-version",
@@ -89,9 +89,9 @@ var flagNames = struct {
 
 // flagValues is a struct for capturing flag values that are parsed by Cobra.
 type flagValues struct {
-	env          string
-	cluster      string
-	app          string
+	env             string
+	cluster         string
+	app             string
 	release         string
 	chartDir        string
 	chartVersion    string
@@ -139,7 +139,7 @@ func newRenderCLI(ctx *ThelmaContext) *renderCLI {
 		renderOptions: renderOptions,
 		helmfileArgs:  helmfileArgs,
 		flagVals:      flagVals,
-		ctx: ctx,
+		ctx:           ctx,
 	}
 
 	cobraCommand.PreRunE = func(cmd *cobra.Command, args []string) error {

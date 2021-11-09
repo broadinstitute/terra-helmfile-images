@@ -15,9 +15,9 @@ import (
 
 // TestArgumentParsing Given given a set of CLI args, verify that options structures are populated correctly
 func TestArgumentParsing(t *testing.T) {
-	type expectedAttrs struct{
+	type expectedAttrs struct {
 		renderOptions *render.Options
-		helmfileArgs *helmfile.Args
+		helmfileArgs  *helmfile.Args
 	}
 	type testConfig struct {
 		t         *testing.T
@@ -25,11 +25,11 @@ func TestArgumentParsing(t *testing.T) {
 		expected  *expectedAttrs
 	}
 
-	testCases := []struct{
-		description   string // testcase description
-		arguments     []string // renderCLI args to pass in
-		setupFn       func (tc *testConfig) error // optional hook for extra setup
-		expectedError *regexp.Regexp // expected error
+	testCases := []struct {
+		description   string                     // testcase description
+		arguments     []string                   // renderCLI args to pass in
+		setupFn       func(tc *testConfig) error // optional hook for extra setup
+		expectedError *regexp.Regexp             // expected error
 	}{
 		{
 			description:   "invalid argument",
@@ -72,23 +72,23 @@ func TestArgumentParsing(t *testing.T) {
 			expectedError: regexp.MustCompile("--chart-version requires a release be specified with --release"),
 		},
 		{
-			description: "--chart-dir should require -r",
-			arguments: Args("render --chart-dir %s", t.TempDir()),
+			description:   "--chart-dir should require -r",
+			arguments:     Args("render --chart-dir %s", t.TempDir()),
 			expectedError: regexp.MustCompile("--chart-dir requires a release be specified with --release"),
 		},
 		{
-			description: "--values-file should require -r",
-			arguments: Args("render --values-file %s", path.Join(t.TempDir(), "does-not-exist.yaml")),
+			description:   "--values-file should require -r",
+			arguments:     Args("render --values-file %s", path.Join(t.TempDir(), "does-not-exist.yaml")),
 			expectedError: regexp.MustCompile("--values-file requires a release be specified with --release"),
 		},
 		{
-			description: "--values-file must exist",
-			arguments: Args("render -e dev -r leonardo --values-file %s", path.Join(t.TempDir(), "does-not-exist.yaml")),
+			description:   "--values-file must exist",
+			arguments:     Args("render -e dev -r leonardo --values-file %s", path.Join(t.TempDir(), "does-not-exist.yaml")),
 			expectedError: regexp.MustCompile("values file does not exist: .*/does-not-exist.yaml"),
 		},
 		{
-			description: "--chart-dir and --chart-version incompatible",
-			arguments: Args("render -e dev -r leonardo --chart-dir %s --chart-version 1.0.0", t.TempDir()),
+			description:   "--chart-dir and --chart-version incompatible",
+			arguments:     Args("render -e dev -r leonardo --chart-dir %s --chart-version 1.0.0", t.TempDir()),
 			expectedError: regexp.MustCompile("only one of --chart-dir or --chart-version may be specified"),
 		},
 		{
@@ -107,8 +107,8 @@ func TestArgumentParsing(t *testing.T) {
 			expectedError: regexp.MustCompile("--argocd cannot be used with.*--chart-version"),
 		},
 		{
-			description: "--argocd and --chart-dir incompatible",
-			arguments: Args("render -e dev -r leonardo --chart-dir=%s --argocd", t.TempDir()),
+			description:   "--argocd and --chart-dir incompatible",
+			arguments:     Args("render -e dev -r leonardo --chart-dir=%s --argocd", t.TempDir()),
 			expectedError: regexp.MustCompile("--argocd cannot be used with.*--chart-dir"),
 		},
 		{
@@ -133,7 +133,7 @@ func TestArgumentParsing(t *testing.T) {
 		},
 		{
 			description: "config repo path must exist",
-			arguments: []string{"render"},
+			arguments:   []string{"render"},
 			setupFn: func(tc *testConfig) error {
 				tc.thelmaCLI.setHome("does-not-exist")
 				return nil
@@ -142,7 +142,7 @@ func TestArgumentParsing(t *testing.T) {
 		},
 		{
 			description: "config repo path env var must be set",
-			arguments: []string{"render"},
+			arguments:   []string{"render"},
 			setupFn: func(tc *testConfig) error {
 				tc.thelmaCLI.setHome("")
 				return nil
@@ -150,8 +150,8 @@ func TestArgumentParsing(t *testing.T) {
 			expectedError: regexp.MustCompile("please specify path to terra-helmfile clone"),
 		},
 		{
-			description: "no arguments",
-			arguments: []string{"render"},
+			description:   "no arguments",
+			arguments:     []string{"render"},
 			expectedError: nil,
 		},
 		{
@@ -183,7 +183,7 @@ func TestArgumentParsing(t *testing.T) {
 		},
 		{
 			description: "--stdout should set stdout",
-			arguments: Args("render --stdout"),
+			arguments:   Args("render --stdout"),
 			setupFn: func(tc *testConfig) error {
 				tc.expected.renderOptions.Stdout = true
 				return nil
@@ -191,7 +191,7 @@ func TestArgumentParsing(t *testing.T) {
 		},
 		{
 			description: "--parallel-workers should set workers",
-			arguments: Args("render --parallel-workers 32"),
+			arguments:   Args("render --parallel-workers 32"),
 			setupFn: func(tc *testConfig) error {
 				tc.expected.renderOptions.ParallelWorkers = 32
 				return nil
@@ -199,7 +199,7 @@ func TestArgumentParsing(t *testing.T) {
 		},
 		{
 			description: "--release should set release name",
-			arguments: Args("render -e dev --release leonardo"),
+			arguments:   Args("render -e dev --release leonardo"),
 			setupFn: func(tc *testConfig) error {
 				env, release := "dev", "leonardo"
 				tc.expected.renderOptions.Env = &env
@@ -209,7 +209,7 @@ func TestArgumentParsing(t *testing.T) {
 		},
 		{
 			description: "--app-version should set app version",
-			arguments: Args("render -e dev -r leonardo --app-version 1.2.3"),
+			arguments:   Args("render -e dev -r leonardo --app-version 1.2.3"),
 			setupFn: func(tc *testConfig) error {
 				env, release, version := "dev", "leonardo", "1.2.3"
 				tc.expected.renderOptions.Env = &env
@@ -220,7 +220,7 @@ func TestArgumentParsing(t *testing.T) {
 		},
 		{
 			description: "--chart-version should set chart version",
-			arguments: Args("render -e dev -r leonardo --chart-version 4.5.6"),
+			arguments:   Args("render -e dev -r leonardo --chart-version 4.5.6"),
 			setupFn: func(tc *testConfig) error {
 				env, release, version := "dev", "leonardo", "4.5.6"
 				tc.expected.renderOptions.Env = &env
@@ -289,7 +289,7 @@ func TestArgumentParsing(t *testing.T) {
 		},
 		{
 			description: "--argocd should enable argocd mode",
-			arguments: Args("render --argocd"),
+			arguments:   Args("render --argocd"),
 			setupFn: func(tc *testConfig) error {
 				tc.expected.helmfileArgs.ArgocdMode = true
 				return nil
@@ -310,7 +310,7 @@ func TestArgumentParsing(t *testing.T) {
 
 			expected := &expectedAttrs{
 				renderOptions: &render.Options{},
-				helmfileArgs: &helmfile.Args{},
+				helmfileArgs:  &helmfile.Args{},
 			}
 
 			configRepoPath := t.TempDir()
@@ -327,9 +327,9 @@ func TestArgumentParsing(t *testing.T) {
 			thelmaCLI.setArgs(testCase.arguments)
 
 			tc := &testConfig{
-				t: t,
+				t:         t,
 				thelmaCLI: thelmaCLI,
-				expected: expected,
+				expected:  expected,
 			}
 
 			// call setupFn if defined

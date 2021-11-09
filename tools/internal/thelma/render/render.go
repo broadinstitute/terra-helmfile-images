@@ -38,7 +38,7 @@ type multiRender struct {
 // renderError represents an error encountered while rendering for a particular target
 type renderError struct {
 	target target.ReleaseTarget // release target that resulted in this error
-	err error // error
+	err    error                // error
 }
 
 // DoRender constructs a multiRender and invokes all functions in correct order to perform a complete
@@ -132,7 +132,7 @@ func (r *multiRender) renderAll(helmfileArgs *helmfile.Args) error {
 					log.Error().Msgf("[worker-%d] error rendering manifests for target %s:\n%v", id, releaseTarget.Name(), err)
 					errCh <- renderError{
 						target: releaseTarget,
-						err: err,
+						err:    err,
 					}
 				}
 			}
@@ -170,7 +170,7 @@ func (r *multiRender) renderSingleTarget(helmfileArgs *helmfile.Args, releaseTar
 	}
 
 	outputDir := path.Join(r.options.OutputDir, releaseTarget.Name())
-	return  r.configRepo.RenderToDir(releaseTarget, outputDir, helmfileArgs)
+	return r.configRepo.RenderToDir(releaseTarget, outputDir, helmfileArgs)
 }
 
 // cleanOutputDirectory removes any old files from output directory

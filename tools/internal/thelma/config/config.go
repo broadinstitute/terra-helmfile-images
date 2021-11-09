@@ -9,12 +9,12 @@ type ConfigData struct {
 
 // Make yaml serialization keys for ConfigData fields available without reflection.
 var ConfigKeys = struct {
-	Home string
-	Tmpdir string
+	Home     string
+	Tmpdir   string
 	LogLevel string
 }{
-	Home: "home",
-	Tmpdir: "tmpdir",
+	Home:     "home",
+	Tmpdir:   "tmpdir",
 	LogLevel: "loglevel",
 }
 

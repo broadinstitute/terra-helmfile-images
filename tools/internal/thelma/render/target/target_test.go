@@ -12,13 +12,13 @@ import (
 
 func TestLoadReleaseTargets(t *testing.T) {
 	testCases := []struct {
-		description string
+		description        string
 		directoryStructure []string
-		expectedError string
-		expectedTargets map[string]ReleaseTarget
+		expectedError      string
+		expectedTargets    map[string]ReleaseTarget
 	}{
 		{
-			description: "missing root directory",
+			description:   "missing root directory",
 			expectedError: "config directory does not exist",
 		},
 		{
@@ -87,11 +87,11 @@ func TestLoadReleaseTargets(t *testing.T) {
 				"environments/live/alpha.yaml",
 			},
 			expectedTargets: map[string]ReleaseTarget{
-				"terra-dev": NewCluster("terra-dev", "terra"),
+				"terra-dev":   NewCluster("terra-dev", "terra"),
 				"terra-alpha": NewCluster("terra-alpha", "terra"),
-				"dev": NewEnvironment("dev", "live"),
-				"perf": NewEnvironment("perf", "live"),
-				"alpha": NewEnvironment("alpha", "live"),
+				"dev":         NewEnvironment("dev", "live"),
+				"perf":        NewEnvironment("perf", "live"),
+				"alpha":       NewEnvironment("alpha", "live"),
 			},
 		},
 	}
@@ -155,20 +155,20 @@ func populateTestFiles(rootDir string, files []string) error {
 }
 
 func TestSortReleaseTargets(t *testing.T) {
-	testCases := []struct{
+	testCases := []struct {
 		description string
-		input []ReleaseTarget
-		expected []ReleaseTarget
+		input       []ReleaseTarget
+		expected    []ReleaseTarget
 	}{
 		{
 			description: "empty",
-			input: make([]ReleaseTarget, 0),
-			expected: make([]ReleaseTarget, 0),
+			input:       make([]ReleaseTarget, 0),
+			expected:    make([]ReleaseTarget, 0),
 		},
 		{
 			description: "single",
-			input: []ReleaseTarget{NewEnvironment("dev", "live")},
-			expected: []ReleaseTarget{NewEnvironment("dev", "live")},
+			input:       []ReleaseTarget{NewEnvironment("dev", "live")},
+			expected:    []ReleaseTarget{NewEnvironment("dev", "live")},
 		},
 		{
 			description: "two",
@@ -215,7 +215,7 @@ func TestSortReleaseTargets(t *testing.T) {
 			input := testCase.input
 			expected := testCase.expected
 
-			rand.Shuffle(len(input), func(i int, j int){
+			rand.Shuffle(len(input), func(i int, j int) {
 				input[i], input[j] = input[j], input[i]
 			})
 

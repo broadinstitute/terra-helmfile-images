@@ -15,9 +15,9 @@ type testState struct {
 }
 
 func TestHelmfileUpdate(t *testing.T) {
-	testCases := []struct{
+	testCases := []struct {
 		description string
-		setupMocks func (t *testing.T, ts *testState)
+		setupMocks  func(t *testing.T, ts *testState)
 	}{
 		{
 			description: "info level logging",
@@ -49,9 +49,9 @@ func TestHelmfileUpdate(t *testing.T) {
 }
 
 func TestRender(t *testing.T) {
-	testCases := []struct{
+	testCases := []struct {
 		description string
-		setupMocks func (t *testing.T, ts *testState)
+		setupMocks  func(t *testing.T, ts *testState)
 	}{
 		{
 			description: "info level logging",
@@ -117,10 +117,10 @@ func setupTestState(t *testing.T) *testState {
 	mockRunner.Test(t)
 
 	configRepo := NewConfigRepo(Options{
-		Path: t.TempDir(),
-		ChartCacheDir: t.TempDir(),
+		Path:             t.TempDir(),
+		ChartCacheDir:    t.TempDir(),
 		HelmfileLogLevel: "info",
-		ShellRunner: mockRunner,
+		ShellRunner:      mockRunner,
 	})
 
 	return &testState{

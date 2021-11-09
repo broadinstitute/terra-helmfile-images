@@ -12,9 +12,9 @@ type Options struct {
 
 // Cross-cutting dependencies for Thelma
 type ThelmaApp struct {
-	Config *config.Config
+	Config      *config.Config
 	ShellRunner shell.Runner
-	Paths *paths.Paths
+	Paths       *paths.Paths
 }
 
 // New construct a new App, given a Config

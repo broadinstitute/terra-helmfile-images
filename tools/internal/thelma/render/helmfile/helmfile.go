@@ -64,9 +64,9 @@ type ConfigRepo struct {
 
 // helmfileParams encapsulates low-level parameters for a `helmfile` command
 type helmfileParams struct {
-	envVars []string
+	envVars     []string
 	stateValues map[string]string
-	selectors map[string]string
+	selectors   map[string]string
 }
 
 // NewConfigRepo constructs a new ConfigRepo object
@@ -80,10 +80,10 @@ func NewConfigRepo(options Options) *ConfigRepo {
 }
 
 // newHelmfileParams returns a new helmfileParams object with all fields initialized
-func newHelmfileParams() *helmfileParams{
+func newHelmfileParams() *helmfileParams {
 	return &helmfileParams{
 		stateValues: make(map[string]string),
-		selectors: make(map[string]string),
+		selectors:   make(map[string]string),
 	}
 }
 

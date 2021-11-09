@@ -30,7 +30,6 @@ func SortReleaseTargets(targets []ReleaseTarget) {
 	})
 }
 
-
 // LoadReleaseTargets loads all environment and cluster release targets from the config repo
 func LoadReleaseTargets(configRepoPath string) (map[string]ReleaseTarget, error) {
 	targets := make(map[string]ReleaseTarget)

@@ -53,11 +53,11 @@ type ThelmaContext struct {
 }
 
 type ThelmaCLI struct {
-	context *ThelmaContext
-	rootCommand *cobra.Command
-	renderCLI *renderCLI
+	context         *ThelmaContext
+	rootCommand     *cobra.Command
+	renderCLI       *renderCLI
 	configOverrides map[string]interface{}
-	shellRunner shell.Runner
+	shellRunner     shell.Runner
 }
 
 // Execute is the main method/entrypoint for Thelma
@@ -113,9 +113,9 @@ func newThelmaCLI() *ThelmaCLI {
 	render := newRenderCLI(ctx)
 
 	cli := ThelmaCLI{
-		context: ctx,
-		rootCommand: rootCommand,
-		renderCLI: render,
+		context:         ctx,
+		rootCommand:     rootCommand,
+		renderCLI:       render,
 		configOverrides: cfgOverrides,
 	}
 
@@ -137,7 +137,7 @@ func newThelmaCLI() *ThelmaCLI {
 		return nil
 	}
 
-	rootCommand.PersistentPostRunE = func (cmd *cobra.Command, args[]string) error {
+	rootCommand.PersistentPostRunE = func(cmd *cobra.Command, args []string) error {
 		return ctx.app.Paths.Cleanup()
 	}
 

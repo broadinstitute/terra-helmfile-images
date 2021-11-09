@@ -129,6 +129,9 @@ func newThelmaCLI() *ThelmaCLI {
 		}
 
 		_app, err := app.NewWithOptions(cfg, app.Options{Runner: cli.shellRunner})
+		if err != nil {
+			return err
+		}
 
 		// Add app to context so subcommands can access it
 		ctx.app = _app

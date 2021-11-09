@@ -2,7 +2,6 @@ package render
 
 import (
 	"fmt"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/app"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render/helmfile"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render/target"
@@ -29,7 +28,6 @@ type Options struct {
 
 // multiRender renders manifests for multiple environments and clusters
 type multiRender struct {
-	shellRunner       shell.Runner                    // shell runner instance to use for executing commands
 	options           *Options                        // Options global render options
 	configuredTargets map[string]target.ReleaseTarget // Collection of release targets (environments and clusters) defined in the config repo, keyed by name
 	configRepo        *helmfile.ConfigRepo            // configRepo refernce to use for executing `helmfile template`

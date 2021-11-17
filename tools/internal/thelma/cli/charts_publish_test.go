@@ -5,5 +5,5 @@ import (
 )
 
 func TestChartsPublish(t *testing.T) {
-	// TODO
+	t.Fatal("TODO")
 }

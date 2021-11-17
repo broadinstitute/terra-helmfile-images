@@ -29,9 +29,6 @@ const configRepoName = "terra-helmfile"
 // globalUsage common usage string printed for all subcommands
 const globalUsage = `CLI tools for interacting with Terra's Helm charts
 
-Common actions for thelma:
-- thelma render:  render manifests for Terra environments
-
 Environment variables:
 | Name                               | Description                                                                       |
 |------------------------------------|-----------------------------------------------------------------------------------|

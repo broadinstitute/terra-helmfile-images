@@ -9,13 +9,17 @@ import (
 	"sort"
 )
 
+// Entry is for deserializing chart entries in a Helm repo index.yaml
 type Entry struct {
 	Version string `yaml:"version"`
 }
+
+// Index is for deserializing a Helm repo index.yaml
 type Index struct {
 	Entries map[string][]Entry `yaml:"entries"`
 }
 
+// LoadFromFile parses an index from a file
 func LoadFromFile(filePath string) (*Index, error) {
 	indexContent, err := os.ReadFile(filePath)
 	if err != nil {
@@ -30,6 +34,7 @@ func LoadFromFile(filePath string) (*Index, error) {
 	return &index, nil
 }
 
+// LatestVersion returns the latest version of the chart in the index
 func (index *Index) LatestVersion(chartName string) string {
 	if index.Entries == nil || len(index.Entries) == 0 {
 		log.Warn().Msgf("index is empty, can't look up chart version for %s", chartName)

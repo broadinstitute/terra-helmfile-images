@@ -6,6 +6,7 @@ require (
 	cloud.google.com/go/storage v1.10.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/gofrs/flock v0.8.1
+	github.com/norwoodj/helm-docs v1.6.0 // indirect
 	github.com/rs/zerolog v1.23.0
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/viper v1.8.1

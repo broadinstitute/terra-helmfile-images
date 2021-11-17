@@ -69,7 +69,16 @@ func Publish(chartsToPublish []string, bucketName string, sourceDir string, app 
 	log.Debug().Msgf("Identified %d charts to publish: %s", len(chartsToPublish), strings.Join(chartsToPublish, ","))
 	depGraph.TopoSort(chartsToPublish)
 
-	bucket := gcs.New(bucketName)
+	bucket, err := gcs.NewBucket(bucketName)
+	if err != nil {
+		return fmt.Errorf("error creating gcs client for bucket %s: %v", bucketName, err)
+	}
+	defer func() {
+		if err := bucket.Close(); err != nil {
+			log.Error().Msgf("Error closing gcs client for bucket %s: %v", bucketName, err)
+		}
+	}()
+
 	chartUploader, err := repo.NewUploader(bucket, app)
 	if err != nil {
 		return err

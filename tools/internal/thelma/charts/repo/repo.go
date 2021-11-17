@@ -58,7 +58,7 @@ func (u *ChartUploader) LockRepo() error {
 		return fmt.Errorf("repo is already locked")
 	}
 
-	if err := u.bucket.DeleteStaleLockIfExists(lockObject, lockStaleAge); err != nil {
+	if err := u.bucket.DeleteStaleLock(lockObject, lockStaleAge); err != nil {
 		return err
 	}
 	lockGen, err := u.bucket.WaitForLock(lockObject, "chart-uploader", lockWait)

@@ -1,4 +1,4 @@
-// +build integration
+// +build smoke
 
 package gcs
 
@@ -16,6 +16,10 @@ type testHarness struct {
 	bucket *Bucket
 	objectPrefix string
 }
+
+// This file contains a smoke test that talks to a real GCS bucket. By default it is ignored by Go test.
+// You can run it with:
+//   go test ./... -tags smoke
 
 // Integration test for gcs package
 const testBucket = "thelma-gcs-integration-test" // lives in dsp-tools-k8s project

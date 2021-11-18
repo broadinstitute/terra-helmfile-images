@@ -94,6 +94,36 @@ func TestTopoSort(t *testing.T) {
 	}
 }
 
+func TestCycleDetection(t *testing.T) {
+	_, err := NewGraph(map[string][]string{
+		"a": {"a"},
+	})
+	assert.Error(t, err)
+	assert.Regexp(t, "cycle detected: a -> a", err.Error())
+
+	_, err = NewGraph(map[string][]string{
+		"a": {"b"},
+		"b": {"a"},
+	})
+	assert.Error(t, err)
+	assert.Regexp(t, "cycle detected", err.Error())
+	assert.Regexp(t, "a -> b", err.Error())
+	assert.Regexp(t, "b -> a", err.Error())
+
+	_, err = NewGraph(map[string][]string{
+		"a": {"b"},
+		"b": {"c"},
+		"c": {"d"},
+		"d": {"e"},
+		"e": {"c"},
+	})
+	assert.Error(t, err)
+	assert.Regexp(t, "cycle detected", err.Error())
+	assert.Regexp(t, "c -> d", err.Error())
+	assert.Regexp(t, "d -> e", err.Error())
+	assert.Regexp(t, "e -> c", err.Error())
+}
+
 func testGraph(t *testing.T) *Graph {
 	deps := map[string][]string{
 		"a": {"b", "c"},

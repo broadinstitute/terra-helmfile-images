@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+const pathRoot = "__ROOT__"
+
 // Graph dependency graph for local charts in a source directory
 type Graph struct {
 	nodes     map[string]*graphNode
@@ -146,8 +148,10 @@ func addDependency(node *graphNode, dep *graphNode) {
 
 func checkForCycles(nodes map[string]*graphNode) error {
 	checked := make(map[string]bool, len(nodes))
-	pathMap := make(map[string]string)
 	for _, node := range nodes {
+		pathMap := make(map[string]string)
+		pathMap[node.chartName] = pathRoot
+
 		if err := searchForCycles(node, pathMap, checked); err != nil {
 			return err
 		}
@@ -179,8 +183,8 @@ func pathToString(path map[string]string, lastElement string, repeatElement stri
 	currentElement := lastElement
 	for {
 		pathList = append(pathList, currentElement)
-		parent, exists := path[currentElement]
-		if !exists {
+		parent := path[currentElement]
+		if parent == pathRoot {
 			break
 		}
 		currentElement = parent

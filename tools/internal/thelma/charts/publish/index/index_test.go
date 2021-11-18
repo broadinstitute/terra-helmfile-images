@@ -20,5 +20,6 @@ func TestLatestVersion(t *testing.T) {
 	assert.NoError(t, err)
 
 	emptyIndex, err := LoadFromFile(emptyFile)
+	assert.NoError(t, err)
 	assert.Equal(t, "", emptyIndex.LatestVersion("agora"))
 }

@@ -106,6 +106,9 @@ func publishCharts(options *chartsPublishOptions, app *app.ThelmaApp) error {
 	depGraph.TopoSort(chartsToPublish)
 
 	_bucket, err := bucket.NewBucket(options.bucketName)
+	if err != nil {
+		return err
+	}
 	_repo := repo.NewRepo(_bucket)
 	defer func() {
 		if err := _bucket.Close(); err != nil {

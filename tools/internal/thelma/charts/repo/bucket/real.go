@@ -104,7 +104,7 @@ func (bucket *RealBucket) DeleteStaleLock(objectPath string, staleAge time.Durat
 		return fmt.Errorf("error loading attributes for lock object gs://%s/%s: %v", bucket.name, objectPath, err)
 	}
 
-	lockAge := time.Now().Sub(attrs.Created)
+	lockAge := time.Since(attrs.Created)
 	if lockAge < staleAge {
 		// lock file exists but is not stale
 		log.Debug().Msgf("Lock file gs://%s/%s is not stale, won't delete it (creation time: %s, age: %s, max age: %s)", bucket.name, objectPath, attrs.Created, lockAge, staleAge)

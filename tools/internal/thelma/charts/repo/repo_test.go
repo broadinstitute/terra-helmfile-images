@@ -60,7 +60,7 @@ func TestLocking(t *testing.T) {
 
 	mock.On("DeleteStaleLock", options.LockPath, options.LockStaleTimeout).Return(nil)
 	mock.On("WaitForLock", options.LockPath, options.LockWaitTimeout).Return(int64(1337), nil)
-	mock.On("ReleaseLock", options.LockPath, int64(1337)).Return( nil)
+	mock.On("ReleaseLock", options.LockPath, int64(1337)).Return(nil)
 
 	assert.False(t, repo.IsLocked())
 	assert.NoError(t, repo.Lock())

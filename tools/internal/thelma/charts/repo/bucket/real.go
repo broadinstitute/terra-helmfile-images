@@ -26,7 +26,6 @@ func NewBucket(name string) (*RealBucket, error) {
 		return nil, err
 	}
 
-
 	return &RealBucket{
 		name:   name,
 		ctx:    context.Background(),
@@ -150,7 +149,7 @@ func (bucket *RealBucket) ReleaseLock(objectPath string, generation int64) error
 func (bucket *RealBucket) Delete(objectPath string) error {
 	object := bucket.getObject(objectPath)
 
-	if err :=  object.Delete(bucket.ctx); err != nil {
+	if err := object.Delete(bucket.ctx); err != nil {
 		return fmt.Errorf("error deleting gs://%s/%s: %v", bucket.name, objectPath, err)
 	}
 

@@ -17,25 +17,26 @@ const chartsPublishHelpMessage = `Publishes Helm charts for Terra services`
 const chartsPublishDefaultBucketName = "terra-helm"
 
 type chartsPublishOptions struct {
-	chartDir string
+	chartDir   string
 	bucketName string
-	dryRun bool
-	charts []string
+	dryRun     bool
+	charts     []string
 }
+
 var chartsPublishFlagNames = struct {
-	chartDir        string
-	bucketName      string
-	dryRun          string
+	chartDir   string
+	bucketName string
+	dryRun     string
 }{
-	chartDir:        "chart-dir",
-	bucketName:      "bucket",
-	dryRun:          "dry-run",
+	chartDir:   "chart-dir",
+	bucketName: "bucket",
+	dryRun:     "dry-run",
 }
 
 type chartsPublishCLI struct {
-	ctx *ThelmaContext
+	ctx          *ThelmaContext
 	cobraCommand *cobra.Command
-	options *chartsPublishOptions
+	options      *chartsPublishOptions
 }
 
 func newChartsPublishCLI(ctx *ThelmaContext) *chartsPublishCLI {
@@ -75,9 +76,9 @@ func newChartsPublishCLI(ctx *ThelmaContext) *chartsPublishCLI {
 	}
 
 	return &chartsPublishCLI{
-		ctx: ctx,
+		ctx:          ctx,
 		cobraCommand: cobraCommand,
-		options: &options,
+		options:      &options,
 	}
 }
 

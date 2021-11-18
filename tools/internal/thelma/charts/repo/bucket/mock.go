@@ -11,7 +11,7 @@ type MockBucket struct {
 }
 
 // NewMockBucket creates a new MockBucket
-func NewMockBucket(name string) (*MockBucket) {
+func NewMockBucket(name string) *MockBucket {
 	return &MockBucket{name: name}
 }
 

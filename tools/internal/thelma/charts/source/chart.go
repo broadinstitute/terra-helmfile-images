@@ -14,10 +14,10 @@ const helmDocsProg = "helm-docs"
 
 // Struct representing a chart source directory on the local filesystem.
 type Chart struct {
-	name     string        // name of the chart
-	path     string        // path to the chart directory on the local filesystem
-	manifest ChartManifest // manifest parsed subset of Chart.yaml
-	shellRunner shell.Runner // shell runner instance to use for executing commands
+	name        string        // name of the chart
+	path        string        // path to the chart directory on the local filesystem
+	manifest    ChartManifest // manifest parsed subset of Chart.yaml
+	shellRunner shell.Runner  // shell runner instance to use for executing commands
 }
 
 func (chart Chart) Name() string {
@@ -80,7 +80,8 @@ func (chart Chart) GenerateDocs() error {
 		},
 		Dir: chart.path,
 	}
-	return chart.shellRunner.Run(cmd)}
+	return chart.shellRunner.Run(cmd)
+}
 
 func (chart Chart) nextVersion(latestPublishedVersion string) string {
 	sourceVersion := chart.manifest.Version

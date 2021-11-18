@@ -38,9 +38,9 @@ type Repo interface {
 }
 
 type Options struct {
-	LockWaitTimeout time.Duration
-	LockStaleTimeout time.Duration
-	LockPath string
+	LockWaitTimeout   time.Duration
+	LockStaleTimeout  time.Duration
+	LockPath          string
 	ChartCacheControl string
 	IndexCacheControl string
 }

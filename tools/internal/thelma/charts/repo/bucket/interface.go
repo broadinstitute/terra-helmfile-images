@@ -26,7 +26,7 @@ type Bucket interface {
 	Exists(objectPath string) (bool, error)
 
 	// Upload uploads a local file to the bucket
-    Upload(localPath string, objectPath string, cacheControl string) error
+	Upload(localPath string, objectPath string, cacheControl string) error
 
 	// Download downloads an object in the bucket to a local file
 	Download(objectPath string, localPath string) error

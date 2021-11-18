@@ -16,15 +16,15 @@ import (
 
 type testState struct {
 	scratchDir string
-	mockRepo *repo.MockRepo
+	mockRepo   *repo.MockRepo
 	mockRunner *shellmock.MockRunner
-	publisher *ChartPublisher
+	publisher  *ChartPublisher
 }
 
 func TestPublish(t *testing.T) {
-	testCases := []struct{
+	testCases := []struct {
 		description string
-		test func(ts testState)
+		test        func(ts testState)
 	}{
 		{
 			description: "should panic error if no charts have been added",
@@ -109,8 +109,8 @@ func TestGetLatestVersion(t *testing.T) {
 	publisher := ts.publisher
 
 	assert.Equal(t, "4.5.6", publisher.LastPublishedVersion("foo"))
-	assert.Equal(t, "",      publisher.LastPublishedVersion("bar"))
-	assert.Equal(t, "",      publisher.LastPublishedVersion("baz"))
+	assert.Equal(t, "", publisher.LastPublishedVersion("bar"))
+	assert.Equal(t, "", publisher.LastPublishedVersion("baz"))
 }
 
 func TestConstructorCreatesEmptyIndexIfNoExist(t *testing.T) {
@@ -156,9 +156,9 @@ func setup(t *testing.T) testState {
 
 	return testState{
 		scratchDir: scratchDir,
-		mockRepo: mockRepo,
+		mockRepo:   mockRepo,
 		mockRunner: mockRunner,
-		publisher: publisher,
+		publisher:  publisher,
 	}
 }
 

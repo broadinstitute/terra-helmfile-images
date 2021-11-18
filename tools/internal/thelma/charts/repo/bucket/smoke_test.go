@@ -1,3 +1,4 @@
+//go:build smoke
 // +build smoke
 
 package bucket
@@ -13,7 +14,7 @@ import (
 )
 
 type testHarness struct {
-	bucket *RealBucket
+	bucket       *RealBucket
 	objectPrefix string
 }
 

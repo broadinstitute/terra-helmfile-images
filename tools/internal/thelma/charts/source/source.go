@@ -17,10 +17,10 @@ const chartManifestFile = "Chart.yaml"
 
 // ChartManifest struct used to unmarshal Helm Chart.yaml files.
 type ChartManifest struct {
-	Name string `yaml:"name"`
-	Version string `yaml:"version"`
+	Name         string `yaml:"name"`
+	Version      string `yaml:"version"`
 	Dependencies []struct {
-		Name string `yaml:"name"`
+		Name       string `yaml:"name"`
 		Repository string `yaml:"repository"`
 	} `yaml:"dependencies"`
 }
@@ -36,7 +36,7 @@ func NewSourceDirectory(sourceDir string, shellRunner shell.Runner) (*Dir, error
 	glob := path.Join(sourceDir, path.Join("*", chartManifestFile))
 	manifestFiles, err := filepath.Glob(glob)
 	if err != nil {
-		return nil, fmt.Errorf("error globbing charts with %q: %v", glob ,err)
+		return nil, fmt.Errorf("error globbing charts with %q: %v", glob, err)
 	}
 
 	// For each Chart.yaml file, parse it and store in collection of Chart objects
@@ -55,9 +55,9 @@ func NewSourceDirectory(sourceDir string, shellRunner shell.Runner) (*Dir, error
 
 		// Create node for this chart
 		chart := Chart{
-			name:     manifest.Name,
-			path:     path.Dir(manifestFile),
-			manifest: manifest,
+			name:        manifest.Name,
+			path:        path.Dir(manifestFile),
+			manifest:    manifest,
 			shellRunner: shellRunner,
 		}
 		charts[chart.name] = chart

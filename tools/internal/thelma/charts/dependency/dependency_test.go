@@ -47,7 +47,7 @@ func TestWithDependents(t *testing.T) {
 	}
 }
 
-func TestTopoSort(t *testing.T){
+func TestTopoSort(t *testing.T) {
 	g := testGraph(t)
 
 	testCases := [][][]string{

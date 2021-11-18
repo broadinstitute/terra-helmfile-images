@@ -2,7 +2,7 @@ package repo
 
 import "github.com/stretchr/testify/mock"
 
-type MockRepo struct{
+type MockRepo struct {
 	mock.Mock
 }
 

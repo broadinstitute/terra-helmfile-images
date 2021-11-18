@@ -29,11 +29,11 @@ import (
 // Note that Publish() can only be called once for a given publisher instance.
 //
 type ChartPublisher struct {
-	repo repo.Repo
-	stagingDir *stagingDir
+	repo        repo.Repo
+	stagingDir  *stagingDir
 	shellRunner shell.Runner
-	index *index.Index
-	closed bool
+	index       *index.Index
+	closed      bool
 }
 
 // NewPublisher is a constructor for a ChartPublisher. It
@@ -42,7 +42,7 @@ type ChartPublisher struct {
 // * locks the repo
 // * downloads the index file
 func NewPublisher(repo repo.Repo, runner shell.Runner, scratchDir string) (*ChartPublisher, error) {
-	_stagingDir := &stagingDir{ root: scratchDir }
+	_stagingDir := &stagingDir{root: scratchDir}
 
 	if err := os.Mkdir(_stagingDir.chartDir(), 0755); err != nil {
 		return nil, fmt.Errorf("chart-publisher: failed to create chart dir: %v", err)
@@ -174,7 +174,7 @@ func (u *ChartPublisher) listChartFiles() ([]string, error) {
 	glob := path.Join(u.ChartDir(), "*.tgz")
 	chartFiles, err := filepath.Glob(glob)
 	if err != nil {
-		return nil, fmt.Errorf("chart-publisher: error globbing charts with %q: %v", glob ,err)
+		return nil, fmt.Errorf("chart-publisher: error globbing charts with %q: %v", glob, err)
 	}
 
 	return chartFiles, nil

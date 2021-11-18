@@ -5,13 +5,12 @@ import (
 	"testing"
 )
 
-
 func TestIsValid(t *testing.T) {
 	testCases := map[string]bool{
-		"": false,
-		"invalid": false,
-		"0": true,
-		"1.2.3": true,
+		"":           false,
+		"invalid":    false,
+		"0":          true,
+		"1.2.3":      true,
 		"1.2.3-beta": true,
 	}
 	for input, expected := range testCases {
@@ -44,19 +43,19 @@ func TestMinorBump(t *testing.T) {
 		"1",
 	}
 	successCases := map[string]string{
-		"1.2": "1.3.0",
-		"1.2.3": "1.3.0",
+		"1.2":        "1.3.0",
+		"1.2.3":      "1.3.0",
 		"1.2.3-beta": "1.3.0",
 	}
 
 	for _, input := range failCases {
 		_, err := MinorBump(input)
-		assert.Error(t, err,"input: %v", input)
+		assert.Error(t, err, "input: %v", input)
 	}
 
 	for input, expected := range successCases {
 		bumped, err := MinorBump(input)
-		assert.NoError(t, err,"input: %v", input)
+		assert.NoError(t, err, "input: %v", input)
 		assert.Equal(t, expected, bumped, "input: %v", input)
 	}
 }

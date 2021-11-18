@@ -8,7 +8,7 @@ import (
 
 // Graph dependency graph for local charts in a source directory
 type Graph struct {
-	nodes map[string]*graphNode
+	nodes     map[string]*graphNode
 	topoOrder map[string]int
 }
 
@@ -43,7 +43,7 @@ func NewGraph(dependencies map[string][]string) (*Graph, error) {
 
 	topoOrder := computeTopoOrdering(nodes)
 
-	return &Graph{ nodes: nodes, topoOrder: topoOrder }, nil
+	return &Graph{nodes: nodes, topoOrder: topoOrder}, nil
 }
 
 // TopoSort will sort the given charts in topological order.
@@ -72,7 +72,7 @@ func (graph *Graph) TopoSort(chartNames []string) {
 // H <- I <- J
 // WithDependents([]string{"A", "G", "I"}) will return []string{"A", "G", "B", "C", "I", "J"}
 // (order not guaranteed)
-func (graph *Graph) WithDependents(chartNames... string) []string {
+func (graph *Graph) WithDependents(chartNames ...string) []string {
 	queue := make([]string, 0, len(chartNames))
 	visited := make(map[string]bool)
 	result := make([]string, 0, len(chartNames))
@@ -192,7 +192,7 @@ func pathToString(path map[string]string, lastElement string, repeatElement stri
 }
 
 func reverse(ss []string) {
-	for i, j := 0, len(ss) - 1; i < len(ss) / 2; i, j = i+1, j-1 {
+	for i, j := 0, len(ss)-1; i < len(ss)/2; i, j = i+1, j-1 {
 		ss[i], ss[j] = ss[j], ss[i]
 	}
 }

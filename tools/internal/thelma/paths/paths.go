@@ -4,7 +4,10 @@ import (
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/config"
 	"github.com/rs/zerolog/log"
 	"os"
+	"path"
 )
+
+const defaultChartSrcDir = "charts"
 
 // Paths is a utility for interacting with terra-helmfile paths
 type Paths struct {
@@ -23,6 +26,11 @@ func New(cfg *config.Config) (*Paths, error) {
 		scratchRootDir: scratchDir,
 	}
 	return paths, nil
+}
+
+// DefaultChartSrcDir default directory in terra-helmfile where chart sources live
+func (p *Paths) DefaultChartSrcDir() string {
+	return path.Join(p.cfg.Home(), defaultChartSrcDir)
 }
 
 // CreateScratchDir creates a new temporary directory

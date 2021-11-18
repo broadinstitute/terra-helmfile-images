@@ -36,7 +36,7 @@ const lockTimeout = 30 * time.Second
 // Options for a chartfetch command
 type Options struct {
 	Version     string // Version of the chart that should be pulled (also passed directly to `helm fetch` )
-	DownloadDir string // DownloadDir Path where chart should be downloaded; if it exists, the chart will not be downloaded again
+	DownloadDir string // DownloadDir path where chart should be downloaded; if it exists, the chart will not be downloaded again
 }
 
 // shellRunner an instance of a shell.Runner used to execute Helm commands.

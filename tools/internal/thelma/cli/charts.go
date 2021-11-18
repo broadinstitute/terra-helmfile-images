@@ -4,12 +4,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-
 const chartsHelpMessage = `Tools for interacting with Terra Helm charts`
 
 type chartsCLI struct {
 	cobraCommand *cobra.Command
-	publishCLI *chartsPublishCLI
+	publishCLI   *chartsPublishCLI
 }
 
 func newChartsCLI(ctx *ThelmaContext) *chartsCLI {
@@ -25,6 +24,6 @@ func newChartsCLI(ctx *ThelmaContext) *chartsCLI {
 	)
 	return &chartsCLI{
 		cobraCommand: cmd,
-		publishCLI: publishCLI,
+		publishCLI:   publishCLI,
 	}
 }

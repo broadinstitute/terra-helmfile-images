@@ -54,11 +54,11 @@ type renderCLI struct {
 	cobraCommand  *cobra.Command
 	helmfileArgs  *helmfile.Args
 	renderOptions *render.Options
-	flagVals      *flagValues
+	flagVals      *renderFlagValues
 }
 
 // Names of all the CLI flags are kept in a struct so they can be easily referenced in error messages
-var flagNames = struct {
+var renderFlagNames = struct {
 	env             string
 	cluster         string
 	app             string
@@ -86,8 +86,8 @@ var flagNames = struct {
 	parallelWorkers: "parallel-workers",
 }
 
-// flagValues is a struct for capturing flag values that are parsed by Cobra.
-type flagValues struct {
+// renderFlagValues is a struct for capturing flag values that are parsed by Cobra.
+type renderFlagValues struct {
 	env             string
 	cluster         string
 	app             string
@@ -104,7 +104,7 @@ type flagValues struct {
 
 // newRenderCLI constructs a new renderCLI
 func newRenderCLI(ctx *ThelmaContext) *renderCLI {
-	flagVals := &flagValues{}
+	flagVals := &renderFlagValues{}
 	helmfileArgs := &helmfile.Args{}
 	renderOptions := &render.Options{}
 
@@ -117,18 +117,18 @@ func newRenderCLI(ctx *ThelmaContext) *renderCLI {
 	}
 
 	// Add CLI flag handlers to cobra command
-	cobraCommand.Flags().StringVarP(&flagVals.env, flagNames.env, "e", "ENV", "Render manifests for a specific Terra environment only")
-	cobraCommand.Flags().StringVarP(&flagVals.cluster, flagNames.cluster, "c", "CLUSTER", "Render manifests for a specific Terra cluster only")
-	cobraCommand.Flags().StringVarP(&flagVals.release, flagNames.release, "r", "RELEASE", "Render manifests for a specific release only")
-	cobraCommand.Flags().StringVarP(&flagVals.app, flagNames.app, "a", "APP", "Render manifests for a specific app only. (Alias for -r/--release)")
-	cobraCommand.Flags().StringVar(&flagVals.chartVersion, flagNames.chartVersion, "VERSION", "Override chart version")
-	cobraCommand.Flags().StringVar(&flagVals.chartDir, flagNames.chartDir, "path/to/charts", "Render from local chart directory instead of official release")
-	cobraCommand.Flags().StringVar(&flagVals.appVersion, flagNames.appVersion, "VERSION", "Override application version")
-	cobraCommand.Flags().StringSliceVar(&flagVals.valuesFile, flagNames.valuesFile, []string{}, "Path to chart values file. Can be specified multiple times with ascending precedence (last wins)")
-	cobraCommand.Flags().BoolVar(&flagVals.argocd, flagNames.argocd, false, "Render ArgoCD manifests instead of application manifests")
-	cobraCommand.Flags().StringVarP(&flagVals.outputDir, flagNames.outputDir, "d", "path/to/output/dir", "Render manifests to custom output directory")
-	cobraCommand.Flags().BoolVar(&flagVals.stdout, flagNames.stdout, false, "Render manifests to stdout instead of output directory")
-	cobraCommand.Flags().IntVar(&flagVals.parallelWorkers, flagNames.parallelWorkers, 1, "Number of parallel workers to launch when rendering")
+	cobraCommand.Flags().StringVarP(&flagVals.env, renderFlagNames.env, "e", "ENV", "Render manifests for a specific Terra environment only")
+	cobraCommand.Flags().StringVarP(&flagVals.cluster, renderFlagNames.cluster, "c", "CLUSTER", "Render manifests for a specific Terra cluster only")
+	cobraCommand.Flags().StringVarP(&flagVals.release, renderFlagNames.release, "r", "RELEASE", "Render manifests for a specific release only")
+	cobraCommand.Flags().StringVarP(&flagVals.app, renderFlagNames.app, "a", "APP", "Render manifests for a specific app only. (Alias for -r/--release)")
+	cobraCommand.Flags().StringVar(&flagVals.chartVersion, renderFlagNames.chartVersion, "VERSION", "Override chart version")
+	cobraCommand.Flags().StringVar(&flagVals.chartDir, renderFlagNames.chartDir, "path/to/charts", "Render from local chart directory instead of official release")
+	cobraCommand.Flags().StringVar(&flagVals.appVersion, renderFlagNames.appVersion, "VERSION", "Override application version")
+	cobraCommand.Flags().StringSliceVar(&flagVals.valuesFile, renderFlagNames.valuesFile, []string{}, "path to chart values file. Can be specified multiple times with ascending precedence (last wins)")
+	cobraCommand.Flags().BoolVar(&flagVals.argocd, renderFlagNames.argocd, false, "Render ArgoCD manifests instead of application manifests")
+	cobraCommand.Flags().StringVarP(&flagVals.outputDir, renderFlagNames.outputDir, "d", "path/to/output/dir", "Render manifests to custom output directory")
+	cobraCommand.Flags().BoolVar(&flagVals.stdout, renderFlagNames.stdout, false, "Render manifests to stdout instead of output directory")
+	cobraCommand.Flags().IntVar(&flagVals.parallelWorkers, renderFlagNames.parallelWorkers, 1, "Number of parallel workers to launch when rendering")
 
 	cli := &renderCLI{
 		cobraCommand:  cobraCommand,
@@ -173,17 +173,17 @@ func (cli *renderCLI) fillRenderOptions() error {
 	renderOptions := cli.renderOptions
 
 	// env
-	if flags.Changed(flagNames.env) {
+	if flags.Changed(renderFlagNames.env) {
 		renderOptions.Env = &flagVals.env
 	}
 
 	// cluster
-	if flags.Changed(flagNames.cluster) {
+	if flags.Changed(renderFlagNames.cluster) {
 		renderOptions.Cluster = &flagVals.cluster
 	}
 
 	// output dir
-	if flags.Changed(flagNames.outputDir) {
+	if flags.Changed(renderFlagNames.outputDir) {
 		dir, err := filepath.Abs(flagVals.outputDir)
 		if err != nil {
 			return err
@@ -210,22 +210,22 @@ func (cli *renderCLI) fillHelmfileArgs() error {
 	helmfileArgs := cli.helmfileArgs
 
 	// release name
-	if flags.Changed(flagNames.release) {
+	if flags.Changed(renderFlagNames.release) {
 		helmfileArgs.ReleaseName = &flagVals.release
 	}
 
 	// chart version
-	if flags.Changed(flagNames.chartVersion) {
+	if flags.Changed(renderFlagNames.chartVersion) {
 		helmfileArgs.ChartVersion = &flagVals.chartVersion
 	}
 
 	// app version
-	if flags.Changed(flagNames.appVersion) {
+	if flags.Changed(renderFlagNames.appVersion) {
 		helmfileArgs.AppVersion = &flagVals.appVersion
 	}
 
 	// chart dir
-	if flags.Changed(flagNames.chartDir) {
+	if flags.Changed(renderFlagNames.chartDir) {
 		dir, err := expandAndVerifyExists(flagVals.chartDir, "chart dir")
 		if err != nil {
 			return err
@@ -234,7 +234,7 @@ func (cli *renderCLI) fillHelmfileArgs() error {
 	}
 
 	// values file
-	if flags.Changed(flagNames.valuesFile) {
+	if flags.Changed(renderFlagNames.valuesFile) {
 		for _, file := range flagVals.valuesFile {
 			fullpath, err := expandAndVerifyExists(file, "values file")
 			if err != nil {
@@ -255,14 +255,14 @@ func (cli *renderCLI) handleFlagAliases() error {
 	flags := cli.cobraCommand.Flags()
 
 	// --app is a legacy alias for --release, so copy the user-supplied value over
-	if flags.Changed(flagNames.app) {
-		if flags.Changed(flagNames.release) {
+	if flags.Changed(renderFlagNames.app) {
+		if flags.Changed(renderFlagNames.release) {
 			return fmt.Errorf("-a is a legacy alias for -r, please specify one or the other but not both")
 		}
-		_app := flags.Lookup(flagNames.app).Value.String()
-		err := flags.Set(flagNames.release, _app)
+		_app := flags.Lookup(renderFlagNames.app).Value.String()
+		err := flags.Set(renderFlagNames.release, _app)
 		if err != nil {
-			return fmt.Errorf("error setting --%s to --%s argument %q: %v", flagNames.release, flagNames.app, _app, err)
+			return fmt.Errorf("error setting --%s to --%s argument %q: %v", renderFlagNames.release, renderFlagNames.app, _app, err)
 		}
 	}
 
@@ -272,58 +272,58 @@ func (cli *renderCLI) handleFlagAliases() error {
 func (cli *renderCLI) checkIncompatibleFlags() error {
 	flags := cli.cobraCommand.Flags()
 
-	if flags.Changed(flagNames.env) && flags.Changed(flagNames.cluster) {
-		return fmt.Errorf("only one of --%s or --%s may be specified", flagNames.env, flagNames.cluster)
+	if flags.Changed(renderFlagNames.env) && flags.Changed(renderFlagNames.cluster) {
+		return fmt.Errorf("only one of --%s or --%s may be specified", renderFlagNames.env, renderFlagNames.cluster)
 	}
 
-	if flags.Changed(flagNames.release) && !(flags.Changed(flagNames.env) || flags.Changed(flagNames.cluster)) {
+	if flags.Changed(renderFlagNames.release) && !(flags.Changed(renderFlagNames.env) || flags.Changed(renderFlagNames.cluster)) {
 		// Not all targets include all charts, so require users to specify target env or cluster when -r / -a is passed in
-		return fmt.Errorf("an environment (--%s) or cluster (--%s) must be specified when a release is specified with --%s", flagNames.env, flagNames.cluster, flagNames.release)
+		return fmt.Errorf("an environment (--%s) or cluster (--%s) must be specified when a release is specified with --%s", renderFlagNames.env, renderFlagNames.cluster, renderFlagNames.release)
 	}
 
-	if flags.Changed(flagNames.chartDir) {
-		if flags.Changed(flagNames.chartVersion) {
+	if flags.Changed(renderFlagNames.chartDir) {
+		if flags.Changed(renderFlagNames.chartVersion) {
 			// Chart dir points at a local chart copy, chart version specifies which version to use, we can only
 			// use one or the other
-			return fmt.Errorf("only one of --%s or --%s may be specified", flagNames.chartDir, flagNames.chartVersion)
+			return fmt.Errorf("only one of --%s or --%s may be specified", renderFlagNames.chartDir, renderFlagNames.chartVersion)
 		}
 
-		if !flags.Changed(flagNames.release) {
-			return fmt.Errorf("--%s requires a release be specified with --%s", flagNames.chartDir, flagNames.release)
-		}
-	}
-
-	if flags.Changed(flagNames.chartVersion) && !flags.Changed(flagNames.release) {
-		return fmt.Errorf("--%s requires a release be specified with --%s", flagNames.chartVersion, flagNames.release)
-	}
-
-	if flags.Changed(flagNames.appVersion) {
-		if !flags.Changed(flagNames.release) {
-			return fmt.Errorf("--%s requires a release be specified with --%s", flagNames.appVersion, flagNames.release)
-		}
-		if flags.Changed(flagNames.cluster) {
-			return fmt.Errorf("--%s cannot be used for cluster releases", flagNames.appVersion)
+		if !flags.Changed(renderFlagNames.release) {
+			return fmt.Errorf("--%s requires a release be specified with --%s", renderFlagNames.chartDir, renderFlagNames.release)
 		}
 	}
 
-	if flags.Changed(flagNames.valuesFile) && !flags.Changed(flagNames.release) {
-		return fmt.Errorf("--%s requires a release be specified with --%s", flagNames.valuesFile, flagNames.release)
+	if flags.Changed(renderFlagNames.chartVersion) && !flags.Changed(renderFlagNames.release) {
+		return fmt.Errorf("--%s requires a release be specified with --%s", renderFlagNames.chartVersion, renderFlagNames.release)
 	}
 
-	if flags.Changed(flagNames.argocd) {
-		if flags.Changed(flagNames.chartDir) || flags.Changed(flagNames.chartVersion) || flags.Changed(flagNames.appVersion) || flags.Changed(flagNames.valuesFile) {
-			return fmt.Errorf("--%s cannot be used with --%s, --%s, --%s, or --%s", flagNames.argocd, flagNames.chartDir, flagNames.chartVersion, flagNames.appVersion, flagNames.valuesFile)
+	if flags.Changed(renderFlagNames.appVersion) {
+		if !flags.Changed(renderFlagNames.release) {
+			return fmt.Errorf("--%s requires a release be specified with --%s", renderFlagNames.appVersion, renderFlagNames.release)
+		}
+		if flags.Changed(renderFlagNames.cluster) {
+			return fmt.Errorf("--%s cannot be used for cluster releases", renderFlagNames.appVersion)
 		}
 	}
 
-	if flags.Changed(flagNames.stdout) && flags.Changed(flagNames.outputDir) {
+	if flags.Changed(renderFlagNames.valuesFile) && !flags.Changed(renderFlagNames.release) {
+		return fmt.Errorf("--%s requires a release be specified with --%s", renderFlagNames.valuesFile, renderFlagNames.release)
+	}
+
+	if flags.Changed(renderFlagNames.argocd) {
+		if flags.Changed(renderFlagNames.chartDir) || flags.Changed(renderFlagNames.chartVersion) || flags.Changed(renderFlagNames.appVersion) || flags.Changed(renderFlagNames.valuesFile) {
+			return fmt.Errorf("--%s cannot be used with --%s, --%s, --%s, or --%s", renderFlagNames.argocd, renderFlagNames.chartDir, renderFlagNames.chartVersion, renderFlagNames.appVersion, renderFlagNames.valuesFile)
+		}
+	}
+
+	if flags.Changed(renderFlagNames.stdout) && flags.Changed(renderFlagNames.outputDir) {
 		// can't render to both stdout and directory
-		return fmt.Errorf("--%s cannot be used with --%s", flagNames.stdout, flagNames.outputDir)
+		return fmt.Errorf("--%s cannot be used with --%s", renderFlagNames.stdout, renderFlagNames.outputDir)
 	}
 
-	if flags.Changed(flagNames.parallelWorkers) && flags.Changed(flagNames.stdout) {
+	if flags.Changed(renderFlagNames.parallelWorkers) && flags.Changed(renderFlagNames.stdout) {
 		// --parallel-workers renders manifests in parallel. For now we only support it for directory renders
-		return fmt.Errorf("--%s cannot be used with --%s", flagNames.parallelWorkers, flagNames.stdout)
+		return fmt.Errorf("--%s cannot be used with --%s", renderFlagNames.parallelWorkers, renderFlagNames.stdout)
 	}
 	return nil
 }

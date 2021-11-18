@@ -1,4 +1,4 @@
-package gcs
+package bucket
 
 import (
 	"cloud.google.com/go/storage"
@@ -12,15 +12,14 @@ import (
 	"time"
 )
 
-// Bucket offers higher-level operations on GCS buckets
-type Bucket struct {
+type RealBucket struct {
 	name   string
 	ctx    context.Context
 	client *storage.Client
 }
 
 // NewBucket creates a new Bucket
-func NewBucket(name string) (*Bucket, error) {
+func NewBucket(name string) (*RealBucket, error) {
 	ctx := context.Background()
 	client, err := storage.NewClient(ctx)
 	if err != nil {
@@ -28,7 +27,7 @@ func NewBucket(name string) (*Bucket, error) {
 	}
 
 
-	return &Bucket{
+	return &RealBucket{
 		name:   name,
 		ctx:    context.Background(),
 		client: client,
@@ -36,18 +35,18 @@ func NewBucket(name string) (*Bucket, error) {
 }
 
 // Close closes gcs client associated with this bucket
-func (bucket *Bucket) Close() error {
+func (bucket *RealBucket) Close() error {
 	return bucket.client.Close()
 }
 
 // Name returns the name of this bucket
-func (bucket *Bucket) Name() string {
+func (bucket *RealBucket) Name() string {
 	return bucket.name
 }
 
 // WaitForLock waits for a lock, timing out after maxTime. It returns a lock id / object generation number
 // that must be passed in to ReleaseLock
-func (bucket *Bucket) WaitForLock(objectPath string, objectContent string, maxWait time.Duration) (int64, error) {
+func (bucket *RealBucket) WaitForLock(objectPath string, maxWait time.Duration) (int64, error) {
 	obj := bucket.getObject(objectPath)
 	obj = obj.If(storage.Conditions{DoesNotExist: true})
 
@@ -61,7 +60,7 @@ func (bucket *Bucket) WaitForLock(objectPath string, objectContent string, maxWa
 		log.Debug().Msgf("Attempt %d to obtain lock gs://%s/%s", attempt, bucket.name, objectPath)
 
 		writer := obj.NewWriter(ctx)
-		_, writeErr := writer.Write([]byte(objectContent))
+		_, writeErr := writer.Write([]byte(""))
 		closeErr := writer.Close()
 
 		if writeErr == nil && closeErr == nil {
@@ -95,7 +94,7 @@ func (bucket *Bucket) WaitForLock(objectPath string, objectContent string, maxWa
 }
 
 // DeleteStaleLock deletes a stale lock file if it exists and is older than staleAge
-func (bucket *Bucket) DeleteStaleLock(objectPath string, staleAge time.Duration) error {
+func (bucket *RealBucket) DeleteStaleLock(objectPath string, staleAge time.Duration) error {
 	obj := bucket.getObject(objectPath)
 	attrs, err := obj.Attrs(bucket.ctx)
 	if err == storage.ErrObjectNotExist {
@@ -131,7 +130,7 @@ func (bucket *Bucket) DeleteStaleLock(objectPath string, staleAge time.Duration)
 }
 
 // ReleaseLock removes a lockfile
-func (bucket *Bucket) ReleaseLock(objectPath string, generation int64) error {
+func (bucket *RealBucket) ReleaseLock(objectPath string, generation int64) error {
 	obj := bucket.getObject(objectPath)
 
 	obj = obj.If(storage.Conditions{GenerationMatch: generation})
@@ -148,7 +147,7 @@ func (bucket *Bucket) ReleaseLock(objectPath string, generation int64) error {
 }
 
 // Delete deletes an object in the bucket
-func (bucket *Bucket) Delete(objectPath string) error {
+func (bucket *RealBucket) Delete(objectPath string) error {
 	object := bucket.getObject(objectPath)
 
 	if err :=  object.Delete(bucket.ctx); err != nil {
@@ -159,7 +158,7 @@ func (bucket *Bucket) Delete(objectPath string) error {
 }
 
 // Exists returns true if the object exists, false otherwise
-func (bucket *Bucket) Exists(objectPath string) (bool, error) {
+func (bucket *RealBucket) Exists(objectPath string) (bool, error) {
 	object := bucket.getObject(objectPath)
 	_, err := object.Attrs(bucket.ctx)
 	if err == nil {
@@ -172,7 +171,7 @@ func (bucket *Bucket) Exists(objectPath string) (bool, error) {
 }
 
 // Upload uploads a local file to the bucket
-func (bucket *Bucket) Upload(localPath string, objectPath string, cacheControl string) error {
+func (bucket *RealBucket) Upload(localPath string, objectPath string, cacheControl string) error {
 	errPrefix := fmt.Sprintf("error uploading file:///%s to gs://%s/%s", localPath, bucket.name, objectPath)
 
 	obj := bucket.getObject(objectPath)
@@ -202,7 +201,7 @@ func (bucket *Bucket) Upload(localPath string, objectPath string, cacheControl s
 }
 
 // Download downloads an object in the bucket to a local file
-func (bucket *Bucket) Download(objectPath string, localPath string) error {
+func (bucket *RealBucket) Download(objectPath string, localPath string) error {
 	errPrefix := fmt.Sprintf("error downloading gs://%s/%s to file:///%s", bucket.name, objectPath, localPath)
 	obj := bucket.getObject(objectPath)
 
@@ -230,7 +229,7 @@ func (bucket *Bucket) Download(objectPath string, localPath string) error {
 	return nil
 }
 
-func (bucket *Bucket) getObject(objectPath string) *storage.ObjectHandle {
+func (bucket *RealBucket) getObject(objectPath string) *storage.ObjectHandle {
 	return bucket.client.Bucket(bucket.name).Object(objectPath)
 }
 

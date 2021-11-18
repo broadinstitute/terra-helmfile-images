@@ -2,50 +2,38 @@ package dependency
 
 import (
 	"fmt"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/source"
 	"sort"
 	"strings"
 )
 
 // Graph dependency graph for local charts in a source directory
 type Graph struct {
-	nodes map[string]graphNode
+	nodes map[string]*graphNode
 	topoOrder map[string]int
 }
 
 // graphNode node in a dependency graph
 type graphNode struct {
 	chartName    string
-	dependencies []graphNode
-	dependents   []graphNode
+	dependencies []*graphNode
+	dependents   []*graphNode
 }
 
 // NewGraph constructor for a dependency graph
-func NewGraph(dir *source.Dir) (*Graph, error) {
-	chartNames := dir.ChartNames()
-
+func NewGraph(dependencies map[string][]string) (*Graph, error) {
 	// Make a node for each chart
-	nodes := make(map[string]graphNode, len(chartNames))
-	for _, chartName := range dir.ChartNames() {
-		nodes[chartName] = graphNode{chartName: chartName}
+	nodes := make(map[string]*graphNode, len(dependencies))
+	for chartName := range dependencies {
+		nodes[chartName] = &graphNode{chartName: chartName}
 	}
 
 	// Populate dependency relationships for nodes in the graph
 	for chartName, node := range nodes {
-		localDeps, err := dir.LocalDependencies(chartName)
-		if err != nil {
-			return nil, err
-		}
-		for _, depName := range localDeps {
-			depNode := nodes[depName]
+		for _, dependency := range dependencies[chartName] {
+			depNode := nodes[dependency]
 
 			// Add dependency relationships
-			node.dependencies = append(node.dependencies, depNode)
-			depNode.dependents = append(depNode.dependents, node)
-
-			// Update graph
-			nodes[node.chartName] = node
-			nodes[depNode.chartName] = depNode
+			addDependency(node, depNode)
 		}
 	}
 
@@ -65,7 +53,7 @@ func NewGraph(dir *source.Dir) (*Graph, error) {
 // G
 // H <- I <- J
 //
-// TopoSort("C", "H", "E", "I", "B", "D") will return
+// TopoSort([]string{"C", "H", "E", "I", "B", "D"}) will sort to
 // []{"D", "B", "H", "I", "C", "E"}
 // (or another valid topological ordering)
 //
@@ -78,12 +66,13 @@ func (graph *Graph) TopoSort(chartNames []string) {
 
 // Given a set of chart names, return the charts along with names of all transitive local dependents
 // Eg. suppose we have
-// A <- B <- C       (C depends on B, which depends on A)
+// A <- B <- C
 // D <- E
 // G
 // H <- I <- J
 // WithDependents([]string{"A", "G", "I"}) will return []string{"A", "G", "B", "C", "I", "J"}
-func (graph *Graph) WithDependents(chartNames []string) []string {
+// (order not guaranteed)
+func (graph *Graph) WithDependents(chartNames... string) []string {
 	queue := make([]string, 0, len(chartNames))
 	visited := make(map[string]bool)
 	result := make([]string, 0, len(chartNames))
@@ -114,10 +103,10 @@ func (graph *Graph) WithDependents(chartNames []string) []string {
 	return result
 }
 
-// compute a topological ordering of lal nodes in the graph
-func computeTopoOrdering(nodes map[string]graphNode) map[string]int {
+// compute a topological ordering of all nodes in the graph
+func computeTopoOrdering(nodes map[string]*graphNode) map[string]int {
 	dependencyCounts := make(map[string]int, len(nodes))
-	queue := make([]graphNode, 0, len(nodes))
+	queue := make([]*graphNode, 0, len(nodes))
 
 	for chartName, node := range nodes {
 		dependencyCounts[chartName] = len(node.dependencies)
@@ -140,6 +129,7 @@ func computeTopoOrdering(nodes map[string]graphNode) map[string]int {
 			depCount := dependencyCounts[dependent.chartName]
 			depCount--
 			dependencyCounts[dependent.chartName] = depCount
+
 			if depCount == 0 {
 				queue = append(queue, dependent)
 			}
@@ -149,7 +139,12 @@ func computeTopoOrdering(nodes map[string]graphNode) map[string]int {
 	return topoOrder
 }
 
-func checkForCycles(nodes map[string]graphNode) error {
+func addDependency(node *graphNode, dep *graphNode) {
+	node.dependencies = append(node.dependencies, dep)
+	dep.dependents = append(dep.dependents, node)
+}
+
+func checkForCycles(nodes map[string]*graphNode) error {
 	checked := make(map[string]bool, len(nodes))
 	pathMap := make(map[string]string)
 	for _, node := range nodes {
@@ -160,7 +155,7 @@ func checkForCycles(nodes map[string]graphNode) error {
 	return nil
 }
 
-func searchForCycles(node graphNode, path map[string]string, checked map[string]bool) error {
+func searchForCycles(node *graphNode, path map[string]string, checked map[string]bool) error {
 	if checked[node.chartName] {
 		return nil
 	}
@@ -196,8 +191,8 @@ func pathToString(path map[string]string, lastElement string, repeatElement stri
 	return strings.Join(pathList, " -> ")
 }
 
-func reverse(s []string) {
-	for i, j := 0, len(s) - 1; i < len(s) / 2; i, j = i+1, j-1 {
-		s[i], s[j] = s[j], s[i]
+func reverse(ss []string) {
+	for i, j := 0, len(ss) - 1; i < len(ss) / 2; i, j = i+1, j-1 {
+		ss[i], ss[j] = ss[j], ss[i]
 	}
 }

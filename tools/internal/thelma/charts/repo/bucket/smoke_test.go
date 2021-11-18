@@ -1,6 +1,6 @@
 // +build smoke
 
-package gcs
+package bucket
 
 import (
 	"fmt"
@@ -13,7 +13,7 @@ import (
 )
 
 type testHarness struct {
-	bucket *Bucket
+	bucket *RealBucket
 	objectPrefix string
 }
 
@@ -38,12 +38,12 @@ func TestLockAndRelease(t *testing.T) {
 	err := bucket.DeleteStaleLock(lockObj, lockStaleTimeout)
 	assert.NoError(t, err, "delete stale lock should not raise err if lock does not exist")
 
-	generation, err := bucket.WaitForLock(lockObj, "integration test", lockWaitTimeout)
+	generation, err := bucket.WaitForLock(lockObj, lockWaitTimeout)
 	assert.NoError(t, err)
 
 	assertObjectExists(t, bucket, lockObj)
 
-	_, err = bucket.WaitForLock(lockObj, "integration test", lockWaitTimeout)
+	_, err = bucket.WaitForLock(lockObj, lockWaitTimeout)
 	assert.Error(t, err)
 	assert.Regexp(t, "timed out after 1s waiting for lock", err.Error())
 
@@ -63,7 +63,7 @@ func TestDeleteStaleLock(t *testing.T) {
 	err := bucket.DeleteStaleLock(lockObj, lockStaleTimeout)
 	assert.NoError(t, err, "delete should not raise error if lock no exist")
 
-	_, err = bucket.WaitForLock(lockObj, "integration test", lockWaitTimeout)
+	_, err = bucket.WaitForLock(lockObj, lockWaitTimeout)
 	assert.NoError(t, err)
 
 	assertObjectExists(t, bucket, lockObj)
@@ -118,7 +118,7 @@ func newTestHarness(t *testing.T) *testHarness {
 	prefix := fmt.Sprintf("%s.%x", timestamp, rand.Int())
 
 	return &testHarness{
-		bucket: setupBucket(t),
+		bucket:       setupBucket(t),
 		objectPrefix: prefix,
 	}
 }
@@ -131,7 +131,7 @@ func (th *testHarness) testObjPath() string {
 	return path.Join(th.objectPrefix, "test.obj")
 }
 
-func setupBucket(t *testing.T) *Bucket {
+func setupBucket(t *testing.T) *RealBucket {
 	bucket, err := NewBucket(testBucket)
 	assert.NoError(t, err)
 	t.Cleanup(func() {
@@ -144,13 +144,13 @@ func setupBucket(t *testing.T) *Bucket {
 	return bucket
 }
 
-func assertObjectExists(t *testing.T, bucket *Bucket, objectPath string) {
+func assertObjectExists(t *testing.T, bucket *RealBucket, objectPath string) {
 	exists, err := bucket.Exists(objectPath)
 	assert.NoError(t, err, "unexpected error checking existence of gs://%s/%s", bucket.Name(), objectPath)
 	assert.True(t, exists, "%s should exist in bucket, but does not", objectPath)
 }
 
-func assertObjectDoesNotExist(t *testing.T, bucket *Bucket, objectPath string) {
+func assertObjectDoesNotExist(t *testing.T, bucket *RealBucket, objectPath string) {
 	exists, err := bucket.Exists(objectPath)
 	assert.NoError(t, err, "unexpected error checking existence of gs://%s/%s", bucket.Name(), objectPath)
 	assert.False(t, exists, "%s should not exist in bucket, but does", objectPath)

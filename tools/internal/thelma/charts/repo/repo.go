@@ -1,200 +1,135 @@
 package repo
 
 import (
-	"errors"
 	"fmt"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/app"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/repo/gcs"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/repo/index"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/helm"
-	"github.com/rs/zerolog/log"
-	"os"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/repo/bucket"
 	"path"
-	"path/filepath"
 	"time"
 )
 
-const chartsSubdir = "charts"
-const chartCacheControl = "public, max-age=300"
-const indexCacheControl = "no-cache"
-const lockObject = ".repo-update.lk"
-const lockWait = 2 * time.Minute
-const lockStaleAge = 5 * time.Minute
+const ChartDir = "charts"
 const indexObject = "index.yaml"
-const prevIndexFile = "index-prev.yaml"
-const newIndexFile = "index.yaml"
 
-// How to use ChartUploader?
-// Well, we point it at a Bucket.
-// All GCS Helm repos follow the structure of having a bucket with index at root and charts under charts/ path.
+const defaultChartCacheControl = "public, max-age=300"
+const defaultIndexCacheControl = "no-cache"
 
-type ChartUploader struct {
-	bucket *gcs.Bucket
-	stagingDir string
-	shellRunner shell.Runner
+const defaultLockPath = ".repo.lk"
+const defaultLockWaitTimeout = 2 * time.Minute
+const defaultLockStaleTimeout = 5 * time.Minute
+
+// Repo supports interactions with GCS-based Helm repositories
+type Repo interface {
+	// RepoURL() returns the public URL of the repo
+	RepoURL() string
+	// IsLocked returns true if the repo is locked
+	IsLocked() bool
+	// Unlock unlocks the repository
+	Unlock() error
+	// Lock locks the repository
+	Lock() error
+	// UploadChart uploads a chart to the bucket
+	UploadChart(fromPath string) error
+	// UploadIndex uploads an index to the bucket
+	UploadIndex(fromPath string) error
+	// HasIndex returns true if this repo has an index object
+	HasIndex() (bool, error)
+	// DownloadIndex downloads an index file locally
+	DownloadIndex(destPath string) error
+}
+
+type Options struct {
+	LockWaitTimeout time.Duration
+	LockStaleTimeout time.Duration
+	LockPath string
+	ChartCacheControl string
+	IndexCacheControl string
+}
+
+type RealRepo struct {
+	bucket         bucket.Bucket
 	lockGeneration int64
+	options        *Options
 }
 
-func NewUploader(bucket *gcs.Bucket, app *app.ThelmaApp) (*ChartUploader, error) {
-	dir, err := app.Paths.CreateScratchDir("chart-uploader")
-	if err != nil {
-		return nil, fmt.Errorf("error creating scratch dir for chart uploader: %v", err)
+func DefaultOptions() *Options {
+	return &Options{
+		LockWaitTimeout:   defaultLockWaitTimeout,
+		LockStaleTimeout:  defaultLockStaleTimeout,
+		LockPath:          defaultLockPath,
+		ChartCacheControl: defaultChartCacheControl,
+		IndexCacheControl: defaultIndexCacheControl,
 	}
-	return &ChartUploader{
-		bucket:     bucket,
-		stagingDir: dir,
-		shellRunner: app.ShellRunner,
-	}, nil
 }
 
-func (u *ChartUploader) ChartStagingDir() string {
-	return path.Join(u.stagingDir, chartsSubdir)
+func NewRepo(bucket bucket.Bucket) Repo {
+	return &RealRepo{
+		bucket:  bucket,
+		options: DefaultOptions(),
+	}
 }
 
-// LockRepo locks the repo to prevent updates
-func (u *ChartUploader) LockRepo() error {
-	if u.IsRepoLocked() {
-		return fmt.Errorf("repo is already locked")
-	}
-
-	if err := u.bucket.DeleteStaleLock(lockObject, lockStaleAge); err != nil {
-		return err
-	}
-	lockGen, err := u.bucket.WaitForLock(lockObject, "chart-uploader", lockWait)
-	if err != nil {
-		return err
-	}
-
-	u.lockGeneration = lockGen
-
-	return nil
+// RepoURL returns the external URL of the Helm repository
+func (r *RealRepo) RepoURL() string {
+	return fmt.Sprintf("https://%s.storage.googleapis.com", r.bucket.Name())
 }
 
-func (u *ChartUploader) UnlockRepo() error {
-	if !u.IsRepoLocked() {
+// IsLocked returns true if the repo is locked
+func (r *RealRepo) IsLocked() bool {
+	return r.lockGeneration != 0
+}
+
+// Unlock unlocks the repository
+func (r *RealRepo) Unlock() error {
+	if !r.IsLocked() {
 		return fmt.Errorf("repo is not locked")
 	}
 
-	if err := u.bucket.ReleaseLock(lockObject, u.lockGeneration); err != nil {
+	if err := r.bucket.ReleaseLock(r.options.LockPath, r.lockGeneration); err != nil {
 		return err
 	}
 
-	u.lockGeneration = 0
+	r.lockGeneration = 0
 
 	return nil
 }
 
-func (u *ChartUploader) IsRepoLocked() bool {
-	return u.lockGeneration != 0
-}
-
-func (u *ChartUploader) UpdateRepo() (updatedCount int, err error) {
-	if err = u.fetchCurrentIndexIfNotExists(); err != nil {
-		return
+// Lock locks the repository
+func (r *RealRepo) Lock() error {
+	if r.IsLocked() {
+		return fmt.Errorf("repo is already locked")
 	}
 
-	if err = u.generateNewIndex(); err != nil {
-		return
+	if err := r.bucket.DeleteStaleLock(r.options.LockPath, r.options.LockStaleTimeout); err != nil {
+		return err
 	}
 
-	updatedCount, err = u.uploadCharts()
+	lockGeneration, err := r.bucket.WaitForLock(r.options.LockPath, r.options.LockWaitTimeout)
 	if err != nil {
-		return
+		return err
 	}
 
-	if err = u.uploadIndex(); err != nil {
-		return
-	}
-
-	return
-}
-
-func (u *ChartUploader) LoadIndex() (*index.Index, error) {
-	if err := u.fetchCurrentIndexIfNotExists(); err != nil {
-		return nil, err
-	}
-
-	return index.LoadFromFile(u.prevIndexPath())
-}
-
-func (u *ChartUploader) fetchCurrentIndexIfNotExists() error {
-	_, err := os.Stat(u.prevIndexPath())
-	if err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("unexpected error checking filesystem for old index file %s: %v", u.prevIndexPath(), err)
-		}
-		return u.fetchCurrentIndex()
-	}
+	r.lockGeneration = lockGeneration
 
 	return nil
 }
 
-
-func (u *ChartUploader) fetchCurrentIndex() error {
-	exists, err := u.bucket.Exists(indexObject)
-	if err != nil {
-		return err
-	}
-	if exists {
-		return u.bucket.Download(indexObject, u.prevIndexPath())
-	}
-
-	// Bucket has no index file, so create an empty stub
-	log.Warn().Msgf("Bucket %s has no %s object, generating empty index file", u.bucket.Name(), indexObject)
-	_, err = os.Create(u.prevIndexPath())
-	return err
+// UploadChart uploads a chart package file to the correct path in the bucket
+func (r *RealRepo) UploadChart(fromPath string) error {
+	objectPath := path.Join(ChartDir, path.Base(fromPath))
+	return r.bucket.Upload(fromPath, objectPath, r.options.ChartCacheControl)
 }
 
-func (u *ChartUploader) generateNewIndex() error {
-	cmd := shell.Command{
-		Prog: helm.ProgName,
-		Args: []string{
-			"repo",
-			"index",
-			"--merge",
-			u.prevIndexPath(),
-			fmt.Sprintf("--url=%q", u.repoURL()),
-			".",
-		},
-		Dir: u.stagingDir,
-	}
-
-	return u.shellRunner.Run(cmd)
+// UploadIndex uploads an index file to correct path in the buck
+func (r *RealRepo) UploadIndex(fromPath string) error {
+	return r.bucket.Upload(fromPath, indexObject, r.options.IndexCacheControl)
 }
 
-func (u *ChartUploader) uploadIndex() error {
-	return u.bucket.Upload(u.newIndexPath(), indexObject, indexCacheControl)
+// HasIndex returns true if this repo has an index object
+func (r *RealRepo) HasIndex() (bool, error) {
+	return r.bucket.Exists(indexObject)
 }
 
-func (u *ChartUploader) uploadCharts() (int, error) {
-	count := 0
-
-	glob := path.Join(u.ChartStagingDir(), "*.tgz")
-	chartFiles, err := filepath.Glob(glob)
-	if err != nil {
-		return count, fmt.Errorf("error globbing charts with %q: %v", glob ,err)
-	}
-
-	for _, chartFile := range chartFiles {
-		objectPath := path.Join(chartsSubdir, path.Base(chartFile))
-		if err := u.bucket.Upload(chartFile, objectPath, chartCacheControl); err != nil {
-			return count, err
-		}
-		count++
-	}
-
-	return count, nil
-}
-
-func (u *ChartUploader) repoURL() string {
-	return fmt.Sprintf("https://%s.storage.googleapis.com", u.bucket.Name())
-}
-
-func (u *ChartUploader) prevIndexPath() string {
-	return path.Join(u.stagingDir, prevIndexFile)
-}
-
-func (u *ChartUploader) newIndexPath() string {
-	return path.Join(u.stagingDir, newIndexFile)
+// DownloadIndex downloads the index object to given push
+func (r *RealRepo) DownloadIndex(destPath string) error {
+	return r.bucket.Download(indexObject, destPath)
 }

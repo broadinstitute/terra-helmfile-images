@@ -93,14 +93,19 @@ func (sourceDir *Dir) GetChart(chartName string) (Chart, error) {
 	return chart, nil
 }
 
-// LocalDependencies given the name of a chart, return the names of the charts that are its local dependencies
-func (sourceDir *Dir) LocalDependencies(chartName string) ([]string, error) {
-	chart, err := sourceDir.GetChart(chartName)
-	if err != nil {
-		return nil, err
+// LocalDependencies returns a map of chart names keyed to a list of their local dependencies
+func (sourceDir *Dir) LocalDependencies() map[string][]string {
+	deps := make(map[string][]string)
+	for chartName, chart := range sourceDir.charts {
+		deps[chartName] = sourceDir.localDependencies(chart)
 	}
+	return deps
+}
 
-	var result []string
+// Returns the names of the local dependencies for a given chart
+func (sourceDir *Dir) localDependencies(chart Chart) []string {
+	var dependencies []string
+
 	for _, dependency := range chart.manifest.Dependencies {
 		log.Debug().Msgf("processing chart %s dependency: %v", chart.name, dependency)
 		if !strings.HasPrefix(dependency.Repository, fileRepoPrefix) {
@@ -113,8 +118,8 @@ func (sourceDir *Dir) LocalDependencies(chartName string) ([]string, error) {
 			continue
 		}
 
-		result = append(result, dependency.Name)
+		dependencies = append(dependencies, dependency.Name)
 	}
 
-	return result, nil
+	return dependencies
 }

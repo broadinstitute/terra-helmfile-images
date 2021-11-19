@@ -49,8 +49,8 @@ type Chart interface {
 	PackageChart(destPath string) error
 	// GenerateDocs re-generates README documentation for the given chart
 	GenerateDocs() error
-    // LocalDependencies returns the names of local dependencies / subcharts (using Helm's "file://" repo support)
-    LocalDependencies() []string
+	// LocalDependencies returns the names of local dependencies / subcharts (using Helm's "file://" repo support)
+	LocalDependencies() []string
 }
 
 // Implements Chart interface

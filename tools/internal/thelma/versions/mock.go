@@ -2,7 +2,7 @@ package versions
 
 import "github.com/stretchr/testify/mock"
 
-type MockVersions struct{
+type MockVersions struct {
 	mock.Mock
 }
 

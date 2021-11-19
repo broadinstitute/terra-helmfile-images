@@ -21,14 +21,14 @@ type Versions interface {
 // Implements public Versions interface
 type versions struct {
 	thelmaHome string
-	yq yq.Yq
+	yq         yq.Yq
 }
 
 // Used for parsing version snapshot files (like "versions/app/dev.yaml")
 type versionsSnapshot struct {
 	Releases map[string]struct {
 		ChartVersion string `yaml:"chartVersion"`
-		AppVersion string `yaml:"appVersion"`
+		AppVersion   string `yaml:"appVersion"`
 	} `yaml:"releases"`
 }
 
@@ -36,7 +36,7 @@ type versionsSnapshot struct {
 func New(thelmaHome string, shellRunner shell.Runner) Versions {
 	return &versions{
 		thelmaHome: thelmaHome,
-		yq: yq.New(shellRunner),
+		yq:         yq.New(shellRunner),
 	}
 }
 

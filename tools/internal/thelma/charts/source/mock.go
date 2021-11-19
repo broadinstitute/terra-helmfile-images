@@ -2,7 +2,7 @@ package source
 
 import "github.com/stretchr/testify/mock"
 
-type MockChart struct{
+type MockChart struct {
 	mock.Mock
 }
 

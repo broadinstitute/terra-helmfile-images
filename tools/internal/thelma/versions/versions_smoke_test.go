@@ -36,4 +36,3 @@ func TestVersions_Smoke(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "7.8.9", snapshot.Releases["agora"].ChartVersion)
 }
-

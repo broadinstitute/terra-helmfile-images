@@ -14,11 +14,11 @@ func TestAutoReleaser_UpdateVersionsFile(t *testing.T) {
 	newVersion := "5.6.7"
 
 	testCases := []struct {
-		name string
-		newVersion string
+		name          string
+		newVersion    string
 		configContent string
-		setupMocks func(*versions.MockVersions)
-		matchErr string
+		setupMocks    func(*versions.MockVersions)
+		matchErr      string
 	}{
 		{
 			name: "No config file should default to enabled + app release type",
@@ -27,18 +27,18 @@ func TestAutoReleaser_UpdateVersionsFile(t *testing.T) {
 			},
 		},
 		{
-			name: "Should not update release version if disabled in config file",
+			name:          "Should not update release version if disabled in config file",
 			configContent: `enabled: false`,
 		},
 		{
-			name: "Should permit release name overriding",
+			name:          "Should permit release name overriding",
 			configContent: `release: {name: foo}`,
 			setupMocks: func(mockVersions *versions.MockVersions) {
 				mockVersions.On("SetReleaseVersionIfDefined", "foo", versions.AppRelease, versions.Dev, newVersion).Return(nil)
 			},
 		},
 		{
-			name: "Should permit release type overriding",
+			name:          "Should permit release type overriding",
 			configContent: `release: {type: cluster}`,
 			setupMocks: func(mockVersions *versions.MockVersions) {
 				mockVersions.On("SetReleaseVersionIfDefined", chartName, versions.ClusterRelease, versions.Dev, newVersion).Return(nil)

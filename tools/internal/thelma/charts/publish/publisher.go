@@ -3,8 +3,8 @@ package publish
 import (
 	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/publish/index"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/repo"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/repo/index"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/helm"
 	"github.com/rs/zerolog/log"
 	"os"

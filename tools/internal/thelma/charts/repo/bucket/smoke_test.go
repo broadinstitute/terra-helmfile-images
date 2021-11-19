@@ -14,7 +14,7 @@ import (
 )
 
 type testHarness struct {
-	bucket       *RealBucket
+	bucket       *bucket
 	objectPrefix string
 }
 
@@ -132,7 +132,7 @@ func (th *testHarness) testObjPath() string {
 	return path.Join(th.objectPrefix, "test.obj")
 }
 
-func setupBucket(t *testing.T) *RealBucket {
+func setupBucket(t *testing.T) *bucket {
 	bucket, err := NewBucket(testBucket)
 	assert.NoError(t, err)
 	t.Cleanup(func() {
@@ -145,13 +145,13 @@ func setupBucket(t *testing.T) *RealBucket {
 	return bucket
 }
 
-func assertObjectExists(t *testing.T, bucket *RealBucket, objectPath string) {
+func assertObjectExists(t *testing.T, bucket *bucket, objectPath string) {
 	exists, err := bucket.Exists(objectPath)
 	assert.NoError(t, err, "unexpected error checking existence of gs://%s/%s", bucket.Name(), objectPath)
 	assert.True(t, exists, "%s should exist in bucket, but does not", objectPath)
 }
 
-func assertObjectDoesNotExist(t *testing.T, bucket *RealBucket, objectPath string) {
+func assertObjectDoesNotExist(t *testing.T, bucket *bucket, objectPath string) {
 	exists, err := bucket.Exists(objectPath)
 	assert.NoError(t, err, "unexpected error checking existence of gs://%s/%s", bucket.Name(), objectPath)
 	assert.False(t, exists, "%s should not exist in bucket, but does", objectPath)

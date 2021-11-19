@@ -45,7 +45,7 @@ type Options struct {
 	IndexCacheControl string
 }
 
-type RealRepo struct {
+type repo struct {
 	bucket         bucket.Bucket
 	lockGeneration int64
 	options        *Options
@@ -62,24 +62,24 @@ func DefaultOptions() *Options {
 }
 
 func NewRepo(bucket bucket.Bucket) Repo {
-	return &RealRepo{
+	return &repo{
 		bucket:  bucket,
 		options: DefaultOptions(),
 	}
 }
 
 // RepoURL returns the external URL of the Helm repository
-func (r *RealRepo) RepoURL() string {
+func (r *repo) RepoURL() string {
 	return fmt.Sprintf("https://%s.storage.googleapis.com", r.bucket.Name())
 }
 
 // IsLocked returns true if the repo is locked
-func (r *RealRepo) IsLocked() bool {
+func (r *repo) IsLocked() bool {
 	return r.lockGeneration != 0
 }
 
 // Unlock unlocks the repository
-func (r *RealRepo) Unlock() error {
+func (r *repo) Unlock() error {
 	if !r.IsLocked() {
 		return fmt.Errorf("repo is not locked")
 	}
@@ -94,7 +94,7 @@ func (r *RealRepo) Unlock() error {
 }
 
 // Lock locks the repository
-func (r *RealRepo) Lock() error {
+func (r *repo) Lock() error {
 	if r.IsLocked() {
 		return fmt.Errorf("repo is already locked")
 	}
@@ -114,22 +114,22 @@ func (r *RealRepo) Lock() error {
 }
 
 // UploadChart uploads a chart package file to the correct path in the bucket
-func (r *RealRepo) UploadChart(fromPath string) error {
+func (r *repo) UploadChart(fromPath string) error {
 	objectPath := path.Join(ChartDir, path.Base(fromPath))
 	return r.bucket.Upload(fromPath, objectPath, r.options.ChartCacheControl)
 }
 
 // UploadIndex uploads an index file to correct path in the buck
-func (r *RealRepo) UploadIndex(fromPath string) error {
+func (r *repo) UploadIndex(fromPath string) error {
 	return r.bucket.Upload(fromPath, indexObject, r.options.IndexCacheControl)
 }
 
 // HasIndex returns true if this repo has an index object
-func (r *RealRepo) HasIndex() (bool, error) {
+func (r *repo) HasIndex() (bool, error) {
 	return r.bucket.Exists(indexObject)
 }
 
 // DownloadIndex downloads the index object to given push
-func (r *RealRepo) DownloadIndex(destPath string) error {
+func (r *repo) DownloadIndex(destPath string) error {
 	return r.bucket.Download(indexObject, destPath)
 }

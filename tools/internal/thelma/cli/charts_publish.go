@@ -3,11 +3,13 @@ package cli
 import (
 	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/app"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/autorelease"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/dependency"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/publish"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/repo"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/repo/bucket"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/source"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/versions"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"strings"
@@ -130,6 +132,9 @@ func publishCharts(options *chartsPublishOptions, app *app.ThelmaApp) error {
 		}
 	}()
 
+	_versions := versions.New(app.Config.Home(), app.ShellRunner)
+	autoreleaser := autorelease.New(_versions)
+
 	for _, chartName := range chartsToPublish {
 		chart, err := src.GetChart(chartName)
 		if err != nil {
@@ -139,13 +144,17 @@ func publishCharts(options *chartsPublishOptions, app *app.ThelmaApp) error {
 		if err := chart.GenerateDocs(); err != nil {
 			return err
 		}
-		if err := chart.BumpChartVersion(publisher.LastPublishedVersion(chartName)); err != nil {
+		newVersion, err := chart.BumpChartVersion(publisher.LastPublishedVersion(chartName))
+		if err != nil {
 			return err
 		}
 		if err := chart.BuildDependencies(); err != nil {
 			return err
 		}
 		if err := chart.PackageChart(publisher.ChartDir()); err != nil {
+			return err
+		}
+		if err := autoreleaser.UpdateVersionsFile(chart, newVersion); err != nil {
 			return err
 		}
 	}
@@ -155,7 +164,7 @@ func publishCharts(options *chartsPublishOptions, app *app.ThelmaApp) error {
 		return err
 	}
 
-	log.Info().Msgf("Uploaded %d charts", count)
+	log.Info().Msgf("Published %d charts", count)
 
 	return nil
 }

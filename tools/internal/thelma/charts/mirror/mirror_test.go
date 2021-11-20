@@ -22,7 +22,7 @@ func TestUploadToMirror(t *testing.T) {
 	_index.On("HasVersion", "reloader", "4.0.2").Return(true, nil)
 	publisher.On("Index").Return(_index)
 	publisher.On("ChartDir").Return(chartDir)
-	publisher.On("Publish", true).Return(1, nil)
+	publisher.On("Publish").Return(1, nil)
 
 	runner.ExpectCmd(shell.Command{
 		Prog: helm.ProgName,
@@ -42,7 +42,7 @@ func TestUploadToMirror(t *testing.T) {
 	mirr, err := NewMirror(publisher, runner, "testdata/config.yaml")
 	assert.NoError(t, err)
 
-	err = mirr.ImportToMirror(true)
+	err = mirr.ImportToMirror()
 	assert.NoError(t, err)
 
 	runner.AssertExpectations(t)

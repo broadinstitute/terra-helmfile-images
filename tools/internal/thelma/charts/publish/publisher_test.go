@@ -23,20 +23,22 @@ func TestPublish(t *testing.T) {
 	testCases := []struct {
 		description string
 		test        func(ts testState)
+		dryRun      bool
 	}{
 		{
 			description: "should panic error if no charts have been added",
+			dryRun: false,
 			test: func(ts testState) {
 				assert.Panics(t, func() {
-					_, _ = ts.publisher.Publish(true)
+					_, _ = ts.publisher.Publish()
 				})
 			},
 		},
 		{
-			description: "should not upload charts if commit is false",
+			description: "should not upload charts if dry run is true",
+			dryRun: true,
 			test: func(ts testState) {
 				ts.mockRepo.On("RepoURL").Return("https://fake")
-				ts.mockRepo.On("Unlock").Return(nil)
 
 				ts.mockRunner.ExpectCmd(shell.Command{
 					Prog: "helm",
@@ -55,13 +57,14 @@ func TestPublish(t *testing.T) {
 				publisher := ts.publisher
 				addFakeChart(t, publisher, "mychart", "0.0.1")
 
-				count, err := publisher.Publish(false)
+				count, err := publisher.Publish()
 				assert.NoError(t, err)
 				assert.Equal(t, 0, count)
 			},
 		},
 		{
-			description: "should upload charts if commit is true",
+			description: "should upload charts & index if dryRun is false",
+			dryRun: false,
 			test: func(ts testState) {
 				ts.mockRepo.On("RepoURL").Return("https://fake")
 				ts.mockRepo.On("UploadChart", path.Join(ts.scratchDir, "charts", "charta-0.0.1.tgz")).Return(nil)
@@ -87,7 +90,7 @@ func TestPublish(t *testing.T) {
 				addFakeChart(t, publisher, "charta", "0.0.1")
 				addFakeChart(t, publisher, "chartb", "4.5.6")
 
-				count, err := publisher.Publish(true)
+				count, err := publisher.Publish()
 				assert.NoError(t, err)
 				assert.Equal(t, 2, count)
 			},
@@ -96,8 +99,34 @@ func TestPublish(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			ts := setup(t)
+			mockRepo := repo.NewMockRepo()
+			mockRunner := shellmock.DefaultMockRunner()
+
+			scratchDir := t.TempDir()
+			indexFile := path.Join(scratchDir, prevIndexFile)
+
+			if !tc.dryRun {
+				mockRepo.On("Lock").Return(nil)
+			}
+			mockRepo.On("HasIndex").Return(true, nil)
+			mockRepo.On("DownloadIndex", indexFile).Run(func(args mock.Arguments) {
+				writeFakeIndexFile(t, indexFile)
+			}).Return(nil)
+
+			publisher, err := NewPublisher(mockRepo, mockRunner, scratchDir, tc.dryRun)
+			assert.NoError(t, err)
+			assert.NotNil(t, publisher)
+
+			ts := testState{
+				scratchDir: scratchDir,
+				mockRepo:   mockRepo,
+				mockRunner: mockRunner,
+				publisher:  publisher,
+			}
 			tc.test(ts)
+
+			mockRepo.AssertExpectations(t)
+			mockRunner.AssertExpectations(t)
 		})
 	}
 }
@@ -111,7 +140,7 @@ func TestConstructorCreatesEmptyIndexIfNoExist(t *testing.T) {
 	mockRepo.On("Lock").Return(nil)
 	mockRepo.On("HasIndex").Return(false, nil)
 
-	publisher, err := NewPublisher(mockRepo, mockRunner, tmpDir)
+	publisher, err := NewPublisher(mockRepo, mockRunner, tmpDir, false)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, publisher)
@@ -119,36 +148,6 @@ func TestConstructorCreatesEmptyIndexIfNoExist(t *testing.T) {
 
 	mockRunner.AssertExpectations(t)
 	mockRepo.AssertExpectations(t)
-}
-
-func setup(t *testing.T) testState {
-	mockRepo := repo.NewMockRepo()
-	mockRunner := shellmock.DefaultMockRunner()
-
-	scratchDir := t.TempDir()
-	indexFile := path.Join(scratchDir, prevIndexFile)
-
-	mockRepo.On("Lock").Return(nil)
-	mockRepo.On("HasIndex").Return(true, nil)
-	mockRepo.On("DownloadIndex", indexFile).Run(func(args mock.Arguments) {
-		writeFakeIndexFile(t, indexFile)
-	}).Return(nil)
-
-	publisher, err := NewPublisher(mockRepo, mockRunner, scratchDir)
-	assert.NoError(t, err)
-	assert.NotNil(t, publisher)
-
-	t.Cleanup(func() {
-		mockRepo.AssertExpectations(t)
-		mockRunner.AssertExpectations(t)
-	})
-
-	return testState{
-		scratchDir: scratchDir,
-		mockRepo:   mockRepo,
-		mockRunner: mockRunner,
-		publisher:  publisher,
-	}
 }
 
 func writeFakeIndexFile(t *testing.T, path string) {

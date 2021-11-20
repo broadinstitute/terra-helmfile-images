@@ -1,7 +1,6 @@
-package autorelease
+package source
 
 import (
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/source"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/versions"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
@@ -15,7 +14,7 @@ const targetVersionSet = versions.Dev
 // AutoReleaser bumps chart versions in versions/app/dev.yaml & friends when a new chart version is released
 type AutoReleaser interface {
 	// UpdateVersionsFile updates the version file
-	UpdateVersionsFile(chart source.Chart, version string) error
+	UpdateVersionsFile(chart Chart, version string) error
 }
 
 // Struct for parsing an autorelease.yaml config file
@@ -32,13 +31,13 @@ type autoReleaser struct {
 	versions versions.Versions
 }
 
-func New(versions versions.Versions) AutoReleaser {
+func NewAutoReleaser(versions versions.Versions) AutoReleaser {
 	return &autoReleaser{
 		versions: versions,
 	}
 }
 
-func (a *autoReleaser) UpdateVersionsFile(chart source.Chart, newVersion string) error {
+func (a *autoReleaser) UpdateVersionsFile(chart Chart, newVersion string) error {
 	cfg := loadConfig(chart)
 	if !cfg.Enabled {
 		return nil
@@ -48,7 +47,7 @@ func (a *autoReleaser) UpdateVersionsFile(chart source.Chart, newVersion string)
 }
 
 // load .autorelease.yaml config file from chart source directory if it exists
-func loadConfig(chart source.Chart) config {
+func loadConfig(chart Chart) config {
 	cfg := config{}
 
 	// Set defaults

@@ -13,6 +13,7 @@ type chartsCLI struct {
 
 func newChartsCLI(ctx *ThelmaContext) *chartsCLI {
 	publishCLI := newChartsPublishCLI(ctx)
+	importCLI := newChartsImportCLI(ctx)
 
 	cmd := &cobra.Command{
 		Use:   "charts [action]",
@@ -21,6 +22,7 @@ func newChartsCLI(ctx *ThelmaContext) *chartsCLI {
 	}
 	cmd.AddCommand(
 		publishCLI.cobraCommand,
+		importCLI.cobraCommand,
 	)
 	return &chartsCLI{
 		cobraCommand: cmd,

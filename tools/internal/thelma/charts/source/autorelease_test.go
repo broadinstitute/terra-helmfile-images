@@ -1,7 +1,6 @@
-package autorelease
+package source
 
 import (
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/source"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/versions"
 	"github.com/stretchr/testify/assert"
 	"os"
@@ -47,7 +46,7 @@ func TestAutoReleaser_UpdateVersionsFile(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		chartDir := t.TempDir()
-		chart := source.NewMockChart()
+		chart := NewMockChart()
 		chart.On("Name").Return("mychart")
 		chart.On("Path").Return(chartDir)
 
@@ -63,7 +62,7 @@ func TestAutoReleaser_UpdateVersionsFile(t *testing.T) {
 				}
 			}
 
-			_autoReleaser := New(mockVersions)
+			_autoReleaser := NewAutoReleaser(mockVersions)
 			err := _autoReleaser.UpdateVersionsFile(chart, newVersion)
 
 			mockVersions.AssertExpectations(t)

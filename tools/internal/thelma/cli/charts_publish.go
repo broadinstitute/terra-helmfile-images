@@ -3,16 +3,10 @@ package cli
 import (
 	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/app"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/autorelease"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/dependency"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/publish"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/repo"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/repo/bucket"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/source"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/cli/builders"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/versions"
-	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"strings"
 )
 
 const chartsPublishHelpMessage = `Publishes Helm charts for Terra services`
@@ -85,86 +79,18 @@ func newChartsPublishCLI(ctx *ThelmaContext) *chartsPublishCLI {
 }
 
 func publishCharts(options *chartsPublishOptions, app *app.ThelmaApp) error {
-	chartsToPublish := options.charts
-
-	src, err := source.NewSourceDirectory(options.chartDir, app.ShellRunner)
+	pb, err := builders.Publisher(app, options.bucketName, options.dryRun)
 	if err != nil {
 		return err
 	}
-
-	for _, chart := range chartsToPublish {
-		if !src.HasChart(chart) {
-			return fmt.Errorf("chart %q does not exist in source dir %s", chart, options.chartDir)
-		}
-	}
-
-	depGraph, err := dependency.NewGraph(src.LocalDependencies())
-	if err != nil {
-		return err
-	}
-	chartsToPublish = depGraph.WithDependents(chartsToPublish...)
-
-	log.Debug().Msgf("Identified %d charts to publish: %s", len(chartsToPublish), strings.Join(chartsToPublish, ","))
-	depGraph.TopoSort(chartsToPublish)
-
-	_bucket, err := bucket.NewBucket(options.bucketName)
-	if err != nil {
-		return err
-	}
-	_repo := repo.NewRepo(_bucket)
-	defer func() {
-		if err := _bucket.Close(); err != nil {
-			log.Error().Msgf("error closing _bucket: %v", err)
-		}
-	}()
-
-	scratchDir, err := app.Paths.CreateScratchDir("chart-publisher")
-	if err != nil {
-		return err
-	}
-	publisher, err := publish.NewPublisher(_repo, app.ShellRunner, scratchDir)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err := publisher.Close(); err != nil {
-			log.Error().Msgf("error closing publisher: %v", err)
-		}
-	}()
+	defer pb.CloseWarn()
 
 	_versions := versions.New(app.Config.Home(), app.ShellRunner)
-	autoreleaser := autorelease.New(_versions)
 
-	for _, chartName := range chartsToPublish {
-		chart, err := src.GetChart(chartName)
-		if err != nil {
-			return err
-		}
-
-		if err := chart.GenerateDocs(); err != nil {
-			return err
-		}
-		newVersion, err := chart.BumpChartVersion(publisher.Index().MostRecentVersion(chartName))
-		if err != nil {
-			return err
-		}
-		if err := chart.BuildDependencies(); err != nil {
-			return err
-		}
-		if err := chart.PackageChart(publisher.ChartDir()); err != nil {
-			return err
-		}
-		if err := autoreleaser.UpdateVersionsFile(chart, newVersion); err != nil {
-			return err
-		}
-	}
-
-	count, err := publisher.Publish(!options.dryRun)
+	chartsDir, err := source.NewChartsDir(options.chartDir, pb.Publisher(), _versions, app.ShellRunner)
 	if err != nil {
 		return err
 	}
 
-	log.Info().Msgf("Published %d charts", count)
-
-	return nil
+	return chartsDir.Release(options.charts)
 }

@@ -21,8 +21,8 @@ func (m *MockPublisher) Index() index.Index {
 	return m.Called().Get(0).(index.Index)
 }
 
-func (m *MockPublisher) Publish(commit bool) (count int, err error) {
-	r := m.Called(commit)
+func (m *MockPublisher) Publish() (count int, err error) {
+	r := m.Called()
 	return r.Int(0), r.Error(1)
 }
 

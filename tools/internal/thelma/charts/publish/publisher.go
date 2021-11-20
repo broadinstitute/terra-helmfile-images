@@ -12,31 +12,15 @@ import (
 	"path/filepath"
 )
 
-// publisher is a utility for publishing new Helm charts to a Helm repo.
-// It should be used as follows:
-//
-//     // create new publisher
-//     publisher, err := publish.NewPublisher(bucketName, app)
-//     // handle error
-//     defer publisher.Close()
-//
-//     chartDir := publisher.ChartDir()
-//
-//     // run `helm package -d #{chartDir}` or similar to package new charts in the chartDir
-//
-//     publisher.Publish(true) // set to false for dry run
-//
-// Note that Publish() can only be called once for a given publisher instance.
-//
+// Publisher is a utility for publishing Helm charts to a GCS bucket-hosted Helm repository.
 type Publisher interface {
 	// ChartDir returns the path where new chart packages should be copied for upload
 	ChartDir() string
 	// Index returns a queryable copy of th eindex that is currently in the Helm repo bucket
 	Index() index.Index
-	// Publish publishes all charts in the chart directory to the target Helm repo
-	// * If commit is false, Publish will generate a new index but not actually upload the
-	//   ne
-	Publish(commit bool) (count int, err error)
+	// Publish uploads all charts in the chart directory to the target Helm repo.
+	// Can only be called once for a given publisher instance!
+	Publish() (count int, err error)
 	// Close unlocks the repo and releases all resources associated with this publisher
 	Close() error
 }
@@ -47,22 +31,21 @@ type publisher struct {
 	stagingDir  *stagingDir
 	shellRunner shell.Runner
 	index       index.Index
+	dryRun      bool
 	closed      bool
 }
 
-// NewPublisher is a constructor for a publisher. It
-// * creates a new GCS bucket client & associated repo object
-// * creates a chart staging directory
-// * locks the repo
-// * downloads the index file
-func NewPublisher(repo repo.Repo, runner shell.Runner, scratchDir string) (*publisher, error) {
+// NewPublisher is a constructor for a publisher
+func NewPublisher(repo repo.Repo, runner shell.Runner, scratchDir string, dryRun bool) (*publisher, error) {
 	_stagingDir := &stagingDir{root: scratchDir}
 
 	if err := os.Mkdir(_stagingDir.chartDir(), 0755); err != nil {
 		return nil, fmt.Errorf("chart-publisher: failed to create chart dir: %v", err)
 	}
 
-	if err := repo.Lock(); err != nil {
+	if dryRun {
+		log.Warn().Msgf("chart-publisher: not locking repo, this is a dry run")
+	} else if err := repo.Lock(); err != nil {
 		return nil, fmt.Errorf("chart-publisher: error locking repo: %v", err)
 	}
 
@@ -80,6 +63,7 @@ func NewPublisher(repo repo.Repo, runner shell.Runner, scratchDir string) (*publ
 		stagingDir:  _stagingDir,
 		index:       _index,
 		shellRunner: runner,
+		dryRun:      dryRun,
 		closed:      false,
 	}, nil
 }
@@ -95,7 +79,7 @@ func (u *publisher) Index() index.Index {
 }
 
 // Publish publishes all charts in the chart directory to the target Helm repo
-func (u *publisher) Publish(commit bool) (int, error) {
+func (u *publisher) Publish() (int, error) {
 	if u.closed {
 		panic("Publish() can only be called once")
 	}
@@ -113,8 +97,8 @@ func (u *publisher) Publish(commit bool) (int, error) {
 		return -1, fmt.Errorf("chart-publisher: failed to generate new index file: %v", err)
 	}
 
-	if !commit {
-		log.Warn().Msgf("chart-publisher: not uploading any charts, since commit=false")
+	if u.dryRun {
+		log.Warn().Msgf("chart-publisher: not uploading any charts, this is a dry run")
 		return 0, u.Close()
 	}
 
@@ -139,7 +123,9 @@ func (u *publisher) Close() error {
 		return nil
 	}
 
-	if err := u.repo.Unlock(); err != nil {
+	if u.dryRun {
+		log.Warn().Msgf("chart-publisher: not unlocking repo, this is a dry run")
+	} else if err := u.repo.Unlock(); err != nil {
 		return fmt.Errorf("chart-publisher: error unlocking repo: %v", err)
 	}
 

@@ -16,7 +16,7 @@ import (
 type Mirror interface {
 	// ImportToMirror uploads configured charts to the GCS repository.
 	// If commit is false, the import is a "dry run" (no charts are uploaded)
-	ImportToMirror(commit bool) error
+	ImportToMirror() error
 }
 
 // Implements Mirror interface
@@ -57,7 +57,7 @@ func NewMirror(publisher publish.Publisher, shellRunner shell.Runner, configFile
 	return m, nil
 }
 
-func (m *mirror) ImportToMirror(commit bool) error {
+func (m *mirror) ImportToMirror() error {
 	if len(m.charts) == 0 {
 		log.Warn().Msgf("No charts defined in config file, won't upload any charts")
 		return nil
@@ -78,7 +78,7 @@ func (m *mirror) ImportToMirror(commit bool) error {
 		return err
 	}
 
-	count, err := m.publisher.Publish(commit)
+	count, err := m.publisher.Publish()
 	if err != nil {
 		return err
 	}

@@ -5,10 +5,8 @@ import (
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shellmock"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/repo"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/repo/index"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"gopkg.in/yaml.v3"
 	"os"
 	"path"
 	"testing"
@@ -18,7 +16,7 @@ type testState struct {
 	scratchDir string
 	mockRepo   *repo.MockRepo
 	mockRunner *shellmock.MockRunner
-	publisher  *ChartPublisher
+	publisher  *publisher
 }
 
 func TestPublish(t *testing.T) {
@@ -104,15 +102,6 @@ func TestPublish(t *testing.T) {
 	}
 }
 
-func TestGetLatestVersion(t *testing.T) {
-	ts := setup(t)
-	publisher := ts.publisher
-
-	assert.Equal(t, "4.5.6", publisher.LastPublishedVersion("foo"))
-	assert.Equal(t, "", publisher.LastPublishedVersion("bar"))
-	assert.Equal(t, "", publisher.LastPublishedVersion("baz"))
-}
-
 func TestConstructorCreatesEmptyIndexIfNoExist(t *testing.T) {
 	mockRepo := repo.NewMockRepo()
 	mockRunner := shellmock.DefaultMockRunner()
@@ -126,7 +115,7 @@ func TestConstructorCreatesEmptyIndexIfNoExist(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, publisher)
-	assert.Equal(t, "", publisher.LastPublishedVersion("foo"))
+	assert.Equal(t, "", publisher.Index().MostRecentVersion("foo"))
 
 	mockRunner.AssertExpectations(t)
 	mockRepo.AssertExpectations(t)
@@ -163,28 +152,20 @@ func setup(t *testing.T) testState {
 }
 
 func writeFakeIndexFile(t *testing.T, path string) {
-	fakeIndex := &index.Index{
-		Entries: map[string][]index.Entry{
-			"foo": {
-				{Version: "1.2.3"},
-				{Version: "4.5.6"},
-			},
-			"bar": {
-				{Version: "invalid"},
-			},
-		},
-	}
-
-	data, err := yaml.Marshal(fakeIndex)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, data, 0400); err != nil {
+	content := `
+entries:
+  foo:
+    - version: 1.2.3
+    - version: 4.5.6
+  bar:
+    - version: invalid
+`
+	if err := os.WriteFile(path, []byte(content), 0400); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func addFakeChart(t *testing.T, publisher *ChartPublisher, name string, version string) {
+func addFakeChart(t *testing.T, publisher *publisher, name string, version string) {
 	file := path.Join(publisher.ChartDir(), fmt.Sprintf("%s-%s.tgz", name, version))
 	if err := os.WriteFile(file, []byte("fake chart file"), 0400); err != nil {
 		t.Fatal(err)

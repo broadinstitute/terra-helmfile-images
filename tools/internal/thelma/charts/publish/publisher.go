@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 )
 
-// ChartPublisher is a utility for publishing new Helm charts to a Helm repo.
+// publisher is a utility for publishing new Helm charts to a Helm repo.
 // It should be used as follows:
 //
 //     // create new publisher
@@ -28,20 +28,34 @@ import (
 //
 // Note that Publish() can only be called once for a given publisher instance.
 //
-type ChartPublisher struct {
+type Publisher interface {
+	// ChartDir returns the path where new chart packages should be copied for upload
+	ChartDir() string
+	// Index returns a queryable copy of th eindex that is currently in the Helm repo bucket
+	Index() index.Index
+	// Publish publishes all charts in the chart directory to the target Helm repo
+	// * If commit is false, Publish will generate a new index but not actually upload the
+	//   ne
+	Publish(commit bool) (count int, err error)
+	// Close unlocks the repo and releases all resources associated with this publisher
+	Close() error
+}
+
+// implements Publisher interface
+type publisher struct {
 	repo        repo.Repo
 	stagingDir  *stagingDir
 	shellRunner shell.Runner
-	index       *index.Index
+	index       index.Index
 	closed      bool
 }
 
-// NewPublisher is a constructor for a ChartPublisher. It
+// NewPublisher is a constructor for a publisher. It
 // * creates a new GCS bucket client & associated repo object
 // * creates a chart staging directory
 // * locks the repo
 // * downloads the index file
-func NewPublisher(repo repo.Repo, runner shell.Runner, scratchDir string) (*ChartPublisher, error) {
+func NewPublisher(repo repo.Repo, runner shell.Runner, scratchDir string) (*publisher, error) {
 	_stagingDir := &stagingDir{root: scratchDir}
 
 	if err := os.Mkdir(_stagingDir.chartDir(), 0755); err != nil {
@@ -61,7 +75,7 @@ func NewPublisher(repo repo.Repo, runner shell.Runner, scratchDir string) (*Char
 		return nil, err
 	}
 
-	return &ChartPublisher{
+	return &publisher{
 		repo:        repo,
 		stagingDir:  _stagingDir,
 		index:       _index,
@@ -71,18 +85,17 @@ func NewPublisher(repo repo.Repo, runner shell.Runner, scratchDir string) (*Char
 }
 
 // ChartDir returns the path where new chart packages should be copied for upload
-func (u *ChartPublisher) ChartDir() string {
+func (u *publisher) ChartDir() string {
 	return u.stagingDir.chartDir()
 }
 
-// LastPublishedVersion returns the latest version of a chart in the index.
-// If the chart is not in the index, returns ""
-func (u *ChartPublisher) LastPublishedVersion(chartName string) string {
-	return u.index.LatestVersion(chartName)
+// Index returns a queryable version the index that is currently in the bucket.
+func (u *publisher) Index() index.Index {
+	return u.index
 }
 
 // Publish publishes all charts in the chart directory to the target Helm repo
-func (u *ChartPublisher) Publish(commit bool) (int, error) {
+func (u *publisher) Publish(commit bool) (int, error) {
 	if u.closed {
 		panic("Publish() can only be called once")
 	}
@@ -121,7 +134,7 @@ func (u *ChartPublisher) Publish(commit bool) (int, error) {
 // Close releases all resources associated with this uploader instance. This includes:
 // * unlocking the Helm repo
 // * deleting the chart staging directory
-func (u *ChartPublisher) Close() error {
+func (u *publisher) Close() error {
 	if u.closed {
 		return nil
 	}
@@ -139,7 +152,7 @@ func (u *ChartPublisher) Close() error {
 }
 
 // Generate a new index file that includes the updated charts
-func (u *ChartPublisher) generateNewIndex() error {
+func (u *publisher) generateNewIndex() error {
 	cmd := shell.Command{
 		Prog: helm.ProgName,
 		Args: []string{
@@ -158,19 +171,19 @@ func (u *ChartPublisher) generateNewIndex() error {
 }
 
 // Upload the new index file
-func (u *ChartPublisher) uploadIndex() error {
+func (u *publisher) uploadIndex() error {
 	log.Info().Msgf("chart-publisher: Uploading new index to repo")
 	return u.repo.UploadIndex(u.stagingDir.newIndexFile())
 }
 
 // Upload a new chart file
-func (u *ChartPublisher) uploadChart(localPath string) error {
+func (u *publisher) uploadChart(localPath string) error {
 	log.Info().Msgf("chart-publisher: Uploading chart %s to repo", localPath)
 	return u.repo.UploadChart(localPath)
 }
 
 // Return a list of chart packages in the chart directory
-func (u *ChartPublisher) listChartFiles() ([]string, error) {
+func (u *publisher) listChartFiles() ([]string, error) {
 	glob := path.Join(u.ChartDir(), "*.tgz")
 	chartFiles, err := filepath.Glob(glob)
 	if err != nil {
@@ -181,7 +194,7 @@ func (u *ChartPublisher) listChartFiles() ([]string, error) {
 }
 
 // Populate a new Index object from the repo, or create an empty index if the repo doesn't have one
-func initializeIndex(repo repo.Repo, stagingDir *stagingDir) (*index.Index, error) {
+func initializeIndex(repo repo.Repo, stagingDir *stagingDir) (index.Index, error) {
 	exists, err := repo.HasIndex()
 	if err != nil {
 		return nil, fmt.Errorf("chart-publisher: error downloading index from repo: %v", err)

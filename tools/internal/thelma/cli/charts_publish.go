@@ -144,7 +144,7 @@ func publishCharts(options *chartsPublishOptions, app *app.ThelmaApp) error {
 		if err := chart.GenerateDocs(); err != nil {
 			return err
 		}
-		newVersion, err := chart.BumpChartVersion(publisher.LastPublishedVersion(chartName))
+		newVersion, err := chart.BumpChartVersion(publisher.Index().MostRecentVersion(chartName))
 		if err != nil {
 			return err
 		}

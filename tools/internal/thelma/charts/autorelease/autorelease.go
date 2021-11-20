@@ -19,7 +19,7 @@ type AutoReleaser interface {
 }
 
 // Struct for parsing an autorelease.yaml config file
-type Config struct {
+type config struct {
 	Enabled bool `yaml:"enabled"` // whether updates to this chart should be added to release train. defaults to true
 	Release struct {
 		Name string               `yaml:"name"` // name of the "release", defaults to chart name
@@ -48,8 +48,8 @@ func (a *autoReleaser) UpdateVersionsFile(chart source.Chart, newVersion string)
 }
 
 // load .autorelease.yaml config file from chart source directory if it exists
-func loadConfig(chart source.Chart) Config {
-	cfg := Config{}
+func loadConfig(chart source.Chart) config {
+	cfg := config{}
 
 	// Set defaults
 	cfg.Enabled = true

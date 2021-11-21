@@ -22,7 +22,7 @@ type Mirror interface {
 // Implements Mirror interface
 type mirror struct {
 	publisher publish.Publisher
-	repositories map[string]RepoDefinition
+	repositories []RepoDefinition
 	charts []ChartDefinition
 	shellRunner shell.Runner
 }
@@ -161,22 +161,22 @@ func (m *mirror) loadConfig(configFile string) error {
 		return fmt.Errorf("error parsing %s: %v", configFile, err)
 	}
 
-	repositories := make(map[string]RepoDefinition)
+	repoMap := make(map[string]RepoDefinition)
 	for _, repoDefn := range cfg.Repositories {
-		_, exists := repositories[repoDefn.Name]
+		_, exists := repoMap[repoDefn.Name]
 		if exists {
 			return fmt.Errorf("configuration error in %s: repository %s is defined more than once", configFile, repoDefn.Name)
 		}
-		repositories[repoDefn.Name] = repoDefn
+		repoMap[repoDefn.Name] = repoDefn
 	}
 
 	for _, chartDefn := range cfg.Charts {
-		if _, exists := repositories[chartDefn.Repo]; !exists {
+		if _, exists := repoMap[chartDefn.Repo]; !exists {
 			return fmt.Errorf("configuration error in %s: chart %s references undefined repository %s", configFile, chartDefn.Name, chartDefn.Repo)
 		}
 	}
 
-	m.repositories = repositories
+	m.repositories = cfg.Repositories
 	m.charts = cfg.Charts
 
 	return nil

@@ -56,8 +56,6 @@ func (r *RealRunner) generateCommandId() string {
 	return fmt.Sprintf(cmdIdFormat, rand.Intn(maxCmdId))
 }
 
-// 2^4 = 1 hex digit
-// 2^8 = 2 hex digits
 // Capture runs a Command, streaming stdout and stderr to the given writers.
 // An error is returned if the command exits non-zero
 func (r *RealRunner) Capture(cmd Command, stdout io.Writer, stderr io.Writer) error {

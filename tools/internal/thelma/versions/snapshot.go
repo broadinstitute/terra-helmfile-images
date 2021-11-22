@@ -56,7 +56,6 @@ func (s *snapshot) ReleaseDefined(releaseName string) bool {
 }
 
 func (s *snapshot) ChartVersion(releaseName string) string {
-	log.Debug().Msgf("%v", s.data)
 	if !s.ReleaseDefined(releaseName) {
 		return ""
 	}

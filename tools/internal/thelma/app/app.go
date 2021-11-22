@@ -39,7 +39,7 @@ func NewWithOptions(cfg *config.Config, options Options) (*ThelmaApp, error) {
 	if options.Runner != nil {
 		app.ShellRunner = options.Runner
 	} else {
-		app.ShellRunner = shell.NewRealRunner()
+		app.ShellRunner = shell.NewDefaultRunner()
 	}
 
 	return app, nil

@@ -1,21 +1,45 @@
 package shellmock
 
 import (
+	"bytes"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
 	"github.com/stretchr/testify/assert"
+	"strings"
 	"testing"
 )
 
 // Example tests demonstrating how to use the shellmock package
 
 // The code we're testing:
+
+// SayHello simply echos hello world
 func SayHello(runner shell.Runner) error {
-	// let's run a bunch of pointless commands!
-	// note: errors ignored for clarity
-	return runner.Run(CmdFromArgs("echo", "hello", "world"))
+	return runner.Run(shell.Command{
+		Prog: "echo",
+		Args: []string{"hello", "world"},
+	})
 }
 
-// The test:
+// ListTmpFiles returns a list of files in the /tmp directory
+func ListTmpFiles(runner shell.Runner) ([]string, error) {
+	cmd := shell.Command{
+		Prog: "ls",
+		Args: []string{"-1", "/tmp"},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+
+	err := runner.Capture(cmd, buf, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	stdout := buf.String()
+	stdout = strings.TrimSuffix(stdout, "\n")
+	return strings.Split(stdout, "\n"), nil
+}
+
+// The tests:
 func TestHello(t *testing.T) {
 	runner := DefaultMockRunner()
 
@@ -25,7 +49,10 @@ func TestHello(t *testing.T) {
 	runner.Test(t)
 
 	// use ExpectCmd() to tell the mock that we expect a specific command to be run
-	runner.ExpectCmd(CmdFromArgs("echo", "hello", "world"))
+	runner.ExpectCmd(shell.Command{
+		Prog: "echo",
+		Args: []string{"hello", "world"},
+	})
 
 	// test the code
 	err := SayHello(runner)
@@ -34,5 +61,23 @@ func TestHello(t *testing.T) {
 	// !!! IMPORTANT !!!
 	// make sure to call AssertExpectations on the testify mock to verify all the
 	// expected commands were actually run.
+	runner.AssertExpectations(t)
+}
+
+func TestCaptureOutput(t *testing.T) {
+	runner := DefaultMockRunner()
+	runner.Test(t)
+
+	// CmdFromArgs is convenience function quickly generating Command structs
+	// CmdFromFmt provides similar functionality, but using format string + args
+	cmd := CmdFromArgs("ls", "-1", "/tmp")
+
+	runner.ExpectCmd(cmd).WithStdout("hello.txt\nzzzz.data\n")
+
+	// verify output was parsed correctly
+	files, err := ListTmpFiles(runner)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"hello.txt", "zzzz.data"}, files)
+
 	runner.AssertExpectations(t)
 }

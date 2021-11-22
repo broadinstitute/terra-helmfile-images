@@ -44,12 +44,6 @@ type Options struct {
 	IgnoreDir bool           // If true, ignore Dir field of shell.Command arguments
 }
 
-type expectedCommand struct {
-	cmd        shell.Command
-	call       *mock.Call
-	matchCount int
-}
-
 // MockRunner is an implementation of Runner interface for use with testify/mock.
 type MockRunner struct {
 	options          Options
@@ -59,6 +53,13 @@ type MockRunner struct {
 	t                *testing.T
 	mutex            sync.Mutex
 	mock.Mock
+}
+
+type expectedCommand struct {
+	cmd        shell.Command
+	stdout     string
+	stderr     string
+	matchCount int
 }
 
 // DefaultMockRunner returns a new mock runner instance with default settings
@@ -142,7 +143,14 @@ func CmdFromArgs(args... string) shell.Command {
 
 // Run Instead of executing the command, logs an info message and registers the call with testify mock
 func (m *MockRunner) Run(cmd shell.Command) error {
-	log.Info().Msgf("[MockRunner] Run called: %q\n", cmd.PrettyFormat())
+	return m.Capture(cmd, nil, nil)
+}
+
+// Capture Instead of executing the command, log an info message and register the call with testify mock
+func (m *MockRunner) Capture(cmd shell.Command, stdout io.Writer, stderr io.Writer) error {
+	log.Info().Msgf("[MockRunner] Command: %q\n", cmd.PrettyFormat())
+
+	// Remove ignored attributes
 	cmd = m.applyIgnores(cmd)
 
 	// we synchronize Run calls on the mock because testify mock isn't safe for concurrent access, and neither are our
@@ -150,17 +158,68 @@ func (m *MockRunner) Run(cmd shell.Command) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	args := m.Mock.Called(cmd)
+	args := m.Mock.Called(cmd, stdout, stderr)
 	if len(args) > 0 {
 		return args.Error(0)
 	}
 	return nil
 }
 
-// Capture Instead of executing the command, log an info message and register the call with testify mock
-func (m *MockRunner) Capture(cmd shell.Command, stdout io.Writer, stderr io.Writer) error {
-	// m.OnCapture(cmd).WriteStdout(bytes[]).WriteStderr(bytes[]).Return(err)
-	panic("TODO")
+// ExpectCmd sets an expectation for a command that should be run.
+func (m *MockRunner) ExpectCmd(cmd shell.Command) *Call {
+	cmd = m.applyIgnores(cmd)
+
+	mockCall := m.Mock.On("Capture", cmd, mock.Anything, mock.Anything)
+	callWrapper := &Call{ Call: mockCall }
+
+	order := len(m.expectedCommands)
+	expected := &expectedCommand{cmd: cmd}
+	m.expectedCommands = append(m.expectedCommands, expected)
+
+	callWrapper.Run(func(args mock.Arguments) {
+		if m.options.VerifyOrder {
+			if m.runCounter != order { // this command is out of order
+				if m.runCounter < len(m.expectedCommands) { // we have remaining expectations
+					err := fmt.Errorf(
+						"Command received out of order (%d instead of %d). Expected:\n%v\nReceived:\n%v",
+						m.runCounter,
+						order,
+						m.expectedCommands[m.runCounter].cmd,
+						cmd,
+					)
+
+					m.panicOrFailNow(err)
+				}
+			}
+		}
+
+		if err := callWrapper.writeMockOutput(args); err != nil {
+			m.panicOrFailNow(err)
+		}
+
+		expected.matchCount++
+		m.runCounter++
+	}).Once()
+
+	return callWrapper
+}
+
+// Test decorates Testify's mock.Mock#Test() function by adding a cleanup hook to the test object
+// that dumps the set of expected command matchers to stderr in the event of a test failure.
+// This is useful because most command matchers are functions and so Testify can't generate
+// a pretty diff for them; you end up with:
+//   (shell.Command={...}) not matched by func(Command) bool
+//
+func (m *MockRunner) Test(t *testing.T) {
+	m.t = t
+	t.Cleanup(func() {
+		if t.Failed() {
+			if err := m.dumpExpectedCmds(os.Stderr); err != nil {
+				t.Error(err)
+			}
+		}
+	})
+	m.Mock.Test(t)
 }
 
 func (m *MockRunner) applyIgnores(cmd shell.Command) shell.Command {
@@ -185,54 +244,6 @@ func (m *MockRunner) applyIgnores(cmd shell.Command) shell.Command {
 	cmd.Env = env
 
 	return cmd
-}
-
-// ExpectCmd sets an expectation for a command that should be run.
-func (m *MockRunner) ExpectCmd(cmd shell.Command) *mock.Call {
-	cmd = m.applyIgnores(cmd)
-	call := m.Mock.On("Run", cmd)
-	order := len(m.expectedCommands)
-	expected := &expectedCommand{cmd: cmd, call: call}
-	m.expectedCommands = append(m.expectedCommands, expected)
-
-	return call.Run(func(args mock.Arguments) {
-		if m.options.VerifyOrder {
-			if m.runCounter != order { // this command is out of order
-				if m.runCounter < len(m.expectedCommands) { // we have remaining expectations
-					err := fmt.Errorf(
-						"Command received out of order (%d instead of %d). Expected:\n%v\nReceived:\n%v",
-						m.runCounter,
-						order,
-						m.expectedCommands[m.runCounter].cmd,
-						cmd,
-					)
-
-					m.panicOrFailNow(err)
-				}
-			}
-		}
-
-		expected.matchCount++
-		m.runCounter++
-	}).Once()
-}
-
-// Test decorates Testify's mock.Mock#Test() function by adding a cleanup hook to the test object
-// that dumps the set of expected command matchers to stderr in the event of a test failure.
-// This is useful because most command matchers are functions and so Testify can't generate
-// a pretty diff for them; you end up with:
-//   (shell.Command={...}) not matched by func(Command) bool
-//
-func (m *MockRunner) Test(t *testing.T) {
-	m.t = t
-	t.Cleanup(func() {
-		if t.Failed() {
-			if err := m.dumpExpectedCmds(os.Stderr); err != nil {
-				t.Error(err)
-			}
-		}
-	})
-	m.Mock.Test(t)
 }
 
 func (m *MockRunner) dumpExpectedCmds(w io.Writer) error {

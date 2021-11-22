@@ -41,7 +41,7 @@ type Options struct {
 }
 
 // shellRunner an instance of a shell.Runner used to execute Helm commands.
-var shellRunner shell.Runner = shell.NewRealRunner()
+var shellRunner shell.Runner = shell.NewDefaultRunner()
 
 // init Initialize logging before anything else
 // This way our Cobra error messages will be nicely formatted

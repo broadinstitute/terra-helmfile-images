@@ -11,7 +11,7 @@ import (
 
 func TestSnapshot_UpdateChartVersionIfDefined_Smoke(t *testing.T) {
 	thelmaHome := t.TempDir()
-	runner := shell.NewRealRunner()
+	runner := shell.NewDefaultRunner()
 	_versions := NewVersions(thelmaHome, runner).(*versions)
 
 	var err error

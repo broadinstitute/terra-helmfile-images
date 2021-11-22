@@ -25,7 +25,6 @@ func TestMockRunnerPassesSingleCommand(t *testing.T) {
 	assert.NoError(t, err)
 
 	m.AssertExpectations(t)
-	m.AssertNumberOfCalls(t, "Run", 1)
 }
 
 // Should pass when we run multiple commands in order
@@ -44,7 +43,6 @@ func TestMockRunnerPassesMultipleCommandsInOrder(t *testing.T) {
 	assert.NoError(t, err)
 
 	m.AssertExpectations(t)
-	m.AssertNumberOfCalls(t, "Run", 2)
 }
 
 // Should fail when commands are run out of order
@@ -87,7 +85,6 @@ func TestMockRunnerOutOfOrderPassesWithNoVerify(t *testing.T) {
 	assert.Nil(t, m.Run(CmdFromArgs("echo", "1")))
 
 	m.AssertExpectations(t)
-	m.AssertNumberOfCalls(t, "Run", 2)
 }
 
 // Verify our mock runner can be used to mock cases where Run() returns an error

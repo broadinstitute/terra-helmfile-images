@@ -9,7 +9,6 @@ import (
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render/target"
 	. "github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/testutils"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"os"
 	"path"
 	"regexp"
@@ -398,18 +397,18 @@ func args(format string, a ...interface{}) []string {
 }
 
 // Convenience function for setting up an expectation for a helmfile update command
-func (ts *TestState) expectHelmfileUpdateCmd() *mock.Call {
+func (ts *TestState) expectHelmfileUpdateCmd() *shellmock.Call {
 	return ts.expectCmd("helmfile --log-level=info --allow-no-matching-release repos")
 }
 
 // Convenience function for setting up an expectation for a helmfile template command
-func (ts *TestState) expectHelmfileCmd(target target.ReleaseTarget, format string, a ...interface{}) *mock.Call {
+func (ts *TestState) expectHelmfileCmd(target target.ReleaseTarget, format string, a ...interface{}) *shellmock.Call {
 	cmd := ts.buildHelmfileCmd(target, format, a...)
 	return ts.mockRunner.ExpectCmd(cmd)
 }
 
 // Convenience function for setting up an expectation for a helmfile template command
-func (ts *TestState) expectHelmfileCmdWithEnv(target target.ReleaseTarget, env []string, format string, a ...interface{}) *mock.Call {
+func (ts *TestState) expectHelmfileCmdWithEnv(target target.ReleaseTarget, env []string, format string, a ...interface{}) *shellmock.Call {
 	cmd := ts.buildHelmfileCmd(target, format, a...)
 	for _, pair := range env {
 		cmd.Env = append(cmd.Env, pair)
@@ -432,7 +431,7 @@ func (ts *TestState) buildHelmfileCmd(target target.ReleaseTarget, format string
 	}
 }
 
-func (ts *TestState) expectCmd(format string, a ...interface{}) *mock.Call {
+func (ts *TestState) expectCmd(format string, a ...interface{}) *shellmock.Call {
 	cmd := ts.buildCmd(format, a...)
 	return ts.mockRunner.ExpectCmd(cmd)
 }

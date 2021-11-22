@@ -18,14 +18,16 @@ type Runner interface {
 	Run(cmd Command) error
 
 	// Capture runs a Command, streaming stdout and stderr to the given writers.
-	// An error is returned if the command exits non-zero
+	// An error is returned if the command exits non-zero.
+	// If you're only interested in stdout, pass in nil for stderr (and vice versa)
 	Capture(cmd Command, stdout io.Writer, stderr io.Writer) error
 }
 
 // Error represents an error encountered running a shell command
 type Error struct {
-	Command Command
-	Err     error
+	Command Command // the command that generated this error
+	Err     error   // underlying error returned by exec package
+	ErrOut  string  // any output the command sent to stderr
 }
 
 // Command encapsulates a shell command
@@ -42,7 +44,14 @@ func (e *Error) Error() string {
 	cmd := e.Command.PrettyFormat()
 	if exitErr, ok := e.Err.(*exec.ExitError); ok {
 		// Command exited non-zero
-		return fmt.Sprintf("Command %q exited with status %d", cmd, exitErr.ExitCode())
+		msg := fmt.Sprintf("Command %q exited with status %d", cmd, exitErr.ExitCode())
+
+		// Add stderr output if any was generated
+		if len(e.ErrOut) > 0 {
+			msg = fmt.Sprintf("%s:\n%s", msg, e.ErrOut)
+		}
+
+		return msg
 	}
 
 	// Command failed to start for some reason

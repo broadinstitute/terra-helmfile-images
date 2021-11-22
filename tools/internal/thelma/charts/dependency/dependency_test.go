@@ -39,7 +39,7 @@ func TestWithDependents(t *testing.T) {
 
 	for _, tc := range testCases {
 		input, expected := tc[0], tc[1]
-		actual := g.WithDependents(input...)
+		actual := g.WithTransitiveDependents(input...)
 		sort.Slice(actual, func(i, j int) bool {
 			return actual[i] < actual[j]
 		})

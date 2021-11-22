@@ -38,3 +38,7 @@ func (c *MockChart) GenerateDocs() error {
 func (c *MockChart) LocalDependencies() []string {
 	return c.Called().Get(0).([]string)
 }
+
+func (c *MockChart) SetDependencyVersion(dependencyName string, newVersion string) error {
+	return c.Called(dependencyName, newVersion).Error(0)
+}

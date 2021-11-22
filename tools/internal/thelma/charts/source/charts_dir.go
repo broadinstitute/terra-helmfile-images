@@ -62,7 +62,7 @@ func (d *chartsDir) Release(chartNames []string) error {
 	}
 
 	// Add dependents.
-	chartsToPublish = d.withDependents(chartsToPublish)
+	chartsToPublish = d.withTransitiveDependents(chartsToPublish)
 
 	d.dependencyGraph.TopoSort(chartsToPublish)
 	log.Info().Msgf("%d charts will be published: %s", len(chartsToPublish), strings.Join(chartsToPublish, ","))
@@ -75,6 +75,9 @@ func (d *chartsDir) Release(chartNames []string) error {
 		}
 		newVersion, err := _chart.BumpChartVersion(d.publisher.Index().MostRecentVersion(chartName))
 		if err != nil {
+			return err
+		}
+		if err := d.updateDependentVersionConstraints(chartName, newVersion); err != nil {
 			return err
 		}
 		if err := _chart.BuildDependencies(); err != nil {
@@ -98,15 +101,26 @@ func (d *chartsDir) Release(chartNames []string) error {
 	return nil
 }
 
-func (d *chartsDir) withDependents(chartNames []string) []string {
-	withDeps := d.dependencyGraph.WithDependents(chartNames...)
+// Go through all dependents and update version constraints to match new version
+func (d *chartsDir) updateDependentVersionConstraints(chartName string, newVersion string) error {
+	for _, dependent := range d.dependencyGraph.GetDependents(chartName) {
+		dependentChart := d.charts[dependent]
+		if err := dependentChart.SetDependencyVersion(chartName, newVersion); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
-	diff := len(withDeps) - len(chartNames)
+func (d *chartsDir) withTransitiveDependents(chartNames []string) []string {
+	result := d.dependencyGraph.WithTransitiveDependents(chartNames...)
+
+	diff := len(result) - len(chartNames)
 	if diff > 0 {
 		log.Info().Msgf("Identified %d additional downstream charts to publish", diff)
 	}
 
-	return withDeps
+	return result
 }
 
 func buildDependencyGraph(charts map[string]Chart) (*dependency.Graph, error) {

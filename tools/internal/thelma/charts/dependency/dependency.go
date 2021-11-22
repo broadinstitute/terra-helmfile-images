@@ -66,15 +66,24 @@ func (graph *Graph) TopoSort(chartNames []string) {
 	})
 }
 
+// Return the names of the dependents for the given chart
+func (graph *Graph) GetDependents(chartName string) []string {
+	var result []string
+	for _, depNode := range graph.nodes[chartName].dependents {
+		result = append(result, depNode.chartName)
+	}
+	return result
+}
+
 // Given a set of chart names, return the charts along with names of all transitive local dependents
 // Eg. suppose we have
 // A <- B <- C
 // D <- E
 // G
 // H <- I <- J
-// WithDependents([]string{"A", "G", "I"}) will return []string{"A", "G", "B", "C", "I", "J"}
+// WithTransitiveDependents([]string{"A", "G", "I"}) will return []string{"A", "G", "B", "C", "I", "J"}
 // (order not guaranteed)
-func (graph *Graph) WithDependents(chartNames ...string) []string {
+func (graph *Graph) WithTransitiveDependents(chartNames ...string) []string {
 	queue := make([]string, 0, len(chartNames))
 	visited := make(map[string]bool)
 	result := make([]string, 0, len(chartNames))

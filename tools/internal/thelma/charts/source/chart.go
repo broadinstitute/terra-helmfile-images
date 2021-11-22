@@ -27,12 +27,13 @@ const chartManifestFile = "Chart.yaml"
 
 // ChartManifest struct used to unmarshal Helm chart.yaml files.
 type ChartManifest struct {
-	Name         string `yaml:"name"`
-	Version      string `yaml:"version"`
+	Name         string
+	Version      string
 	Dependencies []struct {
-		Name       string `yaml:"name"`
-		Repository string `yaml:"repository"`
-	} `yaml:"dependencies"`
+		Name       string
+		Repository string
+		Version    string
+	}
 }
 
 // Chart represents a Helm chart source directory on the local filesystem.
@@ -51,6 +52,8 @@ type Chart interface {
 	GenerateDocs() error
 	// LocalDependencies returns the names of local dependencies / subcharts (using Helm's "file://" repo support)
 	LocalDependencies() []string
+	// SetDependencyVersion sets the version of dependency
+	SetDependencyVersion(dependencyName string, newVersion string) error
 }
 
 // Implements Chart interface
@@ -63,16 +66,10 @@ type chart struct {
 
 // NewChart constructs a Chart
 func NewChart(manifestFile string, shellRunner shell.Runner) (Chart, error) {
-	content, err := ioutil.ReadFile(manifestFile)
+	manifest, err := loadManifest(manifestFile)
 	if err != nil {
-		return nil, fmt.Errorf("error reading chart manifest %s: %v", manifestFile, err)
+		return nil, err
 	}
-
-	manifest := ChartManifest{}
-	if err := yaml.Unmarshal(content, &manifest); err != nil {
-		return nil, fmt.Errorf("error parsing chart manifest %s: %v", manifestFile, err)
-	}
-	log.Debug().Msgf("loaded chart manifest from %s: %v", manifestFile, manifest)
 
 	return &chart{
 		name:        manifest.Name,
@@ -97,7 +94,16 @@ func (c *chart) BumpChartVersion(latestPublishedVersion string) (string, error) 
 	nextVersion := c.nextVersion(latestPublishedVersion)
 	expression := fmt.Sprintf(".version = %q", nextVersion)
 	manifestFile := path.Join(c.path, chartManifestFile)
-	return nextVersion, yq.New(c.shellRunner).Write(expression, manifestFile)
+	if err := yq.New(c.shellRunner).Write(expression, manifestFile); err != nil {
+		return nextVersion, err
+	}
+	if err := c.reloadManifest(); err != nil {
+		return nextVersion, err
+	}
+	if c.manifest.Version != nextVersion {
+		return nextVersion, fmt.Errorf("error updating %s chart version to %s in %s: version is still %s after update", c.name, nextVersion, manifestFile, c.manifest.Version)
+	}
+	return nextVersion, nil
 }
 
 // BuildDependencies runs `helm dependency build` on the local copy of the chart.
@@ -157,6 +163,29 @@ func (c *chart) LocalDependencies() []string {
 	return dependencies
 }
 
+func (c *chart) SetDependencyVersion(dependencyName string, newVersion string) error {
+	expression := fmt.Sprintf(`(.dependencies.[] | select(.name == %q) | .version) |= %q`, dependencyName, newVersion)
+	manifestFile := path.Join(c.path, chartManifestFile)
+	if err := yq.New(c.shellRunner).Write(expression, manifestFile); err != nil {
+		return err
+	}
+	if err := c.reloadManifest(); err != nil {
+		return err
+	}
+	for _, dependency := range c.manifest.Dependencies {
+		if dependency.Name == dependencyName {
+			if dependency.Version == newVersion {
+				log.Debug().Msgf("updated version for dependency %s to %s in %s", dependencyName, newVersion, manifestFile)
+				return nil
+			} else {
+				return fmt.Errorf("error setting dependency %s to version %s in %s: dependency not found", dependencyName, newVersion, manifestFile)
+			}
+		}
+	}
+
+	return fmt.Errorf("error setting dependency %s to version %s in %s: dependency not found", dependencyName, newVersion, manifestFile)
+}
+
 func (c *chart) nextVersion(latestPublishedVersion string) string {
 	sourceVersion := c.manifest.Version
 	nextPublishedVersion, err := semver.MinorBump(latestPublishedVersion)
@@ -184,4 +213,31 @@ func (c *chart) nextVersion(latestPublishedVersion string) string {
 	}
 
 	return nextPublishedVersion
+}
+
+func (c *chart) reloadManifest() error {
+	manifestFile := path.Join(c.path, chartManifestFile)
+	manifest, err := loadManifest(manifestFile)
+	if err != nil {
+		return fmt.Errorf("manifest reload failed: %v", err)
+	}
+	log.Debug().Msgf("chart %s: reloaded manifest file %s", c.name, manifestFile)
+	c.manifest = manifest
+	return nil
+}
+
+func loadManifest(manifestFile string) (ChartManifest, error) {
+	var manifest ChartManifest
+
+	content, err := ioutil.ReadFile(manifestFile)
+	if err != nil {
+		return manifest, fmt.Errorf("error reading chart manifest %s: %v", manifestFile, err)
+	}
+
+	if err := yaml.Unmarshal(content, &manifest); err != nil {
+		return manifest, fmt.Errorf("error parsing chart manifest %s: %v", manifestFile, err)
+	}
+	log.Debug().Msgf("loaded chart manifest from %s: %v", manifestFile, manifest)
+
+	return manifest, nil
 }

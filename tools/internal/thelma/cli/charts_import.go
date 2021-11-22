@@ -10,7 +10,7 @@ import (
 
 const chartsImportHelpMessage = `Imports charts from public Helm repositories into the terra-helm-third-party-repo`
 const chartsImportDefaultBucketName = "terra-helm-thirdparty"
-const chartsImportDefaultConfigFile = ".third-party-charts.yaml"
+const chartsImportDefaultConfigFile = "third-party-charts.yaml"
 
 type chartsImportOptions struct {
 	configFile string
@@ -43,7 +43,7 @@ func newChartsImportCLI(ctx *ThelmaContext) *chartsImportCLI {
 		Long:  chartsImportHelpMessage,
 	}
 
-	cobraCommand.Flags().StringVar(&options.configFile, chartsImportFlagNames.configFile, path.Join("$THELMA_HOME", chartsImportDefaultConfigFile), "Path to import config file")
+	cobraCommand.Flags().StringVar(&options.configFile, chartsImportFlagNames.configFile, path.Join("$THELMA_HOME", "etc", chartsImportDefaultConfigFile), "Path to import config file")
 	cobraCommand.Flags().StringVar(&options.bucketName, chartsImportFlagNames.bucketName, chartsImportDefaultBucketName, "Publish charts to custom GCS bucket")
 	cobraCommand.Flags().BoolVarP(&options.dryRun, chartsImportFlagNames.dryRun, "n", false, "Dry run (don't actually update Helm repo)")
 
@@ -55,7 +55,7 @@ func newChartsImportCLI(ctx *ThelmaContext) *chartsImportCLI {
 			}
 			options.configFile = expanded
 		} else {
-			options.configFile = path.Join(ctx.app.Config.Home(), chartsImportDefaultConfigFile)
+			options.configFile = path.Join(ctx.app.Paths.MiscConfDir(), chartsImportDefaultConfigFile)
 		}
 
 		return nil

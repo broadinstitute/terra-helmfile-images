@@ -96,7 +96,7 @@ func (m *mirror) chartsToUpload() []ChartDefinition {
 			continue
 		}
 
-		log.Info().Msgf("Repo index does include %s version %s, will upload it", chartDefn.Name, chartDefn.Version)
+		log.Info().Msgf("Repo index does not include %s version %s, will upload it", chartDefn.Name, chartDefn.Version)
 		result = append(result, chartDefn)
 	}
 

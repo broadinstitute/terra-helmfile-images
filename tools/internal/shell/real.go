@@ -95,7 +95,7 @@ func (r *RealRunner) Capture(cmd Command, stdout io.Writer, stderr io.Writer) er
 	return nil
 }
 
-// An io.Writer that captures data into a buffer and delegates to another writer
+// An io.Writer that captures data it receives with Write() into a buffer and optionally forwards to another writer
 type capturingWriter struct {
 	len    int
 	maxLen int
@@ -158,7 +158,7 @@ func (cw *capturingWriter) rollover() {
 	cw.len = 0
 }
 
-// An io.Writer that logs messages and optionally forwards to another io.Writer
+// An io.Writer that logs messages that are sent to it with Write() and optionally forwards to another io.Writer
 type loggingWriter struct {
 	level zerolog.Level
 	logger zerolog.Logger

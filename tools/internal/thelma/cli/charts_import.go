@@ -38,7 +38,7 @@ func newChartsImportCLI(ctx *ThelmaContext) *chartsImportCLI {
 	options := chartsImportOptions{}
 
 	cobraCommand := &cobra.Command{
-		Use:   "jmport [options] [CHART1] [CHART2] ...",
+		Use:   "import [options] [CHART1] [CHART2] ...",
 		Short: "Imports third-party Helm charts into the terra-helm-thirdparty repo",
 		Long:  chartsImportHelpMessage,
 	}

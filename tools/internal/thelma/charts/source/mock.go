@@ -23,7 +23,7 @@ func (c *MockChart) BumpChartVersion(latestPublishedVersion string) (string, err
 	return result.String(0), result.Error(1)
 }
 
-func (c *MockChart) BuildDependencies() error {
+func (c *MockChart) UpdateDependencies() error {
 	return c.Called().Error(0)
 }
 

@@ -44,15 +44,15 @@ type Chart interface {
 	Path() string
 	// BumpChartVersion updates chart version in chart.yaml
 	BumpChartVersion(latestPublishedVersion string) (string, error)
-	// BuildDependencies runs `helm dependency build` on the local copy of the chart.
-	BuildDependencies() error
+	// UpdateDependencies runs `helm dependency update` on the local copy of the chart.
+	UpdateDependencies() error
 	// PackageChart runs `helm package` to package a chart
 	PackageChart(destPath string) error
 	// GenerateDocs re-generates README documentation for the given chart
 	GenerateDocs() error
 	// LocalDependencies returns the names of local dependencies / subcharts (using Helm's "file://" repo support)
 	LocalDependencies() []string
-	// SetDependencyVersion sets the version of dependency
+	// SetDependencyVersion sets the version of a dependency in this chart's Chart.yaml
 	SetDependencyVersion(dependencyName string, newVersion string) error
 }
 
@@ -106,13 +106,13 @@ func (c *chart) BumpChartVersion(latestPublishedVersion string) (string, error) 
 	return nextVersion, nil
 }
 
-// BuildDependencies runs `helm dependency build` on the local copy of the chart.
-func (c *chart) BuildDependencies() error {
+// BuildDependencies runs `helm dependency update` on the local copy of the chart.
+func (c *chart) UpdateDependencies() error {
 	cmd := shell.Command{
 		Prog: helm.ProgName,
 		Args: []string{
 			"dependency",
-			"build",
+			"update",
 			"--skip-refresh",
 		},
 		Dir: c.path,

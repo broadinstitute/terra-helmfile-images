@@ -80,7 +80,7 @@ func (d *chartsDir) Release(chartNames []string) error {
 		if err := d.updateDependentVersionConstraints(chartName, newVersion); err != nil {
 			return err
 		}
-		if err := _chart.BuildDependencies(); err != nil {
+		if err := _chart.UpdateDependencies(); err != nil {
 			return err
 		}
 		if err := _chart.PackageChart(d.publisher.ChartDir()); err != nil {

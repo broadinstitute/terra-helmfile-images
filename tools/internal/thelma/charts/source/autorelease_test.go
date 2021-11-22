@@ -12,17 +12,23 @@ func TestAutoReleaser_UpdateVersionsFile(t *testing.T) {
 	chartName := "mychart"
 	newVersion := "5.6.7"
 
+	type mocks struct {
+		versions *versions.MockVersions
+		snapshot *versions.MockSnapshot
+	}
+
 	testCases := []struct {
 		name          string
 		newVersion    string
 		configContent string
-		setupMocks    func(*versions.MockVersions)
+		setupMocks    func(mocks)
 		matchErr      string
 	}{
 		{
 			name: "No config file should default to enabled + app release type",
-			setupMocks: func(mockVersions *versions.MockVersions) {
-				mockVersions.On("SetReleaseVersionIfDefined", chartName, versions.AppRelease, versions.Dev, newVersion).Return(nil)
+			setupMocks: func(m mocks) {
+				m.versions.On("LoadSnapshot", versions.AppRelease, versions.Dev).Return(m.snapshot, nil)
+				m.snapshot.On("UpdateChartVersionIfDefined", chartName, newVersion).Return(nil)
 			},
 		},
 		{
@@ -30,17 +36,19 @@ func TestAutoReleaser_UpdateVersionsFile(t *testing.T) {
 			configContent: `enabled: false`,
 		},
 		{
-			name:          "Should permit release name overriding",
+			name:          "Should support release name overriding",
 			configContent: `release: {name: foo}`,
-			setupMocks: func(mockVersions *versions.MockVersions) {
-				mockVersions.On("SetReleaseVersionIfDefined", "foo", versions.AppRelease, versions.Dev, newVersion).Return(nil)
+			setupMocks: func(m mocks) {
+				m.versions.On("LoadSnapshot", versions.AppRelease, versions.Dev).Return(m.snapshot, nil)
+				m.snapshot.On("UpdateChartVersionIfDefined", "foo", newVersion).Return(nil)
 			},
 		},
 		{
-			name:          "Should permit release type overriding",
+			name:          "Should support release type overriding",
 			configContent: `release: {type: cluster}`,
-			setupMocks: func(mockVersions *versions.MockVersions) {
-				mockVersions.On("SetReleaseVersionIfDefined", chartName, versions.ClusterRelease, versions.Dev, newVersion).Return(nil)
+			setupMocks: func(m mocks) {
+				m.versions.On("LoadSnapshot", versions.ClusterRelease, versions.Dev).Return(m.snapshot, nil)
+				m.snapshot.On("UpdateChartVersionIfDefined", chartName, newVersion).Return(nil)
 			},
 		},
 	}
@@ -51,9 +59,12 @@ func TestAutoReleaser_UpdateVersionsFile(t *testing.T) {
 		chart.On("Path").Return(chartDir)
 
 		t.Run(tc.name, func(t *testing.T) {
-			mockVersions := versions.NewMockVersions()
+			m := mocks{
+				versions: versions.NewMockVersions(),
+				snapshot: versions.NewMockSnapshot(),
+			}
 			if tc.setupMocks != nil {
-				tc.setupMocks(mockVersions)
+				tc.setupMocks(m)
 			}
 
 			if len(tc.configContent) > 0 {
@@ -62,10 +73,11 @@ func TestAutoReleaser_UpdateVersionsFile(t *testing.T) {
 				}
 			}
 
-			_autoReleaser := NewAutoReleaser(mockVersions)
-			err := _autoReleaser.UpdateVersionsFile(chart, newVersion)
+			_autoReleaser := NewAutoReleaser(m.versions)
+			err := _autoReleaser.UpdateReleaseVersion(chart, newVersion)
 
-			mockVersions.AssertExpectations(t)
+			m.versions.AssertExpectations(t)
+			m.snapshot.AssertExpectations(t)
 
 			if len(tc.matchErr) == 0 {
 				assert.NoError(t, err)

@@ -86,7 +86,7 @@ func (d *chartsDir) Release(chartNames []string) error {
 		if err := _chart.PackageChart(d.publisher.ChartDir()); err != nil {
 			return err
 		}
-		if err := d.autoreleaser.UpdateVersionsFile(_chart, newVersion); err != nil {
+		if err := d.autoreleaser.UpdateReleaseVersion(_chart, newVersion); err != nil {
 			return err
 		}
 	}

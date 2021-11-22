@@ -13,15 +13,15 @@ const targetVersionSet = versions.Dev
 
 // AutoReleaser bumps chart versions in versions/app/dev.yaml & friends when a new chart version is released
 type AutoReleaser interface {
-	// UpdateVersionsFile updates the version file
-	UpdateVersionsFile(chart Chart, version string) error
+	// UpdateReleaseVersion updates the version file
+	UpdateReleaseVersion(chart Chart, version string) error
 }
 
 // Struct for parsing an autorelease.yaml config file
 type config struct {
 	Enabled bool `yaml:"enabled"` // whether updates to this chart should be added to release train. defaults to true
 	Release struct {
-		Name string               `yaml:"name"` // name of the "release", defaults to chart name
+		Name string `yaml:"name"`// name of the "release", defaults to chart name
 		Type versions.ReleaseType `yaml:"type"` // either "app" or "cluster", defaults to app
 	} `yaml:"release"`
 }
@@ -37,13 +37,17 @@ func NewAutoReleaser(versions versions.Versions) AutoReleaser {
 	}
 }
 
-func (a *autoReleaser) UpdateVersionsFile(chart Chart, newVersion string) error {
+func (a *autoReleaser) UpdateReleaseVersion(chart Chart, newVersion string) error {
 	cfg := loadConfig(chart)
 	if !cfg.Enabled {
 		return nil
 	}
 
-	return a.versions.SetReleaseVersionIfDefined(cfg.Release.Name, cfg.Release.Type, targetVersionSet, newVersion)
+	snapshot, err := a.versions.LoadSnapshot(cfg.Release.Type, targetVersionSet)
+	if err != nil {
+		return err
+	}
+	return snapshot.UpdateChartVersionIfDefined(cfg.Release.Name, newVersion)
 }
 
 // load .autorelease.yaml config file from chart source directory if it exists

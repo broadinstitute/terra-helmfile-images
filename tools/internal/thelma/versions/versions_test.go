@@ -4,71 +4,156 @@ import (
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shellmock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"gopkg.in/yaml.v3"
 	"os"
 	"path"
 	"testing"
 )
 
-const appDevVersionsContent = `
+const appDevSnapshotInitialContent = `
 releases:
   agora:
     appVersion: ignored # Doesn't matter
     chartVersion: 0.0.0
 `
 
-const clusterAlphaVersionsContent = `
+
+const appDevSnapshotUpdatedContent = `
+releases:
+  agora:
+    appVersion: ignored # Doesn't matter
+    chartVersion: 1.2.3
+`
+
+const clusterAlphaSnapshotInitialContent = `
 releases:
   prometheus:
     chartVersion: 0.1.2
 `
 
-func TestVersions_SetChartVersionIfDefined(t *testing.T) {
-	thelmaHome := t.TempDir()
-	mockRunner := shellmock.DefaultMockRunner()
-	versions := New(thelmaHome, mockRunner)
+const clusterAlphaSnapshotUpdatedContent = `
+releases:
+  prometheus:
+    chartVersion: 4.5.6
+`
 
-	err := populateFakeVersionsDir(thelmaHome)
+func TestSnapshot_ChartVersion(t *testing.T) {
+	thelmaHome := t.TempDir()
+	runner := shellmock.DefaultMockRunner()
+
+	err := initializeFakeVersionsDir(thelmaHome)
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
 
-	//
-	// Agora IS defined in versions/app/dev.yaml, so we should try to set the version.
-	mockRunner.ExpectCmd(shell.Command{
-		Prog: "yq",
-		Args: []string{
-			"eval",
-			"--inplace",
-			`.releases.agora.chartVersion = "1.2.3"`,
-			path.Join(thelmaHome, "versions/app/dev.yaml"),
+	v := NewVersions(thelmaHome, runner)
+	s, err := v.LoadSnapshot(AppRelease, Dev)
+	if !assert.NoError(t, err) {
+		t.FailNow()
+	}
+
+	assert.True(t, s.ReleaseDefined("agora"))
+	assert.Equal(t, "0.0.0", s.ChartVersion("agora"))
+
+	runner.AssertExpectations(t)
+}
+
+func TestSnapshot_UpdateChartVersionIfDefined(t *testing.T) {
+	type testMocks struct {
+		runner *shellmock.MockRunner
+		thelmaHome string
+	}
+	testCases := []struct{
+		name string
+		releaseName string
+		newVersion string
+		releaseType ReleaseType
+		set Set
+		expectedError string
+		setupMocks func(testMocks)
+	}{
+		{
+			name: "should set agora version in versions/app/dev.yaml",
+			releaseName: "agora",
+			newVersion: "1.2.3",
+			releaseType: AppRelease,
+			set: Dev,
+			setupMocks: func(tm testMocks) {
+				tm.runner.ExpectCmd(shell.Command{
+					Prog: "yq",
+					Args: []string{
+						"eval",
+						"--inplace",
+						`.releases.agora.chartVersion = "1.2.3"`,
+						path.Join(tm.thelmaHome, "versions/app/dev.yaml"),
+					},
+				}).Run(func(args mock.Arguments) {
+					if err := writeFakeAppDevVersionsFile(tm.thelmaHome, appDevSnapshotUpdatedContent); err != nil {
+						t.Fatal(err)
+					}
+				})
+			},
 		},
-	})
-
-	err = versions.SetReleaseVersionIfDefined("agora", AppRelease, Dev, "1.2.3")
-	assert.NoError(t, err)
-
-	//
-	// Prometheus IS defined in versions/cluster/alpha.yaml, so we should try to set the version.
-	mockRunner.ExpectCmd(shell.Command{
-		Prog: "yq",
-		Args: []string{
-			"eval",
-			"--inplace",
-			`.releases.prometheus.chartVersion = "4.5.6"`,
-			path.Join(thelmaHome, "versions/cluster/alpha.yaml"),
+		{
+			name: "should set prometheus version in versions/cluster/alpha.yaml",
+			releaseName: "prometheus",
+			newVersion: "4.5.6",
+			releaseType: ClusterRelease,
+			set: Alpha,
+			setupMocks: func(tm testMocks) {
+				tm.runner.ExpectCmd(shell.Command{
+					Prog: "yq",
+					Args: []string{
+						"eval",
+						"--inplace",
+						`.releases.prometheus.chartVersion = "4.5.6"`,
+						path.Join(tm.thelmaHome, "versions/cluster/alpha.yaml"),
+					},
+				}).Run(func(args mock.Arguments) {
+					if err := writeFakeClusterAlphaVersionsFile(tm.thelmaHome, clusterAlphaSnapshotUpdatedContent); err != nil {
+						t.Fatal(err)
+					}
+				})
+			},
 		},
-	})
+		{
+			name: "should NOT version for undefined release",
+			releaseName: "fakechart",
+			newVersion: "1.2.3",
+			releaseType: AppRelease,
+			set: Dev,
+		},
 
-	err = versions.SetReleaseVersionIfDefined("prometheus", ClusterRelease, Alpha, "4.5.6")
-	assert.NoError(t, err)
+	}
 
-	//
-	// fakechart is NOT defined in versions/app/dev.yaml, so the version should NOT be set
-	err = versions.SetReleaseVersionIfDefined("fakechart", AppRelease, Dev, "1.2.3")
-	assert.NoError(t, err)
+	for _, tc := range testCases {
+		mocks := testMocks{
+			thelmaHome: t.TempDir(),
+			runner: shellmock.DefaultMockRunner(),
+		}
+		_versions := NewVersions(mocks.thelmaHome, mocks.runner)
 
-	mockRunner.AssertExpectations(t)
+		err := initializeFakeVersionsDir(mocks.thelmaHome)
+		if !assert.NoError(t, err) {
+			t.FailNow()
+		}
+
+		if tc.setupMocks != nil {
+			tc.setupMocks(mocks)
+		}
+
+		_snapshot, err := _versions.LoadSnapshot(tc.releaseType, tc.set)
+		assert.NoError(t, err)
+		err = _snapshot.UpdateChartVersionIfDefined(tc.releaseName, tc.newVersion)
+
+		if tc.expectedError == "" {
+			assert.NoError(t, err)
+		} else {
+			assert.Error(t, err)
+			assert.Regexp(t, tc.expectedError, err)
+		}
+	}
 }
 
 func TestReleaseType_String(t *testing.T) {
@@ -93,18 +178,34 @@ func TestReleaseType_UnmarshalYAML(t *testing.T) {
 	assert.Regexp(t, "unknown release type", err)
 }
 
-func populateFakeVersionsDir(thelmaHome string) error {
-	appDevVersionsFile := path.Join(thelmaHome, versionsDir, "app", "dev.yaml")
-	clusterAlphaVersionsFile := path.Join(thelmaHome, versionsDir, "cluster", "alpha.yaml")
+func TestMocks_MatchInterface(t *testing.T) {
+	v := NewMockVersions()
+	s := NewMockSnapshot()
 
-	if err := writeFakeVersionsFile(appDevVersionsFile, appDevVersionsContent); err != nil {
+	// make sure interfaces match -- compilation will fail if they don't
+	var _ Versions = v
+	var _ Snapshot = s
+}
+
+func initializeFakeVersionsDir(thelmaHome string) error {
+	if err := writeFakeAppDevVersionsFile(thelmaHome, appDevSnapshotInitialContent); err != nil {
 		return err
 	}
-	if err := writeFakeVersionsFile(clusterAlphaVersionsFile, clusterAlphaVersionsContent); err != nil {
+	if err := writeFakeClusterAlphaVersionsFile(thelmaHome, clusterAlphaSnapshotInitialContent); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func writeFakeAppDevVersionsFile(thelmaHome string, content string) error {
+	file := path.Join(thelmaHome, versionsDir, "app", "dev.yaml")
+	return writeFakeVersionsFile(file, content)
+}
+
+func writeFakeClusterAlphaVersionsFile(thelmaHome string, content string) error {
+	file := path.Join(thelmaHome, versionsDir, "cluster", "alpha.yaml")
+	return writeFakeVersionsFile(file, content)
 }
 
 func writeFakeVersionsFile(fileName string, content string) error {

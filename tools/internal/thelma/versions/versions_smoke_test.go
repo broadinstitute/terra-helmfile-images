@@ -9,30 +9,33 @@ import (
 	"testing"
 )
 
-func TestVersions_Smoke(t *testing.T) {
+func TestSnapshot_UpdateChartVersionIfDefined_Smoke(t *testing.T) {
 	thelmaHome := t.TempDir()
 	runner := shell.NewRealRunner()
-	versions := New(thelmaHome, runner).(*versions)
+	_versions := NewVersions(thelmaHome, runner).(*versions)
 
 	var err error
 
-	err = populateFakeVersionsDir(thelmaHome)
+	err = initializeFakeVersionsDir(thelmaHome)
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
+
+	// load the snapshot
+	_snapshot, err := _versions.LoadSnapshot(AppRelease, Dev)
+	if !assert.NoError(t, err) {
+		t.FailNow()
+	}
+	assert.True(t, _snapshot.ReleaseDefined("agora"))
+	assert.Equal(t, "0.0.0", _snapshot.ChartVersion("agora"))
 
 	// set the chart version
-	err = versions.SetReleaseVersionIfDefined("agora", AppRelease, Dev, "7.8.9")
+	err = _snapshot.UpdateChartVersionIfDefined("agora","7.8.9")
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
 
-	// verify the version was actually set
-	snapshot, err := versions.readVersionsSnapshot(AppRelease, Dev)
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
-
-	assert.NoError(t, err)
-	assert.Equal(t, "7.8.9", snapshot.Releases["agora"].ChartVersion)
+	// verify the version was updated
+	assert.True(t, _snapshot.ReleaseDefined("agora"))
+	assert.Equal(t, "7.8.9", _snapshot.ChartVersion("agora"))
 }

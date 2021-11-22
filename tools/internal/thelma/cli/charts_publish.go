@@ -85,7 +85,7 @@ func publishCharts(options *chartsPublishOptions, app *app.ThelmaApp) error {
 	}
 	defer pb.CloseWarn()
 
-	_versions := versions.New(app.Config.Home(), app.ShellRunner)
+	_versions := versions.NewVersions(app.Config.Home(), app.ShellRunner)
 
 	chartsDir, err := source.NewChartsDir(options.chartDir, pb.Publisher(), _versions, app.ShellRunner)
 	if err != nil {

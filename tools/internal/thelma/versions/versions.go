@@ -50,16 +50,34 @@ func (v *versions) SetReleaseVersionIfDefined(releaseName string, releaseType Re
 		return nil
 	}
 
-	return v.setReleaseVersion(releaseName, releaseType, versionSet, newVersion)
+	if err := v.setReleaseVersion(releaseName, releaseType, versionSet, newVersion); err != nil {
+		return err
+	}
+
+	// Verify the version was set correctly
+	snapPath := v.versionsSnapshotPath(releaseType, versionSet)
+	versionSnap, err := v.readVersionsSnapshot(releaseType, versionSet)
+	if err != nil {
+		return fmt.Errorf("error updating version snapshot %s: %v", snapPath, err)
+	}
+	release, exists := versionSnap.Releases[releaseName]
+	if !exists {
+		snapPath := v.versionsSnapshotPath(releaseType, versionSet)
+		return fmt.Errorf("error updating version snapshot %s: malformed after updating %s chart version", snapPath, releaseName)
+	}
+	if release.ChartVersion != newVersion {
+		return fmt.Errorf("error updating version snapshot %s: chart version incorrect after updating %s chart version (should be %q, is %q)", snapPath, releaseName, newVersion, release.ChartVersion)
+	}
+	return nil
 }
 
 // Returns true if this release is defined in the target version file
 func (v *versions) releaseDefined(releaseName string, releaseType ReleaseType, versionSet Set) (bool, error) {
-	vfile, err := v.readVersionsSnapshot(releaseType, versionSet)
+	versionSnap, err := v.readVersionsSnapshot(releaseType, versionSet)
 	if err != nil {
 		return false, err
 	}
-	_, exists := vfile.Releases[releaseName]
+	_, exists := versionSnap.Releases[releaseName]
 	return exists, nil
 }
 

@@ -12,8 +12,8 @@ import (
 	"strings"
 )
 
-// Command is the name of the `helmfile` binary
-const Command = "helmfile"
+// ProgName is the name of the `helmfile` binary
+const ProgName = "helmfile"
 
 // Environment variables -- prefixed with THF for "terra-helmfile"
 
@@ -157,8 +157,12 @@ func (r *ConfigRepo) runHelmfile(envVars []string, args ...string) error {
 	finalArgs = append(finalArgs, args...)
 
 	cmd := shell.Command{}
-	cmd.Env = envVars
-	cmd.Prog = Command
+
+	if len(envVars) > 0 {
+		cmd.Env = envVars
+	}
+
+	cmd.Prog = ProgName
 	cmd.Args = finalArgs
 	cmd.Dir = r.path
 

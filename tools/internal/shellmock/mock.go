@@ -3,12 +3,13 @@ package shellmock
 import (
 	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shellmock/matchers"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/testutils"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/mock"
 	"io"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -39,6 +40,8 @@ const (
 type Options struct {
 	VerifyOrder bool         // VerifyOrder If true, verify commands are run in the order they were declared
 	DumpStyle   CmdDumpStyle // DumpStyle how to style the dump
+	IgnoreEnvVars []string   // Array of environment variable names to strip when matching shell.Command arguments
+	IgnoreDir bool           // If true, ignore Dir field of shell.Command arguments
 }
 
 type expectedCommand struct {
@@ -50,6 +53,7 @@ type expectedCommand struct {
 // MockRunner is an implementation of Runner interface for use with testify/mock.
 type MockRunner struct {
 	options          Options
+	ignoreEnvVars    map[string]struct{}
 	expectedCommands []*expectedCommand
 	runCounter       int
 	t                *testing.T
@@ -69,22 +73,79 @@ func DefaultMockRunner() *MockRunner {
 func NewMockRunner(options Options) *MockRunner {
 	m := new(MockRunner)
 	m.options = options
+
+	// convert ignoreEnvVars from array to map for fast lookups
+	m.ignoreEnvVars = make(map[string]struct{}, len(m.options.IgnoreEnvVars))
+	for _, name := range m.options.IgnoreEnvVars {
+		m.ignoreEnvVars[name] = struct{}{}
+	}
+
 	return m
 }
 
-// RunWithArgs delegates to Run
-func (m *MockRunner) RunWithArgs(prog string, args ...string) error {
-	return m.Run(shell.Command{
-		Prog: prog,
-		Args: args,
-	})
+
+// Convenience function to build a shell.Command from a format string and arguments
+//
+// Eg. CmdFromFmt("HOME=%s FOO=BAR ls -al %s", "/tmp", "Documents")
+// ->
+// Command{
+//   Env: []string{"HOME=/tmp", "FOO=BAR"},
+//   Prog: "ls",
+//   Args: []string{"-al", "Documents},
+//   Dir: ""
+// }
+func CmdFromFmt(fmt string, args... interface{}) shell.Command {
+	tokens := testutils.Args(fmt, args...)
+
+	return CmdFromArgs(tokens...)
 }
+
+// Convenience function to build a shell.Command from a list of arguments
+//
+// Eg. CmdFromArgs("FOO=BAR", "ls", "-al", ".")
+// ->
+// Command{
+//   Env: []string{"FOO=BAR"},
+//   Prog: "ls",
+//   Args: []string{"-al", "."},
+//   Dir: ""
+// }
+func CmdFromArgs(args... string) shell.Command {
+	// count number of leading NAME=VALUE environment var pairs preceding command
+	var i int
+	for i = 0; i < len(args); i++ {
+		if !strings.Contains(args[i], "=") {
+			// if this is not a NAME=VALUE pair, exit
+			break
+		}
+	}
+
+	numEnvVars := i
+	progIndex := i
+	numArgs := len(args) - (numEnvVars + 1)
+
+	var cmd shell.Command
+
+	if numEnvVars > 0 {
+		cmd.Env = args[0:numEnvVars]
+	}
+	if progIndex < len(args) {
+		cmd.Prog = args[progIndex]
+	}
+	if numArgs > 0 {
+		cmd.Args = args[progIndex+1:]
+	}
+
+	return cmd
+}
+
 
 // Run Instead of executing the command, logs an info message and registers the call with testify mock
 func (m *MockRunner) Run(cmd shell.Command) error {
 	log.Info().Msgf("[MockRunner] Run called: %q\n", cmd.PrettyFormat())
+	cmd = m.applyIgnores(cmd)
 
-	// we synchronize Run calls on the mock because testify mock isn't parallel-safe, and neither are our
+	// we synchronize Run calls on the mock because testify mock isn't safe for concurrent access, and neither are our
 	// order verification callback hooks
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -96,25 +157,40 @@ func (m *MockRunner) Run(cmd shell.Command) error {
 	return nil
 }
 
-// ExpectCmd sets an expectation for a command that should be run. It accepts either a shell.Command or a CmdMatcher
-func (m *MockRunner) ExpectCmd(cmdOrMatcher interface{}) *mock.Call {
-	var call *mock.Call
-	var cmd shell.Command
+// Capture Instead of executing the command, log an info message and register the call with testify mock
+func (m *MockRunner) Capture(cmd shell.Command, stdout io.Writer, stderr io.Writer) error {
+	// m.OnCapture(cmd).WriteStdout(bytes[]).WriteStderr(bytes[]).Return(err)
+	panic("TODO")
+}
 
-	switch c := cmdOrMatcher.(type) {
-	case *matchers.CmdMatcher:
-		cmd = c.AsCmd()
-		call = m.Mock.On("Run", mock.MatchedBy(func(actual shell.Command) bool {
-			return c.Matches(actual)
-		}))
-	case shell.Command:
-		cmd = c
-		call = m.Mock.On("Run", c)
-	default:
-		m.panicOrFailNow(fmt.Errorf("ExpectCmd only supports shell.Command or matchers.CmdMatcher arguments, got %v (type %T)", cmdOrMatcher, cmdOrMatcher))
-		return nil
+func (m *MockRunner) applyIgnores(cmd shell.Command) shell.Command {
+	if m.options.IgnoreDir {
+		cmd.Dir = ""
 	}
 
+	if len(m.ignoreEnvVars) == 0 {
+		return cmd
+	}
+
+	var env []string
+	for _, pair := range cmd.Env {
+		tokens := strings.SplitN(pair, "=", 2)
+		name := tokens[0]
+
+		// if env var is not in ignore list, keep it
+		if _, exists := m.ignoreEnvVars[name]; !exists {
+			env = append(env, pair)
+		}
+	}
+	cmd.Env = env
+
+	return cmd
+}
+
+// ExpectCmd sets an expectation for a command that should be run.
+func (m *MockRunner) ExpectCmd(cmd shell.Command) *mock.Call {
+	cmd = m.applyIgnores(cmd)
+	call := m.Mock.On("Run", cmd)
 	order := len(m.expectedCommands)
 	expected := &expectedCommand{cmd: cmd, call: call}
 	m.expectedCommands = append(m.expectedCommands, expected)

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/semver"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/yq"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/tools/yq"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
 	"os"
@@ -26,7 +26,7 @@ type snapshot struct {
 	releaseType ReleaseType
 	set         Set
 	data        *snapshotData
-	yq 			yq.Yq
+	yq          yq.Yq
 }
 
 // struct used for deserializing a version snapshot
@@ -44,9 +44,9 @@ func loadSnapshot(filePath string, shellRunner shell.Runner) (Snapshot, error) {
 	}
 
 	return &snapshot{
-		filePath:    filePath,
-		data:        data,
-		yq:          yq.New(shellRunner),
+		filePath: filePath,
+		data:     data,
+		yq:       yq.New(shellRunner),
 	}, nil
 }
 

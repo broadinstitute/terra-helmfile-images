@@ -2,6 +2,7 @@ package shell
 
 import (
 	"github.com/rs/zerolog/log"
+	"io"
 	"os"
 	"os/exec"
 )
@@ -38,20 +39,8 @@ func (r *RealRunner) Run(cmd Command) error {
 	return nil
 }
 
-// RunWithArgs is a convenience wrapper around Run.
-// Given a list of string arguments, RunWithArgs calls
-// CmdFromTokens() to create a command passes it to Run()
-//
-// Eg. RunWithArgs("ls", "-al", "~")
-// will create a new Command{
-//   Prog: "ls",
-//   Args: []string{"-al", "~"}
-// }
-// and pass it to Run()
-//
-func (r *RealRunner) RunWithArgs(prog string, args ...string) error {
-	return r.Run(Command{
-		Prog: prog,
-		Args: args,
-	})
+// Capture runs a Command, streaming stdout and stderr to the given writers.
+// An error is returned if the command exits non-zero
+func (r *RealRunner) Capture(cmd Command, stdout io.Writer, stderr io.Writer) error {
+	panic("TODO")
 }

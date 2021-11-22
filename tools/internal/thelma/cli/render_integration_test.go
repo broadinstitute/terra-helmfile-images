@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shellmock"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shellmock/matchers"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render/helmfile"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render/target"
 	. "github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/testutils"
@@ -189,9 +188,8 @@ func TestRenderIntegration(t *testing.T) {
 			},
 			setupMocks: func(ts *TestState) error {
 				ts.expectHelmfileUpdateCmd()
-				matcher := helmfileCmdMatcher(devEnv, "--log-level=info --selector=mode=release,release=leonardo --state-values-set=releases.leonardo.chartVersion=local template --output-dir=%s/output/dev", ts.mockHome)
-				matcher.WithEnvVar(helmfile.ChartSrcDirEnvVar, ts.mockChartSrcDir)
-				ts.mockRunner.ExpectCmd(matcher)
+				envPair := fmt.Sprintf("%s=%s", helmfile.ChartSrcDirEnvVar, ts.mockChartSrcDir)
+				ts.expectHelmfileCmdWithEnv(devEnv, []string{envPair}, "--log-level=info --selector=mode=release,release=leonardo --state-values-set=releases.leonardo.chartVersion=local template --output-dir=%s/output/dev", ts.mockHome)
 				return nil
 			},
 		},
@@ -258,7 +256,7 @@ func TestRenderIntegration(t *testing.T) {
 			arguments:   args("render -e dev"),
 			setupMocks: func(ts *TestState) error {
 				ts.thelmaCLI.setLogLevel("debug")
-				ts.cmd("helmfile --log-level=debug --allow-no-matching-release repos")
+				ts.expectCmd("helmfile --log-level=debug --allow-no-matching-release repos")
 				ts.expectHelmfileCmd(devEnv, "--log-level=debug --selector=mode=release template --skip-deps --output-dir=%s/output/dev", ts.mockHome)
 				return nil
 			},
@@ -401,67 +399,48 @@ func args(format string, a ...interface{}) []string {
 
 // Convenience function for setting up an expectation for a helmfile update command
 func (ts *TestState) expectHelmfileUpdateCmd() *mock.Call {
-	return ts.cmd("helmfile --log-level=info --allow-no-matching-release repos")
+	return ts.expectCmd("helmfile --log-level=info --allow-no-matching-release repos")
 }
 
 // Convenience function for setting up an expectation for a helmfile template command
 func (ts *TestState) expectHelmfileCmd(target target.ReleaseTarget, format string, a ...interface{}) *mock.Call {
-	matcher := helmfileCmdMatcher(target, format, a...)
-	return ts.mockRunner.ExpectCmd(matcher)
+	cmd := ts.buildHelmfileCmd(target, format, a...)
+	return ts.mockRunner.ExpectCmd(cmd)
+}
+
+// Convenience function for setting up an expectation for a helmfile template command
+func (ts *TestState) expectHelmfileCmdWithEnv(target target.ReleaseTarget, env []string, format string, a ...interface{}) *mock.Call {
+	cmd := ts.buildHelmfileCmd(target, format, a...)
+	for _, pair := range env {
+		cmd.Env = append(cmd.Env, pair)
+	}
+	return ts.mockRunner.ExpectCmd(cmd)
 }
 
 // Given a release target, and CLI arguments to `helmfile` in the form of a format string and arguments,
-// return a matcher for a `helmfile` command that matches the given target and CLI args
-func helmfileCmdMatcher(target target.ReleaseTarget, format string, a ...interface{}) *matchers.CmdMatcher {
-	directoryExists := matchers.MatchesPredicate("directory exists", func(dir string) bool {
-		f, err := os.Stat(dir)
-		if err != nil {
-			return false
-		}
-		return f.IsDir()
-	})
-
-	matcher := matchers.CmdWithProg(helmfile.Command).
-		WithEnvVar(helmfile.TargetTypeEnvVar, target.Type()).
-		WithEnvVar(helmfile.TargetBaseEnvVar, target.Base()).
-		WithEnvVar(helmfile.TargetNameEnvVar, target.Name()).
-		WithEnvVar(helmfile.ChartCacheDirEnvVar, directoryExists).
-		WithExactArgs(args(format, a...)...)
-
-	return matcher
+// return a matching shell.Command
+func (ts *TestState) buildHelmfileCmd(target target.ReleaseTarget, format string, a ...interface{}) shell.Command {
+	return shell.Command{
+		Prog: helmfile.ProgName,
+		Args: Args(format, a...),
+		Env: []string{
+			fmt.Sprintf("%s=%s", helmfile.TargetTypeEnvVar, target.Type()),
+			fmt.Sprintf("%s=%s", helmfile.TargetBaseEnvVar, target.Base()),
+			fmt.Sprintf("%s=%s", helmfile.TargetNameEnvVar, target.Name()),
+		},
+		Dir: ts.mockHome,
+	}
 }
 
-// Convenience function to create a successful/non-erroring ExpectedCommand, given
-// a format string _for_ the command.
-//
-// Eg. cmd("THF_TARGET_NAME=%s FOO=BAR helmfile template", "alpha")
-// ->
-// Command{
-//   Env: []string{"THF_TARGET_NAME=alpha", "FOO=BAR"},
-//   Prog: "helmfile",
-//   Args: []string{"template"},
-//   Dir: "mock/config/repo/path" // tmpdir
-// }
-func (ts *TestState) cmd(format string, a ...interface{}) *mock.Call {
-	tokens := args(format, a...)
-
-	// count number of leading NAME=VALUE environment var pairs preceding `helmfile` command
-	var i int
-	for i = 0; i < len(tokens); i++ {
-		if !strings.Contains(tokens[i], "=") {
-			// if this is not a NAME=VALUE pair, quit
-			break
-		}
-	}
-
-	cmd := shell.Command{
-		Env:  tokens[0:i],
-		Prog: tokens[i],
-		Args: tokens[i+1:],
-		Dir:  ts.mockHome,
-	}
-
+func (ts *TestState) expectCmd(format string, a ...interface{}) *mock.Call {
+	cmd := ts.buildCmd(format, a...)
 	return ts.mockRunner.ExpectCmd(cmd)
+}
+
+func (ts *TestState) buildCmd(format string, a ...interface{}) shell.Command {
+	cmd := shellmock.CmdFromFmt(format, a...)
+	cmd.Dir = ts.mockHome
+	return cmd
 }
 
 // Per-test setup, run before each TestRenderIntegration test case
@@ -476,8 +455,8 @@ func setup(t *testing.T) (*TestState, error) {
 	}
 
 	// Create mock chart dir inside tmp dir
-	mockChartDir := path.Join(tmpDir, "charts")
-	err = os.MkdirAll(mockChartDir, 0755)
+	mockChartSrcDir := path.Join(tmpDir, "charts")
+	err = os.MkdirAll(mockChartSrcDir, 0755)
 	if err != nil {
 		return nil, err
 	}
@@ -491,7 +470,11 @@ func setup(t *testing.T) (*TestState, error) {
 	scratchDir := path.Join(tmpDir, "scratch")
 
 	// Create a mock runner for executing shell commands
-	mockRunner := shellmock.NewMockRunner(shellmock.Options{VerifyOrder: false})
+	mockRunnerOpts := shellmock.Options{
+		IgnoreEnvVars: []string{"THF_CHART_CACHE_DIR"}, // ignore chart cache dir (created randomly at runtime)
+		VerifyOrder: false, // disable order verification because commands run in parallel
+	}
+	mockRunner := shellmock.NewMockRunner(mockRunnerOpts)
 	mockRunner.Test(t)
 
 	thelmaCLI := newThelmaCLI()
@@ -499,11 +482,11 @@ func setup(t *testing.T) (*TestState, error) {
 	thelmaCLI.setShellRunner(mockRunner)
 
 	ts := &TestState{
-		mockHome:        mockHome,
-		mockRunner:      mockRunner,
-		mockChartSrcDir: mockChartDir,
-		scratchDir:      scratchDir,
-		thelmaCLI:       thelmaCLI,
+		mockHome:          mockHome,
+		mockRunner:        mockRunner,
+		mockChartSrcDir:   mockChartSrcDir,
+		scratchDir:        scratchDir,
+		thelmaCLI:         thelmaCLI,
 	}
 
 	return ts, nil

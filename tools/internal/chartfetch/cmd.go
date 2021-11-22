@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/flock"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/tools/helm"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -125,7 +126,20 @@ func fetchChart(chart string, options *Options) error {
 		// download chart into a temporary directory
 		tmpDir := siblingPath(options.DownloadDir, ".tmp", true)
 		log.Info().Msgf("Downloading chart to tmp dir %s", tmpDir)
-		if err := shellRunner.RunWithArgs("helm", "fetch", chart, "--version", options.Version, "--untar", "-d", tmpDir); err != nil {
+
+		cmd := shell.Command{
+			Prog: helm.ProgName,
+			Args: []string{
+				"fetch",
+				chart,
+				"--version",
+				options.Version,
+				"--untar",
+				"-d",
+				tmpDir,
+			},
+		}
+		if err := shellRunner.Run(cmd); err != nil {
 			return err
 		}
 

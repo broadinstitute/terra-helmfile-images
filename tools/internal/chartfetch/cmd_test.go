@@ -3,8 +3,8 @@ package chartfetch
 import (
 	"errors"
 	"fmt"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shellmock"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shellmock/matchers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"os"
@@ -28,7 +28,8 @@ func TestFetch(t *testing.T) {
 		extraVerification func(t *testing.T)
 	}{
 		{
-			description:   "no arguments",
+			description:   "no pos arguments",
+			args: args("-v 1.2.3 -d /does/not/exist"),
 			expectedError: regexp.MustCompile(`accepts 1 arg\(s\), received 0`),
 		},
 		{
@@ -49,7 +50,18 @@ func TestFetch(t *testing.T) {
 			description: "should download if directory does not exist",
 			args:        args("terra-helm/leonardo -v 1.2.3 -d %s/my/nested/download-dir", testDir),
 			setupMocks: func(t *testing.T, m *shellmock.MockRunner) {
-				cmd := matchers.CmdFromFmt("helm fetch terra-helm/leonardo --version 1.2.3 --untar -d %s/my/nested/.download-dir.tmp", testDir)
+				cmd := shell.Command{
+					Prog: "helm",
+					Args: []string{
+						"fetch",
+						"terra-helm/leonardo",
+						"--version",
+						"1.2.3",
+						"--untar",
+						"-d",
+						fmt.Sprintf("%s/my/nested/.download-dir.tmp", testDir),
+					},
+				}
 				m.ExpectCmd(cmd).Run(func(args mock.Arguments) {
 					chartDir := path.Join(testDir, "my", "nested", ".download-dir.tmp", "leonardo")
 					if err := os.MkdirAll(chartDir, 0755); err != nil {
@@ -69,7 +81,18 @@ func TestFetch(t *testing.T) {
 			description: "should return an error if the helm fetch command fails",
 			args:        args("terra-helm/leonardo -v 1.2.3 -d %s/download-dir", testDir),
 			setupMocks: func(t *testing.T, m *shellmock.MockRunner) {
-				cmd := matchers.CmdFromFmt("helm fetch terra-helm/leonardo --version 1.2.3 --untar -d %s/.download-dir.tmp", testDir)
+				cmd := shell.Command{
+					Prog: "helm",
+					Args: []string{
+						"fetch",
+						"terra-helm/leonardo",
+						"--version",
+						"1.2.3",
+						"--untar",
+						"-d",
+						fmt.Sprintf("%s/.download-dir.tmp", testDir),
+					},
+				}
 				m.ExpectCmd(cmd).Return(errors.New("command failed because reasons"))
 			},
 			expectedError: regexp.MustCompile("command failed because reasons"),

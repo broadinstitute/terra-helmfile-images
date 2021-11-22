@@ -2,6 +2,7 @@ package shell
 
 import (
 	"fmt"
+	"io"
 	"os/exec"
 	"strings"
 )
@@ -13,8 +14,12 @@ import (
 // https://joshrendek.com/2014/06/go-lang-mocking-exec-dot-command-using-interfaces/
 //
 type Runner interface {
+	// Run runs a command, streaming stdout and stderr to the log at debug level.
 	Run(cmd Command) error
-	RunWithArgs(prog string, args ...string) error
+
+	// Capture runs a Command, streaming stdout and stderr to the given writers.
+	// An error is returned if the command exits non-zero
+	Capture(cmd Command, stdout io.Writer, stderr io.Writer) error
 }
 
 // Error represents an error encountered running a shell command

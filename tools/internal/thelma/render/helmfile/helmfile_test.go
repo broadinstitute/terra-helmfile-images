@@ -1,8 +1,8 @@
 package helmfile
 
 import (
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shellmock"
-	. "github.com/broadinstitute/terra-helmfile-images/tools/internal/shellmock/matchers"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"path"
@@ -23,14 +23,30 @@ func TestHelmfileUpdate(t *testing.T) {
 			description: "info level logging",
 			setupMocks: func(t *testing.T, ts *testState) {
 				ts.configRepo.helmfileLogLevel = "info"
-				ts.mockRunner.ExpectCmd(CmdFromString("helmfile --log-level=info --allow-no-matching-release repos"))
+				ts.mockRunner.ExpectCmd(shell.Command{
+					Prog: "helmfile",
+					Args: []string{
+						"--log-level=info",
+						"--allow-no-matching-release",
+						"repos",
+					},
+					Dir: ts.configRepo.path,
+				})
 			},
 		},
 		{
 			description: "debug level logging",
 			setupMocks: func(t *testing.T, ts *testState) {
 				ts.configRepo.helmfileLogLevel = "debug"
-				ts.mockRunner.ExpectCmd(CmdFromString("helmfile --log-level=debug --allow-no-matching-release repos"))
+				ts.mockRunner.ExpectCmd(shell.Command{
+					Prog: "helmfile",
+					Args: []string{
+						"--log-level=debug",
+						"--allow-no-matching-release",
+						"repos",
+					},
+					Dir: ts.configRepo.path,
+				})
 			},
 		},
 	}
@@ -57,14 +73,30 @@ func TestRender(t *testing.T) {
 			description: "info level logging",
 			setupMocks: func(t *testing.T, ts *testState) {
 				ts.configRepo.helmfileLogLevel = "info"
-				ts.mockRunner.ExpectCmd(CmdFromString("helmfile --log-level=info --allow-no-matching-release repos"))
+				ts.mockRunner.ExpectCmd(shell.Command{
+					Prog: "helmfile",
+					Args: []string{
+						"--log-level=info",
+						"--allow-no-matching-release",
+						"repos",
+					},
+					Dir: ts.configRepo.path,
+				})
 			},
 		},
 		{
 			description: "debug level logging",
 			setupMocks: func(t *testing.T, ts *testState) {
 				ts.configRepo.helmfileLogLevel = "debug"
-				ts.mockRunner.ExpectCmd(CmdFromString("helmfile --log-level=debug --allow-no-matching-release repos"))
+				ts.mockRunner.ExpectCmd(shell.Command{
+					Prog: "helmfile",
+					Args: []string{
+						"--log-level=debug",
+						"--allow-no-matching-release",
+						"repos",
+					},
+					Dir: ts.configRepo.path,
+				})
 			},
 		},
 	}

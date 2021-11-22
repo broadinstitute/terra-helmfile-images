@@ -5,7 +5,7 @@ import (
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shellmock"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/publish"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/repo/index"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/helm"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/tools/helm"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

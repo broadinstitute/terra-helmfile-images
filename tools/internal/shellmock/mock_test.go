@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shellmock/matchers"
 	"github.com/stretchr/testify/assert"
 	"regexp"
 	"testing"
@@ -15,13 +14,15 @@ func TestMockRunnerPassesSingleCommand(t *testing.T) {
 	m := DefaultMockRunner()
 	m.Test(t)
 
-	m.ExpectCmd(matchers.CmdWithEnv("FOO=BAR", "echo", "hello", "world"))
+	m.ExpectCmd(CmdFromArgs("FOO=BAR", "echo", "hello", "world"))
 
-	assert.Nil(t, m.Run(shell.Command{
+	err :=  m.Run(shell.Command{
 		Prog: "echo",
 		Args: []string{"hello", "world"},
 		Env:  []string{"FOO=BAR"},
-	}))
+	})
+
+	assert.NoError(t, err)
 
 	m.AssertExpectations(t)
 	m.AssertNumberOfCalls(t, "Run", 1)
@@ -31,12 +32,16 @@ func TestMockRunnerPassesSingleCommand(t *testing.T) {
 func TestMockRunnerPassesMultipleCommandsInOrder(t *testing.T) {
 	m := DefaultMockRunner()
 	m.Test(t)
+	
+	m.ExpectCmd(CmdFromArgs("echo", "1"))
+	m.ExpectCmd(CmdFromArgs("echo", "2"))
 
-	m.ExpectCmd(matchers.CmdWithArgs("echo", "1"))
-	m.ExpectCmd(matchers.CmdWithArgs("echo", "2"))
+	var err error
+	err = m.Run(CmdFromArgs("echo", "1"))
+	assert.NoError(t, err)
 
-	assert.Nil(t, m.RunWithArgs("echo", "1"))
-	assert.Nil(t, m.RunWithArgs("echo", "2"))
+	err = m.Run(CmdFromArgs("echo", "2"))
+	assert.NoError(t, err)
 
 	m.AssertExpectations(t)
 	m.AssertNumberOfCalls(t, "Run", 2)
@@ -63,10 +68,10 @@ func TestMockRunnerFailsWhenOutOfOrder(t *testing.T) {
 	// DON'T pass in the test. We want to panic on failure we can detect whether the error happened with recover()
 	// m.Test(t) // <- Don't do this
 
-	m.ExpectCmd(matchers.CmdWithArgs("echo", "1"))
-	m.ExpectCmd(matchers.CmdWithArgs("echo", "2"))
+	m.ExpectCmd(CmdFromArgs("echo", "1"))
+	m.ExpectCmd(CmdFromArgs("echo", "2"))
 
-	_ = m.RunWithArgs("echo", "2") // this will trigger a panic
+	_ = m.Run(CmdFromArgs("echo", "2")) // this will trigger a panic
 	t.Errorf("This line of code should never be reached")
 }
 
@@ -75,11 +80,11 @@ func TestMockRunnerOutOfOrderPassesWithNoVerify(t *testing.T) {
 	m := NewMockRunner(Options{VerifyOrder: false})
 	m.Test(t)
 
-	m.ExpectCmd(matchers.CmdWithArgs("echo", "1"))
-	m.ExpectCmd(matchers.CmdWithArgs("echo", "2"))
+	m.ExpectCmd(CmdFromArgs("echo", "1"))
+	m.ExpectCmd(CmdFromArgs("echo", "2"))
 
-	assert.Nil(t, m.RunWithArgs("echo", "2"))
-	assert.Nil(t, m.RunWithArgs("echo", "1"))
+	assert.Nil(t, m.Run(CmdFromArgs("echo", "2")))
+	assert.Nil(t, m.Run(CmdFromArgs("echo", "1")))
 
 	m.AssertExpectations(t)
 	m.AssertNumberOfCalls(t, "Run", 2)
@@ -90,22 +95,63 @@ func TestMockRunnerCanMockErrors(t *testing.T) {
 	m := DefaultMockRunner()
 	m.Test(t)
 
-	m.ExpectCmd(matchers.CmdWithArgs("echo", "1")).Return(fmt.Errorf("my error"))
+	m.ExpectCmd(CmdFromArgs("echo", "1")).Return(fmt.Errorf("my error"))
 
-	e := m.RunWithArgs("echo", "1")
+	e := m.Run(CmdFromArgs("echo", "1"))
 	assert.Error(t, e, "error should not be nil")
 	assert.Errorf(t, e, "my error", "mock runner should return the mocked error")
 }
 
-// Verify our mock runner can be used to set expectations on mocks with raw shell.Command objects,
-// not just matchers
+// Verify our mock runner can be used to set expectations on mocks with shell.Command
 func TestMockRunnerCanMockRawCmds(t *testing.T) {
 	m := DefaultMockRunner()
 	m.Test(t)
 
 	m.ExpectCmd(shell.Command{Prog: "echo", Args: []string{"1"}})
 
-	e := m.RunWithArgs("echo", "1")
+	e := m.Run(CmdFromArgs("echo", "1"))
+	assert.Nil(t, e, "mock runner should not return an error")
+}
+
+
+// Verify our mock runner can ignore environment variables
+func TestMockRunnerCanIgnoreSubsetOfEnvVars(t *testing.T) {
+	m := NewMockRunner(Options{
+		IgnoreEnvVars: []string{"FOO"},
+	})
+	m.Test(t)
+
+	m.ExpectCmd(shell.Command{
+		Prog: "ls",
+		Env: []string{"HOME=/home/jdoe", "FOO=BAR"},
+	})
+
+	e := m.Run(shell.Command{
+		Prog: "ls",
+		Env: []string{"HOME=/home/jdoe", "FOO=NOTBAR"},
+	})
+
+	assert.Nil(t, e, "mock runner should not return an error")
+}
+
+
+// Verify our mock runner can ignore dir attribute on commands
+func TestMockRunnerCanIgnoreDir(t *testing.T) {
+	m := NewMockRunner(Options{
+		IgnoreDir: true,
+	})
+	m.Test(t)
+
+	m.ExpectCmd(shell.Command{
+		Prog: "ls",
+		Dir: "/tmp/foo",
+	})
+
+	e := m.Run(shell.Command{
+		Prog: "ls",
+		Dir: "/tmp/bar",
+	})
+
 	assert.Nil(t, e, "mock runner should not return an error")
 }
 
@@ -113,7 +159,7 @@ func TestMockRunnerCanMockRawCmds(t *testing.T) {
 func TestMockRunnerCanDumpCmdsDefault(t *testing.T) {
 	m := NewMockRunner(Options{DumpStyle: Default})
 
-	m.ExpectCmd(matchers.CmdWithArgs("echo", "foo"))
+	m.ExpectCmd(CmdFromArgs("echo", "foo"))
 	m.ExpectCmd(shell.Command{Prog: "echo", Args: []string{"bar"}})
 
 	w := bytes.NewBufferString("")
@@ -124,7 +170,7 @@ func TestMockRunnerCanDumpCmdsDefault(t *testing.T) {
 Expected commands:
 
 	0 (0 matches):
-	shell.Command{Prog:"echo", Args:[]string{"foo"}, Env:[]string{}, Dir:"<any>", PristineEnv:false}
+	shell.Command{Prog:"echo", Args:[]string{"foo"}, Env:[]string(nil), Dir:"", PristineEnv:false}
 
 	1 (0 matches):
 	shell.Command{Prog:"echo", Args:[]string{"bar"}, Env:[]string(nil), Dir:"", PristineEnv:false}
@@ -138,7 +184,7 @@ Expected commands:
 func TestMockRunnerCanDumpCmdsPretty(t *testing.T) {
 	m := NewMockRunner(Options{DumpStyle: Pretty})
 
-	m.ExpectCmd(matchers.CmdWithArgs("echo", "foo"))
+	m.ExpectCmd(CmdFromArgs("echo", "foo"))
 	m.ExpectCmd(shell.Command{Prog: "echo", Args: []string{"bar"}})
 
 	w := bytes.NewBufferString("")
@@ -161,7 +207,7 @@ Expected commands:
 func TestMockRunnerCanDumpCmdsSpew(t *testing.T) {
 	m := NewMockRunner(Options{DumpStyle: Spew})
 
-	m.ExpectCmd(matchers.CmdWithArgs("echo", "foo"))
+	m.ExpectCmd(CmdFromArgs("echo", "foo"))
 	m.ExpectCmd(shell.Command{Prog: "echo", Args: []string{"bar"}})
 
 	w := bytes.NewBufferString("")
@@ -178,9 +224,8 @@ Expected commands:
 	Args: ([]string) (len=1) {
 		(string) (len=3) "foo"
 	},
-	Env: ([]string) {
-	},
-	Dir: (string) (len=5) "<any>",
+	Env: ([]string) <nil>,
+	Dir: (string) "",
 	PristineEnv: (bool) false
 }
 
@@ -198,4 +243,15 @@ Expected commands:
 
 `
 	assert.Equal(t, expected, w.String())
+}
+
+func TestCmdFromFmt(t *testing.T) {
+	expected := shell.Command{
+		Prog: "ls",
+		Args: []string{"-al", "/var"},
+		Env: []string{"FOO=BAR", "HOME=/tmp"},
+	}
+
+	actual := CmdFromFmt("FOO=%s HOME=%s ls -al %s", "BAR", "/tmp", "/var")
+	assert.Equal(t, expected, actual)
 }

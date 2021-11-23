@@ -94,7 +94,7 @@ func TestCapture(t *testing.T) {
 		Args: []string{path.Join(t.TempDir(), "does-not-exist")},
 	}, nil, stderr)
 	assert.Error(t, err)
-	assert.Regexp(t, "does-not-exist: No such file or directory", stderr.String())
+	assert.Regexp(t, "does-not-exist.*No such file or directory", stderr.String())
 }
 
 func TestCapturingWriterRollover(t *testing.T) {

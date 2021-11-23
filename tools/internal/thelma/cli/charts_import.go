@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/app"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/mirror"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/cli/builders"
@@ -38,7 +39,7 @@ func newChartsImportCLI(ctx *ThelmaContext) *chartsImportCLI {
 	options := chartsImportOptions{}
 
 	cobraCommand := &cobra.Command{
-		Use:   "import [options] [CHART1] [CHART2] ...",
+		Use:   "import [options]",
 		Short: "Imports third-party Helm charts into the terra-helm-thirdparty repo",
 		Long:  chartsImportHelpMessage,
 	}
@@ -48,6 +49,9 @@ func newChartsImportCLI(ctx *ThelmaContext) *chartsImportCLI {
 	cobraCommand.Flags().BoolVarP(&options.dryRun, chartsImportFlagNames.dryRun, "n", false, "Dry run (don't actually update Helm repo)")
 
 	cobraCommand.PreRunE = func(cmd *cobra.Command, args []string) error {
+		if len(args) != 0 {
+			return fmt.Errorf("expected no positional arguments, got %v", args)
+		}
 		if cmd.Flags().Changed(chartsImportFlagNames.configFile) {
 			expanded, err := expandAndVerifyExists(options.configFile, "configFile")
 			if err != nil {

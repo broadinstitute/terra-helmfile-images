@@ -410,9 +410,7 @@ func (ts *TestState) expectHelmfileCmd(target target.ReleaseTarget, format strin
 // Convenience function for setting up an expectation for a helmfile template command
 func (ts *TestState) expectHelmfileCmdWithEnv(target target.ReleaseTarget, env []string, format string, a ...interface{}) *shellmock.Call {
 	cmd := ts.buildHelmfileCmd(target, format, a...)
-	for _, pair := range env {
-		cmd.Env = append(cmd.Env, pair)
-	}
+	cmd.Env = append(cmd.Env, env...)
 	return ts.mockRunner.ExpectCmd(cmd)
 }
 

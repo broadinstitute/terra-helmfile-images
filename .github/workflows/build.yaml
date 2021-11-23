@@ -27,7 +27,6 @@ jobs:
     env:
       IMAGE_NAME: tools
     outputs:
-      test: foo
       tag-branch:     ${{ steps.tags.outputs.branch }}
       tag-short:      ${{ steps.tags.outputs.short }}
       tag-long:       ${{ steps.tags.outputs.long }}
@@ -128,6 +127,7 @@ jobs:
           - "jenkins-gke-deploy"
           - "jenkins-helmfile-version-query"
           - "render-action"
+          - "thelma-action"
     env:
       ARGOCD_VERSION: "2.0.5"
       VAULT_VERSION: "1.1.0"

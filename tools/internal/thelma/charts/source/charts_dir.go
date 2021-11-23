@@ -65,7 +65,7 @@ func (d *chartsDir) Release(chartNames []string) error {
 	chartsToPublish = d.withTransitiveDependents(chartsToPublish)
 
 	d.dependencyGraph.TopoSort(chartsToPublish)
-	log.Info().Msgf("%d charts will be published: %s", len(chartsToPublish), strings.Join(chartsToPublish, ","))
+	log.Info().Msgf("%d charts will be published: %s", len(chartsToPublish), strings.Join(chartsToPublish, ", "))
 
 	for _, chartName := range chartsToPublish {
 		_chart := d.charts[chartName]

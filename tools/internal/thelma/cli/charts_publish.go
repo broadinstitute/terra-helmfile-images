@@ -1,11 +1,11 @@
 package cli
 
 import (
-	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/app"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/source"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/cli/builders"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/versions"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -49,9 +49,6 @@ func newChartsPublishCLI(ctx *ThelmaContext) *chartsPublishCLI {
 	cobraCommand.Flags().BoolVarP(&options.dryRun, chartsPublishFlagNames.dryRun, "n", false, "Dry run (don't actually update Helm repo)")
 
 	cobraCommand.PreRunE = func(cmd *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			return fmt.Errorf("at least one chart must be specified")
-		}
 		options.charts = args
 
 		if cmd.Flags().Changed(chartsPublishFlagNames.chartDir) {
@@ -79,6 +76,11 @@ func newChartsPublishCLI(ctx *ThelmaContext) *chartsPublishCLI {
 }
 
 func publishCharts(options *chartsPublishOptions, app *app.ThelmaApp) error {
+	if len(options.charts) == 0 {
+		log.Warn().Msgf("No charts specified; exiting")
+		return nil
+	}
+
 	pb, err := builders.Publisher(app, options.bucketName, options.dryRun)
 	if err != nil {
 		return err

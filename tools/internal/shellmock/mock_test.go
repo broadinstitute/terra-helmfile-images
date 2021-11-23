@@ -16,7 +16,7 @@ func TestMockRunnerPassesSingleCommand(t *testing.T) {
 
 	m.ExpectCmd(CmdFromArgs("FOO=BAR", "echo", "hello", "world"))
 
-	err :=  m.Run(shell.Command{
+	err := m.Run(shell.Command{
 		Prog: "echo",
 		Args: []string{"hello", "world"},
 		Env:  []string{"FOO=BAR"},
@@ -31,7 +31,7 @@ func TestMockRunnerPassesSingleCommand(t *testing.T) {
 func TestMockRunnerPassesMultipleCommandsInOrder(t *testing.T) {
 	m := DefaultMockRunner()
 	m.Test(t)
-	
+
 	m.ExpectCmd(CmdFromArgs("echo", "1"))
 	m.ExpectCmd(CmdFromArgs("echo", "2"))
 
@@ -110,7 +110,6 @@ func TestMockRunnerCanMockRawCmds(t *testing.T) {
 	assert.Nil(t, e, "mock runner should not return an error")
 }
 
-
 // Verify our mock runner can ignore environment variables
 func TestMockRunnerCanIgnoreSubsetOfEnvVars(t *testing.T) {
 	m := NewMockRunner(Options{
@@ -120,17 +119,16 @@ func TestMockRunnerCanIgnoreSubsetOfEnvVars(t *testing.T) {
 
 	m.ExpectCmd(shell.Command{
 		Prog: "ls",
-		Env: []string{"HOME=/home/jdoe", "FOO=BAR"},
+		Env:  []string{"HOME=/home/jdoe", "FOO=BAR"},
 	})
 
 	e := m.Run(shell.Command{
 		Prog: "ls",
-		Env: []string{"HOME=/home/jdoe", "FOO=NOTBAR"},
+		Env:  []string{"HOME=/home/jdoe", "FOO=NOTBAR"},
 	})
 
 	assert.Nil(t, e, "mock runner should not return an error")
 }
-
 
 // Verify our mock runner can ignore dir attribute on commands
 func TestMockRunnerCanIgnoreDir(t *testing.T) {
@@ -141,12 +139,12 @@ func TestMockRunnerCanIgnoreDir(t *testing.T) {
 
 	m.ExpectCmd(shell.Command{
 		Prog: "ls",
-		Dir: "/tmp/foo",
+		Dir:  "/tmp/foo",
 	})
 
 	e := m.Run(shell.Command{
 		Prog: "ls",
-		Dir: "/tmp/bar",
+		Dir:  "/tmp/bar",
 	})
 
 	assert.Nil(t, e, "mock runner should not return an error")
@@ -246,7 +244,7 @@ func TestCmdFromFmt(t *testing.T) {
 	expected := shell.Command{
 		Prog: "ls",
 		Args: []string{"-al", "/var"},
-		Env: []string{"FOO=BAR", "HOME=/tmp"},
+		Env:  []string{"FOO=BAR", "HOME=/tmp"},
 	}
 
 	actual := CmdFromFmt("FOO=%s HOME=%s ls -al %s", "BAR", "/tmp", "/var")

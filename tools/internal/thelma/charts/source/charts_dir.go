@@ -23,7 +23,7 @@ func NewChartsDir(
 	publisher publish.Publisher,
 	versions versions.Versions,
 	shellRunner shell.Runner,
-	) (ChartsDir, error) {
+) (ChartsDir, error) {
 
 	charts, err := loadCharts(sourceDir, shellRunner)
 	if err != nil {
@@ -36,20 +36,20 @@ func NewChartsDir(
 	}
 
 	return &chartsDir{
-		sourceDir: sourceDir,
-		charts: charts,
-		publisher: publisher,
-		autoreleaser: NewAutoReleaser(versions),
+		sourceDir:       sourceDir,
+		charts:          charts,
+		publisher:       publisher,
+		autoreleaser:    NewAutoReleaser(versions),
 		dependencyGraph: dependencyGraph,
 	}, nil
 }
 
 // implemeents ChartsDir interface
 type chartsDir struct {
-	sourceDir string
-	charts map[string]Chart
-	publisher publish.Publisher
-	autoreleaser AutoReleaser
+	sourceDir       string
+	charts          map[string]Chart
+	publisher       publish.Publisher
+	autoreleaser    AutoReleaser
 	dependencyGraph *dependency.Graph
 }
 

@@ -2,7 +2,7 @@ package index
 
 import "github.com/stretchr/testify/mock"
 
-type MockIndex struct{
+type MockIndex struct {
 	mock.Mock
 }
 

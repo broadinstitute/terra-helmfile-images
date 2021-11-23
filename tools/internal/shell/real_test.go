@@ -86,7 +86,7 @@ func TestCapture(t *testing.T) {
 	}, stdout, nil)
 
 	assert.NoError(t, err)
-	assert.Equal(t,"hello\n", stdout.String())
+	assert.Equal(t, "hello\n", stdout.String())
 
 	stderr := bytes.NewBuffer([]byte{})
 	err = runner.Capture(Command{
@@ -101,34 +101,34 @@ func TestCapturingWriterRollover(t *testing.T) {
 	var n int
 	var err error
 
-	writer := newCapturingWriter(4, log.Logger,nil)
-	assert.Equal(t,4, writer.maxLen)
+	writer := newCapturingWriter(4, log.Logger, nil)
+	assert.Equal(t, 4, writer.maxLen)
 
 	// writing a message shorter than maxLen should trigger a rollover
 	n, err = writer.Write([]byte("abcd"))
 	assert.NoError(t, err)
 	assert.Equal(t, 4, n)
 	assert.Equal(t, 4, writer.len)
-	assert.Equal(t,"abcd", writer.String())
+	assert.Equal(t, "abcd", writer.String())
 
 	// writing a message longer than maxLen should trigger a rollover
 	n, err = writer.Write([]byte("egfhi"))
 	assert.NoError(t, err)
 	assert.Equal(t, 5, n)
 	assert.Equal(t, 0, writer.len)
-	assert.Equal(t,"", writer.String())
+	assert.Equal(t, "", writer.String())
 
 	// buffer should not include any previously written data
 	n, err = writer.Write([]byte("jkl"))
 	assert.NoError(t, err)
 	assert.Equal(t, 3, n)
 	assert.Equal(t, 3, writer.len)
-	assert.Equal(t,"jkl", writer.String())
+	assert.Equal(t, "jkl", writer.String())
 
 	// one more rollover for funsies
 	n, err = writer.Write([]byte("mn"))
 	assert.NoError(t, err)
 	assert.Equal(t, 2, n)
 	assert.Equal(t, 2, writer.len)
-	assert.Equal(t,"mn", writer.String())
+	assert.Equal(t, "mn", writer.String())
 }

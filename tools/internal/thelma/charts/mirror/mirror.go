@@ -21,34 +21,34 @@ type Mirror interface {
 
 // Implements Mirror interface
 type mirror struct {
-	publisher publish.Publisher
+	publisher    publish.Publisher
 	repositories []RepoDefinition
-	charts []ChartDefinition
-	shellRunner shell.Runner
+	charts       []ChartDefinition
+	shellRunner  shell.Runner
 }
 
 // Used for deserializing repo definitions in mirror configuration
 type RepoDefinition struct {
 	Name string
-	Url string
+	Url  string
 }
 
 // Used for deserializing chart definitions in mirror configuration
 type ChartDefinition struct {
-	Name string
-	Repo string
+	Name    string
+	Repo    string
 	Version string
 }
 
 // Struct for deserializing a mirror configuration file
 type config struct {
 	Repositories []RepoDefinition
-	Charts []ChartDefinition
+	Charts       []ChartDefinition
 }
 
 func NewMirror(publisher publish.Publisher, shellRunner shell.Runner, configFile string) (Mirror, error) {
 	m := &mirror{
-		publisher: publisher,
+		publisher:   publisher,
 		shellRunner: shellRunner,
 	}
 	if err := m.loadConfig(configFile); err != nil {

@@ -30,7 +30,7 @@ func TestSnapshot_UpdateChartVersionIfDefined_Smoke(t *testing.T) {
 	assert.Equal(t, "0.0.0", _snapshot.ChartVersion("agora"))
 
 	// set the chart version
-	err = _snapshot.UpdateChartVersionIfDefined("agora","7.8.9")
+	err = _snapshot.UpdateChartVersionIfDefined("agora", "7.8.9")
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}

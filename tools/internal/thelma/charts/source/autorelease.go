@@ -21,7 +21,7 @@ type AutoReleaser interface {
 type config struct {
 	Enabled bool `yaml:"enabled"` // whether updates to this chart should be added to release train. defaults to true
 	Release struct {
-		Name string `yaml:"name"`// name of the "release", defaults to chart name
+		Name string               `yaml:"name"` // name of the "release", defaults to chart name
 		Type versions.ReleaseType `yaml:"type"` // either "app" or "cluster", defaults to app
 	} `yaml:"release"`
 }

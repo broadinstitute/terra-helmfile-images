@@ -5,11 +5,11 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-type MockPublisher struct{
+type MockPublisher struct {
 	mock.Mock
 }
 
-func NewMockPublisher() *MockPublisher{
+func NewMockPublisher() *MockPublisher {
 	return &MockPublisher{}
 }
 

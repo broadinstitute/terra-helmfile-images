@@ -16,14 +16,14 @@ type Versions interface {
 
 // Implements public Versions interface
 type versions struct {
-	thelmaHome string
+	thelmaHome  string
 	shellRunner shell.Runner
 }
 
 // NewVersions returns a new Versions instance
 func NewVersions(thelmaHome string, shellRunner shell.Runner) Versions {
 	return &versions{
-		thelmaHome: thelmaHome,
+		thelmaHome:  thelmaHome,
 		shellRunner: shellRunner,
 	}
 }
@@ -38,4 +38,3 @@ func snapshotPath(thelmaHome string, releaseType ReleaseType, set Set) string {
 	fileName := fmt.Sprintf("%s.yaml", set)
 	return path.Join(thelmaHome, versionsDir, releaseType.String(), fileName)
 }
-

@@ -13,7 +13,7 @@ import (
 )
 
 const maxErrorBufLenBytes = 5 * 1024 // 5 kb
-const maxCmdId = 1 << 24 - 1
+const maxCmdId = 1<<24 - 1
 const cmdIdFormat = "%06x"
 const eol = '\n'
 
@@ -24,7 +24,7 @@ type Options struct {
 }
 
 // RealRunner is an implementation of the Runner interface that actually executes shell commands
-type RealRunner struct{
+type RealRunner struct {
 	logger zerolog.Logger
 }
 
@@ -87,8 +87,8 @@ func (r *RealRunner) Capture(cmd Command, stdout io.Writer, stderr io.Writer) er
 		logger.Debug().Msgf("Command failed: %v\n", err)
 		return &Error{
 			Command: cmd,
-			Err: err,
-			ErrOut: errCapture.String(),
+			Err:     err,
+			ErrOut:  errCapture.String(),
 		}
 	}
 
@@ -130,7 +130,7 @@ func (cw *capturingWriter) Write(p []byte) (n int, err error) {
 
 		n, err = len(p), nil
 	} else {
-		if cw.len + len(p) > cw.maxLen {
+		if cw.len+len(p) > cw.maxLen {
 			cw.rollover()
 		}
 
@@ -160,18 +160,18 @@ func (cw *capturingWriter) rollover() {
 
 // An io.Writer that logs messages that are sent to it with Write() and optionally forwards to another io.Writer
 type loggingWriter struct {
-	level zerolog.Level
+	level  zerolog.Level
 	logger zerolog.Logger
 	prefix string
-	inner io.Writer
+	inner  io.Writer
 }
 
 func newLoggingWriter(level zerolog.Level, logger zerolog.Logger, prefix string, inner io.Writer) *loggingWriter {
 	return &loggingWriter{
-		level: level,
+		level:  level,
 		logger: logger,
 		prefix: prefix,
-		inner: inner,
+		inner:  inner,
 	}
 }
 

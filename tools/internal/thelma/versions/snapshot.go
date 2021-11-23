@@ -22,9 +22,9 @@ type Snapshot interface {
 
 // Represents a version snapshot file in terra-helmfile (eg. "versions/app/dev.yaml")
 type snapshot struct {
-	filePath    string
-	data        *snapshotData
-	yq          yq.Yq
+	filePath string
+	data     *snapshotData
+	yq       yq.Yq
 }
 
 // struct used for deserializing a version snapshot
@@ -70,7 +70,7 @@ func (s *snapshot) UpdateChartVersionIfDefined(releaseName string, newVersion st
 	chartVersion := s.ChartVersion(releaseName)
 	if semver.IsValid(chartVersion) {
 		if semver.Compare(chartVersion, newVersion) <= 0 {
-			log.Warn().Msgf("Won't update chart version for release %s in %s (Current chart version %q  <= new chart version %q)", releaseName, s.filePath,  chartVersion, newVersion)
+			log.Warn().Msgf("Won't update chart version for release %s in %s (Current chart version %q  <= new chart version %q)", releaseName, s.filePath, chartVersion, newVersion)
 		}
 	} else {
 		log.Warn().Msgf("Current chart version %q for release %s in %s is invalid", chartVersion, releaseName, s.filePath)

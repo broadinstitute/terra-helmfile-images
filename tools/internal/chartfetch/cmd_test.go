@@ -29,7 +29,7 @@ func TestFetch(t *testing.T) {
 	}{
 		{
 			description:   "no pos arguments",
-			args: args("-v 1.2.3 -d /does/not/exist"),
+			args:          args("-v 1.2.3 -d /does/not/exist"),
 			expectedError: regexp.MustCompile(`accepts 1 arg\(s\), received 0`),
 		},
 		{

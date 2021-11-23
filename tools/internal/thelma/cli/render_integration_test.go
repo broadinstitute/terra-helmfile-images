@@ -469,7 +469,7 @@ func setup(t *testing.T) (*TestState, error) {
 	// Create a mock runner for executing shell commands
 	mockRunnerOpts := shellmock.Options{
 		IgnoreEnvVars: []string{"THF_CHART_CACHE_DIR"}, // ignore chart cache dir (created randomly at runtime)
-		VerifyOrder: false, // disable order verification because commands run in parallel
+		VerifyOrder:   false,                           // disable order verification because commands run in parallel
 	}
 	mockRunner := shellmock.NewMockRunner(mockRunnerOpts)
 	mockRunner.Test(t)
@@ -479,11 +479,11 @@ func setup(t *testing.T) (*TestState, error) {
 	thelmaCLI.setShellRunner(mockRunner)
 
 	ts := &TestState{
-		mockHome:          mockHome,
-		mockRunner:        mockRunner,
-		mockChartSrcDir:   mockChartSrcDir,
-		scratchDir:        scratchDir,
-		thelmaCLI:         thelmaCLI,
+		mockHome:        mockHome,
+		mockRunner:      mockRunner,
+		mockChartSrcDir: mockChartSrcDir,
+		scratchDir:      scratchDir,
+		thelmaCLI:       thelmaCLI,
 	}
 
 	return ts, nil

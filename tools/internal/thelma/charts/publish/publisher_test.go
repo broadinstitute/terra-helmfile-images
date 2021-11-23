@@ -27,7 +27,7 @@ func TestPublish(t *testing.T) {
 	}{
 		{
 			description: "should panic error if no charts have been added",
-			dryRun: false,
+			dryRun:      false,
 			test: func(ts testState) {
 				assert.Panics(t, func() {
 					_, _ = ts.publisher.Publish()
@@ -36,7 +36,7 @@ func TestPublish(t *testing.T) {
 		},
 		{
 			description: "should not upload charts if dry run is true",
-			dryRun: true,
+			dryRun:      true,
 			test: func(ts testState) {
 				ts.mockRepo.On("RepoURL").Return("https://fake")
 
@@ -64,7 +64,7 @@ func TestPublish(t *testing.T) {
 		},
 		{
 			description: "should upload charts & index if dryRun is false",
-			dryRun: false,
+			dryRun:      false,
 			test: func(ts testState) {
 				ts.mockRepo.On("RepoURL").Return("https://fake")
 				ts.mockRepo.On("UploadChart", path.Join(ts.scratchDir, "charts", "charta-0.0.1.tgz")).Return(nil)

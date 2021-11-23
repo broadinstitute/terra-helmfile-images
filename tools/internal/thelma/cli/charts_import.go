@@ -19,7 +19,7 @@ type chartsImportOptions struct {
 }
 
 var chartsImportFlagNames = struct {
-	configFile   string
+	configFile string
 	bucketName string
 	dryRun     string
 }{

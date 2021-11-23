@@ -18,7 +18,6 @@ releases:
     chartVersion: 0.0.0
 `
 
-
 const appDevSnapshotUpdatedContent = `
 releases:
   agora:
@@ -61,24 +60,24 @@ func TestSnapshot_ChartVersion(t *testing.T) {
 
 func TestSnapshot_UpdateChartVersionIfDefined(t *testing.T) {
 	type testMocks struct {
-		runner *shellmock.MockRunner
+		runner     *shellmock.MockRunner
 		thelmaHome string
 	}
-	testCases := []struct{
-		name string
-		releaseName string
-		newVersion string
-		releaseType ReleaseType
-		set Set
+	testCases := []struct {
+		name          string
+		releaseName   string
+		newVersion    string
+		releaseType   ReleaseType
+		set           Set
 		expectedError string
-		setupMocks func(testMocks)
+		setupMocks    func(testMocks)
 	}{
 		{
-			name: "should set agora version in versions/app/dev.yaml",
+			name:        "should set agora version in versions/app/dev.yaml",
 			releaseName: "agora",
-			newVersion: "1.2.3",
+			newVersion:  "1.2.3",
 			releaseType: AppRelease,
-			set: Dev,
+			set:         Dev,
 			setupMocks: func(tm testMocks) {
 				tm.runner.ExpectCmd(shell.Command{
 					Prog: "yq",
@@ -96,11 +95,11 @@ func TestSnapshot_UpdateChartVersionIfDefined(t *testing.T) {
 			},
 		},
 		{
-			name: "should set prometheus version in versions/cluster/alpha.yaml",
+			name:        "should set prometheus version in versions/cluster/alpha.yaml",
 			releaseName: "prometheus",
-			newVersion: "4.5.6",
+			newVersion:  "4.5.6",
 			releaseType: ClusterRelease,
-			set: Alpha,
+			set:         Alpha,
 			setupMocks: func(tm testMocks) {
 				tm.runner.ExpectCmd(shell.Command{
 					Prog: "yq",
@@ -118,19 +117,18 @@ func TestSnapshot_UpdateChartVersionIfDefined(t *testing.T) {
 			},
 		},
 		{
-			name: "should NOT version for undefined release",
+			name:        "should NOT version for undefined release",
 			releaseName: "fakechart",
-			newVersion: "1.2.3",
+			newVersion:  "1.2.3",
 			releaseType: AppRelease,
-			set: Dev,
+			set:         Dev,
 		},
-
 	}
 
 	for _, tc := range testCases {
 		mocks := testMocks{
 			thelmaHome: t.TempDir(),
-			runner: shellmock.DefaultMockRunner(),
+			runner:     shellmock.DefaultMockRunner(),
 		}
 		_versions := NewVersions(mocks.thelmaHome, mocks.runner)
 

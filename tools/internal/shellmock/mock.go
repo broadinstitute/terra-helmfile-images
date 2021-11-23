@@ -38,10 +38,10 @@ const (
 
 // Options for a MockRunner
 type Options struct {
-	VerifyOrder bool         // VerifyOrder If true, verify commands are run in the order they were declared
-	DumpStyle   CmdDumpStyle // DumpStyle how to style the dump
-	IgnoreEnvVars []string   // Array of environment variable names to strip when matching shell.Command arguments
-	IgnoreDir bool           // If true, ignore Dir field of shell.Command arguments
+	VerifyOrder   bool         // VerifyOrder If true, verify commands are run in the order they were declared
+	DumpStyle     CmdDumpStyle // DumpStyle how to style the dump
+	IgnoreEnvVars []string     // Array of environment variable names to strip when matching shell.Command arguments
+	IgnoreDir     bool         // If true, ignore Dir field of shell.Command arguments
 }
 
 // MockRunner is an implementation of Runner interface for use with testify/mock.
@@ -82,7 +82,6 @@ func NewMockRunner(options Options) *MockRunner {
 	return m
 }
 
-
 // Convenience function to build a shell.Command from a format string and arguments
 //
 // Eg. CmdFromFmt("HOME=%s FOO=BAR ls -al %s", "/tmp", "Documents")
@@ -93,7 +92,7 @@ func NewMockRunner(options Options) *MockRunner {
 //   Args: []string{"-al", "Documents},
 //   Dir: ""
 // }
-func CmdFromFmt(fmt string, args... interface{}) shell.Command {
+func CmdFromFmt(fmt string, args ...interface{}) shell.Command {
 	tokens := testutils.Args(fmt, args...)
 
 	return CmdFromArgs(tokens...)
@@ -109,7 +108,7 @@ func CmdFromFmt(fmt string, args... interface{}) shell.Command {
 //   Args: []string{"-al", "."},
 //   Dir: ""
 // }
-func CmdFromArgs(args... string) shell.Command {
+func CmdFromArgs(args ...string) shell.Command {
 	// count number of leading NAME=VALUE environment var pairs preceding command
 	var i int
 	for i = 0; i < len(args); i++ {
@@ -137,7 +136,6 @@ func CmdFromArgs(args... string) shell.Command {
 
 	return cmd
 }
-
 
 // Run Instead of executing the command, logs an info message and registers the call with testify mock
 func (m *MockRunner) Run(cmd shell.Command) error {
@@ -168,7 +166,7 @@ func (m *MockRunner) ExpectCmd(cmd shell.Command) *Call {
 	cmd = m.applyIgnores(cmd)
 
 	mockCall := m.Mock.On("Capture", cmd, mock.Anything, mock.Anything)
-	callWrapper := &Call{ Call: mockCall }
+	callWrapper := &Call{Call: mockCall}
 
 	order := len(m.expectedCommands)
 	expected := &expectedCommand{cmd: cmd}

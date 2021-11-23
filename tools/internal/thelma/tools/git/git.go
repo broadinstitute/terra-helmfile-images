@@ -11,13 +11,13 @@ type Clone interface {
 
 // Implements the Clone interface
 type clone struct {
-	clonePath string
+	clonePath   string
 	shellRunner shell.Runner
 }
 
 func NewClone(clonePath string, shellRunner shell.Runner) Clone {
 	return &clone{
-		clonePath: clonePath,
+		clonePath:   clonePath,
 		shellRunner: shellRunner,
 	}
 }

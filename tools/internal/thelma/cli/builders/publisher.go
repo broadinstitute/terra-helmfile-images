@@ -20,8 +20,8 @@ type PublisherBuilder interface {
 
 type publisherBuilder struct {
 	publisher publish.Publisher
-	repo repo.Repo
-	bucket bucket.Bucket
+	repo      repo.Repo
+	bucket    bucket.Bucket
 }
 
 func Publisher(app *app.ThelmaApp, bucketName string, dryRun bool) (PublisherBuilder, error) {
@@ -43,8 +43,8 @@ func Publisher(app *app.ThelmaApp, bucketName string, dryRun bool) (PublisherBui
 
 	return &publisherBuilder{
 		publisher: publisher,
-		repo: _repo,
-		bucket: _bucket,
+		repo:      _repo,
+		bucket:    _bucket,
 	}, nil
 }
 

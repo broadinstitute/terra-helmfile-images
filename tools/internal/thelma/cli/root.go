@@ -32,9 +32,9 @@ const globalUsage = `CLI tools for interacting with Terra's Helm charts
 Environment variables:
 | Name                               | Description                                                                       |
 |------------------------------------|-----------------------------------------------------------------------------------|
-| $THELMA_HOME                       | Required. path to terra-helmfile clone                                            |
-| $THELMA_VERBOSITY                  | Logging verbosity. One of ERROR, WARN, INFO (default), DEBUG, or TRACE            |
-| $THELMA_TMPDIR                     | path where Thelma should generate temporary files. Defaults to OS tmp dir.        |
+| $THELMA_HOME                       | Required. Path to terra-helmfile clone.                                           |
+| $THELMA_LOGLEVEL                   | Logging verbosity. One of error, warn, info (default), debug, or trace            |
+| $THELMA_TMPDIR                     | Path where Thelma should generate temporary files. Defaults to OS tmp dir.        |
 `
 
 func init() {

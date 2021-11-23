@@ -57,7 +57,7 @@ func (r *RealRunner) generateCommandId() string {
 }
 
 // Capture runs a Command, streaming stdout and stderr to the given writers.
-// An error is returned if the command exits non-zero
+// An error is returned if the command exits non-zero.
 func (r *RealRunner) Capture(cmd Command, stdout io.Writer, stderr io.Writer) error {
 	// Generate an id to uniquely identify this command in log messages
 	id := r.generateCommandId()

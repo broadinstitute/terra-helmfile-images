@@ -23,8 +23,6 @@ type Snapshot interface {
 // Represents a version snapshot file in terra-helmfile (eg. "versions/app/dev.yaml")
 type snapshot struct {
 	filePath    string
-	releaseType ReleaseType
-	set         Set
 	data        *snapshotData
 	yq          yq.Yq
 }

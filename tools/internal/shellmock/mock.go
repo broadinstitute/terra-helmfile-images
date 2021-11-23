@@ -57,8 +57,6 @@ type MockRunner struct {
 
 type expectedCommand struct {
 	cmd        shell.Command
-	stdout     string
-	stderr     string
 	matchCount int
 }
 

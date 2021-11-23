@@ -23,5 +23,6 @@ func NewClone(clonePath string, shellRunner shell.Runner) Clone {
 }
 
 func (c clone) GetUpdatedFiles(ref string) ([]string, error) {
+	_ = progName
 	panic("TODO")
 }

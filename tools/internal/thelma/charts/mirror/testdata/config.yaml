@@ -4,12 +4,9 @@ repositories:
   - name: stakater
     url: https://stakater.com/charts
 charts:
-  - name: mongodb
-    repo: bitnami
+  - name: bitnami/mongodb
     version: 1.2.3
-  - name: mongodb
-    repo: bitnami
+  - name: bitnami/mongodb
     version: 0.1.0
-  - name: reloader
-    repo: stakater
+  - name: stakater/reloader
     version: 4.0.2

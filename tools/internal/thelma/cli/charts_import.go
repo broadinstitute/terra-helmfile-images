@@ -5,6 +5,7 @@ import (
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/app"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/mirror"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/cli/builders"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/cli/printing"
 	"github.com/spf13/cobra"
 	"path"
 )
@@ -48,6 +49,9 @@ func newChartsImportCLI(ctx *ThelmaContext) *chartsImportCLI {
 	cobraCommand.Flags().StringVar(&options.bucketName, chartsImportFlagNames.bucketName, chartsImportDefaultBucketName, "Publish charts to custom GCS bucket")
 	cobraCommand.Flags().BoolVarP(&options.dryRun, chartsImportFlagNames.dryRun, "n", false, "Dry run (don't actually update Helm repo)")
 
+	printer := printing.NewPrinter()
+	printer.AddFlags(cobraCommand)
+
 	cobraCommand.PreRunE = func(cmd *cobra.Command, args []string) error {
 		if len(args) != 0 {
 			return fmt.Errorf("expected no positional arguments, got %v", args)
@@ -62,11 +66,20 @@ func newChartsImportCLI(ctx *ThelmaContext) *chartsImportCLI {
 			options.configFile = path.Join(ctx.app.Paths.MiscConfDir(), chartsImportDefaultConfigFile)
 		}
 
+		if err := printer.VerifyFlags(); err != nil {
+			return err
+		}
+
 		return nil
 	}
 
 	cobraCommand.RunE = func(cmd *cobra.Command, args []string) error {
-		return importCharts(&options, ctx.app)
+		imported, err := importCharts(&options, ctx.app)
+		if err != nil {
+			return err
+		}
+
+		return printer.PrintOutput(imported, cmd.OutOrStdout())
 	}
 
 	return &chartsImportCLI{
@@ -76,16 +89,16 @@ func newChartsImportCLI(ctx *ThelmaContext) *chartsImportCLI {
 	}
 }
 
-func importCharts(options *chartsImportOptions, app *app.ThelmaApp) error {
+func importCharts(options *chartsImportOptions, app *app.ThelmaApp) ([]mirror.ChartDefinition, error) {
 	pb, err := builders.Publisher(app, options.bucketName, options.dryRun)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer pb.CloseWarn()
 
 	_mirror, err := mirror.NewMirror(pb.Publisher(), app.ShellRunner, options.configFile)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	return _mirror.ImportToMirror()

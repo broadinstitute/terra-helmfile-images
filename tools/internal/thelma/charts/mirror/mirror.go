@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
 	"os"
+	"strings"
 )
 
 // Mirror contains logic for mirror-hosting third-party Helm charts in a GCS Helm repository.
@@ -15,34 +16,36 @@ import (
 // download the charts locally and upload them to a GCS bucket repository.
 type Mirror interface {
 	// ImportToMirror uploads configured charts to the GCS repository.
-	// If commit is false, the import is a "dry run" (no charts are uploaded)
-	ImportToMirror() error
+	// If a given chart version already exists in the repo, it won't be imported.
+	// It returns a slice of ChartDefinitions representing the charts that were imported, if any.
+	ImportToMirror() (imported []ChartDefinition, err error)
 }
 
 // Implements Mirror interface
 type mirror struct {
 	publisher    publish.Publisher
-	repositories []RepoDefinition
+	repositories []RepositoryDefinition
 	charts       []ChartDefinition
 	shellRunner  shell.Runner
 }
 
-// Used for deserializing repo definitions in mirror configuration
-type RepoDefinition struct {
-	Name string
-	Url  string
+// Struct used for deserializing repo definitions in mirror configuration
+type RepositoryDefinition struct {
+	Name string // Repository name, eg. "bitnami"
+	Url  string // Repository url, eg. "https://charts.bitnami.com/bitnami"
 }
 
-// Used for deserializing chart definitions in mirror configuration
+// Struct used for deserializing chart definitions in mirror configuration
 type ChartDefinition struct {
-	Name    string
-	Repo    string
-	Version string
+	Name      string `json:"name"` // Name of the chart in form "<repo>/<name>", eg. "bitnami/mongodb"
+	Version   string `json:"version"` // Version of the chart, eg. "1.2.3"
+	chartName string // chart component of Name, eg "mongodb"
+	repoName  string // repository component of Name, eg "bitnami"
 }
 
 // Struct for deserializing a mirror configuration file
 type config struct {
-	Repositories []RepoDefinition
+	Repositories []RepositoryDefinition
 	Charts       []ChartDefinition
 }
 
@@ -57,46 +60,46 @@ func NewMirror(publisher publish.Publisher, shellRunner shell.Runner, configFile
 	return m, nil
 }
 
-func (m *mirror) ImportToMirror() error {
+func (m *mirror) ImportToMirror() ([]ChartDefinition, error) {
 	if len(m.charts) == 0 {
 		log.Warn().Msgf("No charts defined in config file, won't upload any charts")
-		return nil
+		return nil, nil
 	}
 
 	charts := m.chartsToUpload()
 
 	if len(charts) == 0 {
 		log.Info().Msgf("No new charts to upload, exiting")
-		return nil
+		return nil, nil
 	}
 
 	if err := m.addHelmRepos(); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := m.fetchCharts(charts); err != nil {
-		return err
+		return nil, err
 	}
 
 	count, err := m.publisher.Publish()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	log.Info().Msgf("Imported %d new charts", count)
-	return nil
+	return charts, nil
 }
 
 func (m *mirror) chartsToUpload() []ChartDefinition {
 	var result []ChartDefinition
 
 	for _, chartDefn := range m.charts {
-		if m.publisher.Index().HasVersion(chartDefn.Name, chartDefn.Version) {
-			log.Debug().Msgf("Repo index includes %s version %s, won't try to upload", chartDefn.Name, chartDefn.Version)
+		if m.publisher.Index().HasVersion(chartDefn.chartName, chartDefn.Version) {
+			log.Debug().Msgf("Repo index includes %s version %s, won't try to upload", chartDefn.chartName, chartDefn.Version)
 			continue
 		}
 
-		log.Info().Msgf("Repo index does not include %s version %s, will upload it", chartDefn.Name, chartDefn.Version)
+		log.Info().Msgf("Repo index does not include %s version %s, will upload it", chartDefn.chartName, chartDefn.Version)
 		result = append(result, chartDefn)
 	}
 
@@ -112,7 +115,7 @@ func (m *mirror) addHelmRepos() error {
 	return nil
 }
 
-func (m *mirror) addHelmRepo(repository RepoDefinition) error {
+func (m *mirror) addHelmRepo(repository RepositoryDefinition) error {
 	return m.shellRunner.Run(shell.Command{
 		Prog: helm.ProgName,
 		Args: []string{
@@ -141,7 +144,7 @@ func (m *mirror) fetchChart(chart ChartDefinition) error {
 		Prog: helm.ProgName,
 		Args: []string{
 			"fetch",
-			fmt.Sprintf("%s/%s", chart.Repo, chart.Name),
+			fmt.Sprintf(chart.Name),
 			"--version",
 			chart.Version,
 			"--destination",
@@ -161,7 +164,7 @@ func (m *mirror) loadConfig(configFile string) error {
 		return fmt.Errorf("error parsing %s: %v", configFile, err)
 	}
 
-	repoMap := make(map[string]RepoDefinition)
+	repoMap := make(map[string]RepositoryDefinition)
 	for _, repoDefn := range cfg.Repositories {
 		_, exists := repoMap[repoDefn.Name]
 		if exists {
@@ -170,9 +173,18 @@ func (m *mirror) loadConfig(configFile string) error {
 		repoMap[repoDefn.Name] = repoDefn
 	}
 
-	for _, chartDefn := range cfg.Charts {
-		if _, exists := repoMap[chartDefn.Repo]; !exists {
-			return fmt.Errorf("configuration error in %s: chart %s references undefined repository %s", configFile, chartDefn.Name, chartDefn.Repo)
+	for i, chartDefn := range cfg.Charts {
+		tokens := strings.Split(chartDefn.Name, "/")
+		if len(tokens) != 2 {
+			return fmt.Errorf(`"configuration error in %s: chart name must be a string of form <repository>/<chart> (eg. "bitnami/mongodb"), got %q`, configFile, chartDefn.Name)
+		}
+
+		chartDefn.repoName = tokens[0]
+		chartDefn.chartName = tokens[1]
+		cfg.Charts[i] = chartDefn
+
+		if _, exists := repoMap[chartDefn.repoName]; !exists {
+			return fmt.Errorf("configuration error in %s: chart %s references undefined repository %s", configFile, chartDefn.Name, chartDefn.repoName)
 		}
 	}
 

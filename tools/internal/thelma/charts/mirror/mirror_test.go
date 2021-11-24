@@ -42,8 +42,11 @@ func TestUploadToMirror(t *testing.T) {
 	mirr, err := NewMirror(publisher, runner, "testdata/config.yaml")
 	assert.NoError(t, err)
 
-	err = mirr.ImportToMirror()
+	imported, err := mirr.ImportToMirror()
 	assert.NoError(t, err)
+	assert.Equal(t, 1, len(imported))
+	assert.Equal(t, "bitnami/mongodb", imported[0].Name)
+	assert.Equal(t, "1.2.3", imported[0].Version)
 
 	runner.AssertExpectations(t)
 	publisher.AssertExpectations(t)

@@ -14,7 +14,15 @@ import (
 
 // ChartsDir represents a directory of Helm chart sources on the local filesystem.
 type ChartsDir interface {
-	Release(chartNames []string) error
+	// Given a set of charts to release, release new versions of them, as well as any downstream dependents.
+	// For example, if chart `bar` depends on chart `foo`, Release([]string{`foo`}) will also release `bar`.
+	//
+	// Returns a map representing the names and versions of charts that were released. Eg.
+	// {
+	//   "foo": "1.2.3",
+	//   "bar": "0.2.0",
+	// }
+	Release(chartNames []string) (releasedVersions map[string]string, err error)
 }
 
 // NewChartsDir constructs a new ChartsDir
@@ -53,11 +61,11 @@ type chartsDir struct {
 	dependencyGraph *dependency.Graph
 }
 
-func (d *chartsDir) Release(chartNames []string) error {
+func (d *chartsDir) Release(chartNames []string) (map[string]string, error) {
 	chartsToPublish := chartNames
 	for _, chartName := range chartsToPublish {
 		if _, exists := d.charts[chartName]; !exists {
-			return fmt.Errorf("chart %q does not exist in source dir %s", chartName, d.sourceDir)
+			return nil, fmt.Errorf("chart %q does not exist in source dir %s", chartName, d.sourceDir)
 		}
 	}
 
@@ -67,38 +75,40 @@ func (d *chartsDir) Release(chartNames []string) error {
 	d.dependencyGraph.TopoSort(chartsToPublish)
 	log.Info().Msgf("%d charts will be published: %s", len(chartsToPublish), strings.Join(chartsToPublish, ", "))
 
+	releasedVersions := make(map[string]string, len(chartsToPublish))
 	for _, chartName := range chartsToPublish {
 		_chart := d.charts[chartName]
 
 		if err := _chart.GenerateDocs(); err != nil {
-			return err
+			return nil, err
 		}
 		newVersion, err := _chart.BumpChartVersion(d.publisher.Index().MostRecentVersion(chartName))
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if err := d.updateDependentVersionConstraints(chartName, newVersion); err != nil {
-			return err
+			return nil, err
 		}
 		if err := _chart.UpdateDependencies(); err != nil {
-			return err
+			return nil, err
 		}
 		if err := _chart.PackageChart(d.publisher.ChartDir()); err != nil {
-			return err
+			return nil, err
 		}
 		if err := d.autoreleaser.UpdateReleaseVersion(_chart, newVersion); err != nil {
-			return err
+			return nil, err
 		}
+		releasedVersions[chartName] = newVersion
 	}
 
 	count, err := d.publisher.Publish()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	log.Info().Msgf("Published %d charts", count)
 
-	return nil
+	return releasedVersions, nil
 }
 
 // Go through all dependents and update version constraints to match new version

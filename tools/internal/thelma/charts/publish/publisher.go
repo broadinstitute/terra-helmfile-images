@@ -78,7 +78,8 @@ func (u *publisher) Index() index.Index {
 	return u.index
 }
 
-// Publish publishes all charts in the chart directory to the target Helm repo
+// Publish publishes all charts in the chart directory to the target Helm repo,
+// returning an integer denoting the number of charts that were published.
 func (u *publisher) Publish() (int, error) {
 	if u.closed {
 		panic("Publish() can only be called once")

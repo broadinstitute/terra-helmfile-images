@@ -184,7 +184,7 @@ func (m *mirror) loadConfig(configFile string) error {
 		cfg.Charts[i] = chartDefn
 
 		if _, exists := repoMap[chartDefn.repoName]; !exists {
-			return fmt.Errorf("configuration error in %s: chart %s references undefined repository %s", configFile, chartDefn.Name, chartDefn.repoName)
+			return fmt.Errorf("configuration error in %s: chart %q references undefined repository %q", configFile, chartDefn.Name, chartDefn.repoName)
 		}
 	}
 

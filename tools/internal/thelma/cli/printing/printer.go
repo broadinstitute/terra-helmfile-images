@@ -69,5 +69,5 @@ func printToStdout(data []byte, stdout io.Writer) error {
 }
 
 func printToFile(data []byte, filename string) error {
-	return os.WriteFile(filename, data,0660)
+	return os.WriteFile(filename, data,0666)
 }

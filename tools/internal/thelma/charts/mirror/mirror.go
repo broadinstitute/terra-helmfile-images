@@ -27,6 +27,7 @@ type mirror struct {
 	repositories []RepositoryDefinition
 	charts       []ChartDefinition
 	shellRunner  shell.Runner
+	configFile   string
 }
 
 // Struct used for deserializing repo definitions in mirror configuration
@@ -63,6 +64,7 @@ func NewMirror(publisher publish.Publisher, shellRunner shell.Runner, configFile
 	m := &mirror{
 		publisher:   publisher,
 		shellRunner: shellRunner,
+		configFile:  configFile,
 	}
 	if err := m.loadConfig(configFile); err != nil {
 		return nil, err
@@ -72,14 +74,14 @@ func NewMirror(publisher publish.Publisher, shellRunner shell.Runner, configFile
 
 func (m *mirror) ImportToMirror() ([]ChartDefinition, error) {
 	if len(m.charts) == 0 {
-		log.Warn().Msgf("No charts defined in config file, won't upload any charts")
+		log.Warn().Msgf("No chart imports declared in config file: %s", m.configFile)
 		return nil, nil
 	}
 
 	charts := m.chartsToUpload()
 
 	if len(charts) == 0 {
-		log.Info().Msgf("No new charts to upload, exiting")
+		log.Info().Msgf("No new charts to import")
 		return nil, nil
 	}
 

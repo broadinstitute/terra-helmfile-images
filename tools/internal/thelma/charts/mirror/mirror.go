@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/publish"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/cli/views"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/tools/helm"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
@@ -19,7 +18,7 @@ type Mirror interface {
 	// ImportToMirror uploads configured charts to the GCS repository.
 	// If a given chart version already exists in the repo, it won't be imported.
 	// It returns a slice of ChartDefinitions representing the charts that were imported, if any.
-	ImportToMirror() (imported []views.ChartRelease, err error)
+	ImportToMirror() (imported []ChartDefinition, err error)
 }
 
 // Implements Mirror interface
@@ -71,7 +70,7 @@ func NewMirror(publisher publish.Publisher, shellRunner shell.Runner, configFile
 	return m, nil
 }
 
-func (m *mirror) ImportToMirror() ([]views.ChartRelease, error) {
+func (m *mirror) ImportToMirror() ([]ChartDefinition, error) {
 	if len(m.charts) == 0 {
 		log.Warn().Msgf("No charts defined in config file, won't upload any charts")
 		return nil, nil
@@ -98,20 +97,7 @@ func (m *mirror) ImportToMirror() ([]views.ChartRelease, error) {
 	}
 
 	log.Info().Msgf("Imported %d new charts", count)
-	return toView(charts), nil
-}
-
-func toView(chartDefns []ChartDefinition) []views.ChartRelease {
-	var result []views.ChartRelease
-	for _, chartDefn := range chartDefns {
-		result = append(result, views.ChartRelease{
-			Name:    chartDefn.ChartName(),
-			Version: chartDefn.Version,
-			Repo:    chartDefn.RepoName(),
-		})
-	}
-	views.SortChartReleases(result)
-	return result
+	return charts, nil
 }
 
 func (m *mirror) chartsToUpload() []ChartDefinition {

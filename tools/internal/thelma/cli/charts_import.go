@@ -109,5 +109,20 @@ func importCharts(options *chartsImportOptions, app *app.ThelmaApp) ([]views.Cha
 		return nil, err
 	}
 
-	return _mirror.ImportToMirror()
+	chartDefns, err := _mirror.ImportToMirror()
+	if err != nil {
+		return nil, err
+	}
+
+	// convert result to view
+	var result []views.ChartRelease
+	for _, chartDefn := range chartDefns {
+		result = append(result, views.ChartRelease{
+			Name:    chartDefn.ChartName(),
+			Version: chartDefn.Version,
+			Repo:    chartDefn.RepoName(),
+		})
+	}
+	views.SortChartReleases(result)
+	return result, nil
 }

@@ -45,8 +45,9 @@ func TestUploadToMirror(t *testing.T) {
 	imported, err := mirr.ImportToMirror()
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(imported))
-	assert.Equal(t, "bitnami", imported[0].Repo)
-	assert.Equal(t, "mongodb", imported[0].Name)
+	assert.Equal(t, "bitnami/mongodb", imported[0].Name)
+	assert.Equal(t, "bitnami", imported[0].RepoName())
+	assert.Equal(t, "mongodb", imported[0].ChartName())
 	assert.Equal(t, "1.2.3", imported[0].Version)
 
 	runner.AssertExpectations(t)

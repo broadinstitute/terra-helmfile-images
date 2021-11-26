@@ -7,6 +7,7 @@ import (
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/cli/builders"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/cli/printing"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/cli/views"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"path"
 )
@@ -78,6 +79,12 @@ func newChartsImportCLI(ctx *ThelmaContext) *chartsImportCLI {
 		imported, err := importCharts(&options, ctx.app)
 		if err != nil {
 			return err
+		}
+
+		if options.dryRun {
+			log.Info().Msgf("This is a dry run; would have imported %d charts to %s", len(imported), options.bucketName)
+		} else {
+			log.Info().Msgf("Imported %d charts to %s", len(imported), options.bucketName)
 		}
 
 		return printer.PrintOutput(imported, cmd.OutOrStdout())

@@ -106,7 +106,7 @@ func (d *chartsDir) Release(chartNames []string) (map[string]string, error) {
 		return nil, err
 	}
 
-	log.Info().Msgf("Published %d charts", count)
+	log.Info().Msgf("%d charts were uploaded to the repository", count)
 
 	return releasedVersions, nil
 }

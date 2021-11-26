@@ -74,11 +74,17 @@ func newChartsPublishCLI(ctx *ThelmaContext) *chartsPublishCLI {
 	}
 
 	cobraCommand.RunE = func(cmd *cobra.Command, args []string) error {
-		releasedVersions, err := publishCharts(&options, ctx.app)
+		published, err := publishCharts(&options, ctx.app)
 		if err != nil {
 			return err
 		}
-		return printer.PrintOutput(releasedVersions, cmd.OutOrStdout())
+
+		if options.dryRun {
+			log.Info().Msgf("This is a dry run; would have released %d charts to %s", len(published), options.bucketName)
+		} else {
+			log.Info().Msgf("Released %d charts to %s", len(published), options.bucketName)
+		}
+		return printer.PrintOutput(published, cmd.OutOrStdout())
 	}
 
 	return &chartsPublishCLI{

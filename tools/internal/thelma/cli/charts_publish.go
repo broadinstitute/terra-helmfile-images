@@ -5,6 +5,7 @@ import (
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/source"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/cli/builders"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/cli/printing"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/cli/views"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/versions"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -87,10 +88,10 @@ func newChartsPublishCLI(ctx *ThelmaContext) *chartsPublishCLI {
 	}
 }
 
-func publishCharts(options *chartsPublishOptions, app *app.ThelmaApp) (map[string]string, error) {
+func publishCharts(options *chartsPublishOptions, app *app.ThelmaApp) ([]views.ChartRelease, error) {
 	if len(options.charts) == 0 {
 		log.Warn().Msgf("No charts specified; exiting")
-		return make(map[string]string), nil
+		return []views.ChartRelease{}, nil
 	}
 
 	pb, err := builders.Publisher(app, options.bucketName, options.dryRun)
@@ -98,13 +99,29 @@ func publishCharts(options *chartsPublishOptions, app *app.ThelmaApp) (map[strin
 		return nil, err
 	}
 	defer pb.CloseWarn()
+	publisher := pb.Publisher()
 
 	_versions := versions.NewVersions(app.Config.Home(), app.ShellRunner)
 
-	chartsDir, err := source.NewChartsDir(options.chartDir, pb.Publisher(), _versions, app.ShellRunner)
+	chartsDir, err := source.NewChartsDir(options.chartDir, publisher, _versions, app.ShellRunner)
 	if err != nil {
 		return nil, err
 	}
 
-	return chartsDir.Release(options.charts)
+	chartVersions, err := chartsDir.Release(options.charts)
+	if err != nil {
+		return nil, err
+	}
+
+	// Collate version map into a slice of chart releases
+	var view []views.ChartRelease
+	for chartName, chartVersion := range chartVersions {
+		view = append(view, views.ChartRelease{
+			Name: chartName,
+			Version: chartVersion,
+			Repo: options.bucketName,
+		})
+	}
+	views.SortChartReleases(view)
+	return view, nil
 }

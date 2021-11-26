@@ -6,6 +6,7 @@ import (
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/mirror"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/cli/builders"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/cli/printing"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/cli/views"
 	"github.com/spf13/cobra"
 	"path"
 )
@@ -89,7 +90,7 @@ func newChartsImportCLI(ctx *ThelmaContext) *chartsImportCLI {
 	}
 }
 
-func importCharts(options *chartsImportOptions, app *app.ThelmaApp) ([]mirror.ChartDefinition, error) {
+func importCharts(options *chartsImportOptions, app *app.ThelmaApp) ([]views.ChartRelease, error) {
 	pb, err := builders.Publisher(app, options.bucketName, options.dryRun)
 	if err != nil {
 		return nil, err

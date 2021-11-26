@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/publish"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/cli/views"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/tools/helm"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
@@ -18,7 +19,7 @@ type Mirror interface {
 	// ImportToMirror uploads configured charts to the GCS repository.
 	// If a given chart version already exists in the repo, it won't be imported.
 	// It returns a slice of ChartDefinitions representing the charts that were imported, if any.
-	ImportToMirror() (imported []ChartDefinition, err error)
+	ImportToMirror() (imported []views.ChartRelease, err error)
 }
 
 // Implements Mirror interface
@@ -37,10 +38,20 @@ type RepositoryDefinition struct {
 
 // Struct used for deserializing chart definitions in mirror configuration
 type ChartDefinition struct {
-	Name      string `json:"name"` // Name of the chart in form "<repo>/<name>", eg. "bitnami/mongodb"
-	Version   string `json:"version"` // Version of the chart, eg. "1.2.3"
+	Name      string // Name of the chart in form "<repo>/<name>", eg. "bitnami/mongodb"
+	Version   string // Version of the chart, eg. "1.2.3"
 	chartName string // chart component of Name, eg "mongodb"
 	repoName  string // repository component of Name, eg "bitnami"
+}
+
+// Name of the repo. Eg. "terra-helm"
+func (c ChartDefinition) RepoName() string {
+	return c.repoName
+}
+
+// Name of the chart. Eg. "agora"
+func (c ChartDefinition) ChartName() string {
+	return c.chartName
 }
 
 // Struct for deserializing a mirror configuration file
@@ -60,7 +71,7 @@ func NewMirror(publisher publish.Publisher, shellRunner shell.Runner, configFile
 	return m, nil
 }
 
-func (m *mirror) ImportToMirror() ([]ChartDefinition, error) {
+func (m *mirror) ImportToMirror() ([]views.ChartRelease, error) {
 	if len(m.charts) == 0 {
 		log.Warn().Msgf("No charts defined in config file, won't upload any charts")
 		return nil, nil
@@ -87,7 +98,20 @@ func (m *mirror) ImportToMirror() ([]ChartDefinition, error) {
 	}
 
 	log.Info().Msgf("Imported %d new charts", count)
-	return charts, nil
+	return toView(charts), nil
+}
+
+func toView(chartDefns []ChartDefinition) []views.ChartRelease {
+	var result []views.ChartRelease
+	for _, chartDefn := range chartDefns {
+		result = append(result, views.ChartRelease{
+			Name:    chartDefn.ChartName(),
+			Version: chartDefn.Version,
+			Repo:    chartDefn.RepoName(),
+		})
+	}
+	views.SortChartReleases(result)
+	return result
 }
 
 func (m *mirror) chartsToUpload() []ChartDefinition {

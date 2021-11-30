@@ -3,8 +3,9 @@ package helmfile
 import (
 	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render/target"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/gitops/target"
 	"github.com/rs/zerolog/log"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -51,6 +52,8 @@ type Options struct {
 	Path             string       // Path to terra-helmfile repo clone
 	ChartCacheDir    string       // ChartCacheDir path to shared chart cache directory that can be re-used across renders
 	HelmfileLogLevel string       // HelmfileLogLevel is the --log-level argument to pass to `helmfile` command
+	Stdout     		 bool         // Stdout if true, render to stdout instead of output directory
+	OutputDir        string       // Output directory where manifests should be rendered
 	ShellRunner      shell.Runner // ShellRunner shell Runner to use for executing helmfile commands
 }
 
@@ -59,6 +62,8 @@ type ConfigRepo struct {
 	path             string
 	chartCacheDir    string
 	helmfileLogLevel string
+	stdout bool
+	outputDir string
 	shellRunner      shell.Runner
 }
 
@@ -75,6 +80,8 @@ func NewConfigRepo(options Options) *ConfigRepo {
 		path:             options.Path,
 		chartCacheDir:    options.ChartCacheDir,
 		helmfileLogLevel: options.HelmfileLogLevel,
+		stdout: options.Stdout,
+		outputDir: options.OutputDir,
 		shellRunner:      options.ShellRunner,
 	}
 }
@@ -87,6 +94,44 @@ func newHelmfileParams() *helmfileParams {
 	}
 }
 
+// CleanOutputDirectory cleans the output directory before rendering
+func (r *ConfigRepo) CleanOutputDirectoryIfEnabled() error {
+	if r.stdout {
+		// No need to clean output directory if we're rendering to stdout
+		return nil
+	}
+
+	if _, err := os.Stat(r.outputDir); os.IsNotExist(err) {
+		// Output dir does not exist, nothing to clean up
+		return nil
+	}
+
+	// Delete any files that exist inside the output directory.
+	log.Debug().Msgf("Cleaning output directory: %s", r.outputDir)
+
+	// This code would be simpler if we could just call os.RemoveAll() on the
+	// output directory itself, but in some cases the output directory is a volume
+	// mount, and trying to remove it throws an error.
+	dir, err := ioutil.ReadDir(r.outputDir)
+	if err != nil {
+		return err
+	}
+
+	for _, file := range dir {
+		filePath := path.Join([]string{r.outputDir, file.Name()}...)
+		log.Debug().Msgf("Deleting %s", filePath)
+
+		err = os.RemoveAll(filePath)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+
+// TODO: move to chart cache
 // HelmUpdate updates Helm repos
 func (r *ConfigRepo) HelmUpdate() error {
 	log.Debug().Msg("Updating Helm repos...")
@@ -94,23 +139,12 @@ func (r *ConfigRepo) HelmUpdate() error {
 }
 
 // RenderToStdout renders to stdout
-func (r *ConfigRepo) RenderToStdout(target target.ReleaseTarget, helmfileArgs *Args) error {
+func (r *ConfigRepo) Render(target target.ReleaseTarget, helmfileArgs *Args) error {
 	return r.renderSingleTarget(target, helmfileArgs)
 }
 
-// RenderToDir renders manfiests into a target directory (the directory will be created if it does not exist)
-func (r *ConfigRepo) RenderToDir(target target.ReleaseTarget, outputDir string, helmfileArgs *Args) error {
-	outputDirFlag := fmt.Sprintf("--output-dir=%s", outputDir)
-
-	if err := r.renderSingleTarget(target, helmfileArgs, outputDirFlag); err != nil {
-		return err
-	}
-
-	return normalizeOutputDir(outputDir)
-}
-
 // renderSingleTarget renders manifests for a single environment or cluster
-func (r *ConfigRepo) renderSingleTarget(target target.ReleaseTarget, args *Args, extraArgs ...string) error {
+func (r *ConfigRepo) renderSingleTarget(target target.ReleaseTarget, args *Args) error {
 	log.Info().Msgf("Rendering manifests for %s %s", target.Type(), target.Name())
 
 	// Take given helmfileArgs and translate them to helmfile parameters (selectors, state values & env vars)
@@ -145,7 +179,11 @@ func (r *ConfigRepo) renderSingleTarget(target target.ReleaseTarget, args *Args,
 		cliArgs = append(cliArgs, fmt.Sprintf("--values=%s", strings.Join(args.ValuesFiles, ",")))
 	}
 
-	cliArgs = append(cliArgs, extraArgs...)
+	if !r.stdout {
+		outputDir := path.Join(r.outputDir, target.Name())
+		outputDirFlag := fmt.Sprintf("--output-dir=%s", outputDir)
+		cliArgs = append(cliArgs, outputDirFlag)
+	}
 
 	return r.runHelmfile(params.envVars, cliArgs...)
 }

@@ -6,7 +6,7 @@ import (
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/cli/builders"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/cli/printing"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/cli/views"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/versions"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/gitops/versions"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )

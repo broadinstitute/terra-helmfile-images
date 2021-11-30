@@ -1,7 +1,8 @@
 package source
 
 import (
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/versions"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/gitops/release"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/gitops/versions"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
 	"os"
@@ -21,8 +22,8 @@ type AutoReleaser interface {
 type config struct {
 	Enabled bool `yaml:"enabled"` // whether updates to this chart should be added to release train. defaults to true
 	Release struct {
-		Name string               `yaml:"name"` // name of the "release", defaults to chart name
-		Type versions.ReleaseType `yaml:"type"` // either "app" or "cluster", defaults to app
+		Name string              `yaml:"name"` // name of the "release", defaults to chart name
+		Type release.ReleaseType `yaml:"type"` // either "app" or "cluster", defaults to app
 	} `yaml:"release"`
 }
 
@@ -57,7 +58,7 @@ func loadConfig(chart Chart) config {
 	// Set defaults
 	cfg.Enabled = true
 	cfg.Release.Name = chart.Name()
-	cfg.Release.Type = versions.AppRelease
+	cfg.Release.Type = release.AppType
 
 	file := path.Join(chart.Path(), configFile)
 	_, err := os.Stat(file)

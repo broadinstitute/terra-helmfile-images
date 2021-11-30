@@ -1,4 +1,4 @@
-package versions
+package release
 
 import (
 	"fmt"
@@ -9,8 +9,8 @@ import (
 type ReleaseType int
 
 const (
-	AppRelease ReleaseType = iota
-	ClusterRelease
+	AppType ReleaseType = iota
+	ClusterType
 )
 
 // UnmarshalYAML is a custom unmarshaler so that the string "app" or "cluster" in a
@@ -18,10 +18,10 @@ const (
 func (r *ReleaseType) UnmarshalYAML(value *yaml.Node) error {
 	switch value.Value {
 	case "app":
-		*r = AppRelease
+		*r = AppType
 		return nil
 	case "cluster":
-		*r = ClusterRelease
+		*r = ClusterType
 		return nil
 	}
 
@@ -30,9 +30,9 @@ func (r *ReleaseType) UnmarshalYAML(value *yaml.Node) error {
 
 func (r ReleaseType) String() string {
 	switch r {
-	case AppRelease:
+	case AppType:
 		return "app"
-	case ClusterRelease:
+	case ClusterType:
 		return "cluster"
 	}
 	return "unknown"

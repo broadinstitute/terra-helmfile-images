@@ -3,6 +3,7 @@ package versions
 import (
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shellmock"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/gitops/release"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gopkg.in/yaml.v3"
@@ -47,7 +48,7 @@ func TestSnapshot_ChartVersion(t *testing.T) {
 	}
 
 	v := NewVersions(thelmaHome, runner)
-	s, err := v.LoadSnapshot(AppRelease, Dev)
+	s, err := v.LoadSnapshot(release.AppType, Dev)
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
@@ -67,7 +68,7 @@ func TestSnapshot_UpdateChartVersionIfDefined(t *testing.T) {
 		name          string
 		releaseName   string
 		newVersion    string
-		releaseType   ReleaseType
+		releaseType   release.ReleaseType
 		set           Set
 		expectedError string
 		setupMocks    func(testMocks)
@@ -76,7 +77,7 @@ func TestSnapshot_UpdateChartVersionIfDefined(t *testing.T) {
 			name:        "should set agora version in versions/app/dev.yaml",
 			releaseName: "agora",
 			newVersion:  "1.2.3",
-			releaseType: AppRelease,
+			releaseType: release.AppType,
 			set:         Dev,
 			setupMocks: func(tm testMocks) {
 				tm.runner.ExpectCmd(shell.Command{
@@ -98,7 +99,7 @@ func TestSnapshot_UpdateChartVersionIfDefined(t *testing.T) {
 			name:        "should set prometheus version in versions/cluster/alpha.yaml",
 			releaseName: "prometheus",
 			newVersion:  "4.5.6",
-			releaseType: ClusterRelease,
+			releaseType: release.ClusterType,
 			set:         Alpha,
 			setupMocks: func(tm testMocks) {
 				tm.runner.ExpectCmd(shell.Command{
@@ -120,7 +121,7 @@ func TestSnapshot_UpdateChartVersionIfDefined(t *testing.T) {
 			name:        "should NOT version for undefined release",
 			releaseName: "fakechart",
 			newVersion:  "1.2.3",
-			releaseType: AppRelease,
+			releaseType: release.AppType,
 			set:         Dev,
 		},
 	}
@@ -155,21 +156,21 @@ func TestSnapshot_UpdateChartVersionIfDefined(t *testing.T) {
 }
 
 func TestReleaseType_String(t *testing.T) {
-	assert.Equal(t, "app", AppRelease.String())
-	assert.Equal(t, "cluster", ClusterRelease.String())
+	assert.Equal(t, "app", release.AppType.String())
+	assert.Equal(t, "cluster", release.ClusterType.String())
 }
 
 func TestReleaseType_UnmarshalYAML(t *testing.T) {
 	var err error
-	var r ReleaseType
+	var r release.ReleaseType
 
 	err = yaml.Unmarshal([]byte("app"), &r)
 	assert.NoError(t, err)
-	assert.Equal(t, AppRelease, r)
+	assert.Equal(t, release.AppType, r)
 
 	err = yaml.Unmarshal([]byte("cluster"), &r)
 	assert.NoError(t, err)
-	assert.Equal(t, ClusterRelease, r)
+	assert.Equal(t, release.ClusterType, r)
 
 	err = yaml.Unmarshal([]byte("invalid"), &r)
 	assert.Error(t, err)

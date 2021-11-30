@@ -5,7 +5,7 @@ import (
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/dependency"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/publish"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/versions"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/gitops/versions"
 	"github.com/rs/zerolog/log"
 	"path"
 	"path/filepath"

@@ -3,12 +3,9 @@ package render
 import (
 	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/app"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/gitops/target"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render/helmfile"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render/target"
 	"github.com/rs/zerolog/log"
-	"io/ioutil"
-	"os"
-	"path"
 	"strings"
 	"sync"
 	"time"
@@ -19,11 +16,11 @@ const multiRenderTimeout = 5 * time.Minute
 
 // Options encapsulates CLI options for a render
 type Options struct {
-	Env             *string // Env If supplied, render for a single environment instead of all targets
-	Cluster         *string // Cluster If supplied, render for a single cluster instead of all targets
-	OutputDir       string  // OutputDir Output directory where manifests should be rendered
-	Stdout          bool    // Stdout Render to stdout instead of output directory
-	ParallelWorkers int     // ParallelWorkers Number of parallel workers
+	Env             *string  // Env If supplied, render for a single environment instead of all targets
+	Cluster         *string  // Cluster If supplied, render for a single cluster instead of all targets
+	Stdout     		 bool    // Stdout if true, render to stdout instead of output directory
+	OutputDir        string  // Output directory where manifests should be rendered
+	ParallelWorkers int      // ParallelWorkers Number of parallel workers
 }
 
 // multiRender renders manifests for multiple environments and clusters
@@ -46,7 +43,7 @@ func DoRender(app *app.ThelmaApp, globalOptions *Options, helmfileArgs *helmfile
 	if err != nil {
 		return err
 	}
-	if err = r.cleanOutputDirectory(); err != nil {
+	if err = r.configRepo.CleanOutputDirectoryIfEnabled(); err != nil {
 		return err
 	}
 	if err = r.configRepo.HelmUpdate(); err != nil {
@@ -78,6 +75,8 @@ func newRender(app *app.ThelmaApp, options *Options) (*multiRender, error) {
 		Path:             app.Config.Home(),
 		ChartCacheDir:    chartCacheDir,
 		HelmfileLogLevel: app.Config.LogLevel(),
+		Stdout: options.Stdout,
+		OutputDir: options.OutputDir,
 		ShellRunner:      app.ShellRunner,
 	})
 
@@ -163,48 +162,7 @@ func (r *multiRender) renderAll(helmfileArgs *helmfile.Args) error {
 
 // RenderAll renders manifests based on supplied arguments
 func (r *multiRender) renderSingleTarget(helmfileArgs *helmfile.Args, releaseTarget target.ReleaseTarget) error {
-	if r.options.Stdout {
-		return r.configRepo.RenderToStdout(releaseTarget, helmfileArgs)
-	}
-
-	outputDir := path.Join(r.options.OutputDir, releaseTarget.Name())
-	return r.configRepo.RenderToDir(releaseTarget, outputDir, helmfileArgs)
-}
-
-// cleanOutputDirectory removes any old files from output directory
-func (r *multiRender) cleanOutputDirectory() error {
-	if r.options.Stdout {
-		// No need to clean output directory if we're rendering to stdout
-		return nil
-	}
-
-	if _, err := os.Stat(r.options.OutputDir); os.IsNotExist(err) {
-		// Output dir does not exist, nothing to clean up
-		return nil
-	}
-
-	// Delete any files that exist inside the output directory.
-	log.Debug().Msgf("Cleaning output directory: %s", r.options.OutputDir)
-
-	// This code would be simpler if we could just call os.RemoveAll() on the
-	// output directory itself, but in some cases the output directory is a volume
-	// mount, and trying to remove it throws an error.
-	dir, err := ioutil.ReadDir(r.options.OutputDir)
-	if err != nil {
-		return err
-	}
-
-	for _, file := range dir {
-		filePath := path.Join([]string{r.options.OutputDir, file.Name()}...)
-		log.Debug().Msgf("Deleting %s", filePath)
-
-		err = os.RemoveAll(filePath)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return r.configRepo.Render(releaseTarget, helmfileArgs)
 }
 
 // getTargets returns the set of release targets to render manifests for

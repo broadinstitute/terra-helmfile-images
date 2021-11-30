@@ -1,6 +1,9 @@
 package versions
 
-import "github.com/stretchr/testify/mock"
+import (
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/gitops/release"
+	"github.com/stretchr/testify/mock"
+)
 
 type MockVersions struct {
 	mock.Mock
@@ -10,7 +13,7 @@ func NewMockVersions() *MockVersions {
 	return &MockVersions{}
 }
 
-func (v *MockVersions) LoadSnapshot(releaseType ReleaseType, versionSet Set) (Snapshot, error) {
+func (v *MockVersions) LoadSnapshot(releaseType release.ReleaseType, versionSet Set) (Snapshot, error) {
 	result := v.Called(releaseType, versionSet)
 	return result.Get(0).(Snapshot), result.Error(1)
 }

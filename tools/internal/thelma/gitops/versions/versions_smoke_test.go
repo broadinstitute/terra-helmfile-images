@@ -5,6 +5,7 @@ package versions
 
 import (
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/gitops/release"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -22,7 +23,7 @@ func TestSnapshot_UpdateChartVersionIfDefined_Smoke(t *testing.T) {
 	}
 
 	// load the snapshot
-	_snapshot, err := _versions.LoadSnapshot(AppRelease, Dev)
+	_snapshot, err := _versions.LoadSnapshot(release.AppType, Dev)
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}

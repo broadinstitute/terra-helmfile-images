@@ -3,13 +3,13 @@
 set -eo pipefail
 
 # This variable is expected by the render tool
-if [[ -z "${TERRA_HELMFILE_PATH}" ]]; then
-  echo "${TERRA_HELMFILE_PATH} is required" >&2
+if [[ -z "${THELMA_HOME}" ]]; then
+  echo "env var ${THELMA_HOME} is required" >&2
   exit 1
 fi
 
 if [[ -z "${OUTPUT_DIR}" ]]; then
-  echo "${OUTPUT_DIR} is required" >&2
+  echo "env var OUTPUT_DIR is required" >&2
   exit 1
 fi
 

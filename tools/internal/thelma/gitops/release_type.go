@@ -1,4 +1,4 @@
-package release
+package gitops
 
 import (
 	"fmt"
@@ -9,19 +9,34 @@ import (
 type ReleaseType int
 
 const (
-	AppType ReleaseType = iota
-	ClusterType
+	AppReleaseType ReleaseType = iota
+	ClusterReleaseType
 )
+
+func ReleaseTypes() []ReleaseType {
+	return []ReleaseType{AppReleaseType, ClusterReleaseType}
+}
+
+// Returns 0 if r == other, -1 if r < other, or +1 if r > other.
+func (r ReleaseType) Compare(other ReleaseType) int {
+	if r == other {
+		return 0
+	}
+	if r == AppReleaseType {
+		return -1
+	}
+	return 1
+}
 
 // UnmarshalYAML is a custom unmarshaler so that the string "app" or "cluster" in a
 // yaml file can be unmarshaled into a ReleaseType
 func (r *ReleaseType) UnmarshalYAML(value *yaml.Node) error {
 	switch value.Value {
 	case "app":
-		*r = AppType
+		*r = AppReleaseType
 		return nil
 	case "cluster":
-		*r = ClusterType
+		*r = ClusterReleaseType
 		return nil
 	}
 
@@ -30,9 +45,9 @@ func (r *ReleaseType) UnmarshalYAML(value *yaml.Node) error {
 
 func (r ReleaseType) String() string {
 	switch r {
-	case AppType:
+	case AppReleaseType:
 		return "app"
-	case ClusterType:
+	case ClusterReleaseType:
 		return "cluster"
 	}
 	return "unknown"

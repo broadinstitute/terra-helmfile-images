@@ -120,9 +120,9 @@ func TestNormalizeOutputDir(t *testing.T) {
 
 	// Create some fake helmfile output directories
 	manifestDirs := []string{
-		"helmfile-b47efc70-leonardo",
-		"helmfile-a14e02c1-cromwell",
-		"this-should-not-match",
+		"helmfile-b47efc70-leonardo/leonardo",
+		"helmfile-a14e02c1-cromwell/cromwell",
+		"this-should-not-match/ignored",
 	}
 
 	for _, manifestDir := range manifestDirs {

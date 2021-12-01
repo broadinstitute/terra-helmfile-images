@@ -1,9 +1,9 @@
-package versions
+package gitops
 
 import (
+	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shellmock"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/gitops/release"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gopkg.in/yaml.v3"
@@ -12,27 +12,15 @@ import (
 	"testing"
 )
 
-const appDevSnapshotInitialContent = `
+const updateContent1 = `
 releases:
   agora:
-    appVersion: ignored # Doesn't matter
-    chartVersion: 0.0.0
-`
-
-const appDevSnapshotUpdatedContent = `
-releases:
-  agora:
-    appVersion: ignored # Doesn't matter
+    appVersion: v100
     chartVersion: 1.2.3
 `
 
-const clusterAlphaSnapshotInitialContent = `
-releases:
-  prometheus:
-    chartVersion: 0.1.2
-`
 
-const clusterAlphaSnapshotUpdatedContent = `
+const updateContent2 = `
 releases:
   prometheus:
     chartVersion: 4.5.6
@@ -47,14 +35,21 @@ func TestSnapshot_ChartVersion(t *testing.T) {
 		t.FailNow()
 	}
 
-	v := NewVersions(thelmaHome, runner)
-	s, err := v.LoadSnapshot(release.AppType, Dev)
+	v, err := NewVersions(thelmaHome, runner)
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
 
-	assert.True(t, s.ReleaseDefined("agora"))
-	assert.Equal(t, "0.0.0", s.ChartVersion("agora"))
+	s1 := v.GetSnapshot(AppReleaseType, Dev)
+
+	assert.True(t, s1.ReleaseDefined("agora"))
+	assert.Equal(t, "0.10.0", s1.ChartVersion("agora"))
+	assert.Equal(t, "v100", s1.AppVersion("agora"))
+
+	s2 := v.GetSnapshot(ClusterReleaseType, Alpha)
+	assert.True(t, s2.ReleaseDefined("prometheus"))
+	assert.Equal(t, "0.1.3", s2.ChartVersion("prometheus"))
+	assert.Equal(t, "", s2.AppVersion("prometheus"))
 
 	runner.AssertExpectations(t)
 }
@@ -68,8 +63,8 @@ func TestSnapshot_UpdateChartVersionIfDefined(t *testing.T) {
 		name          string
 		releaseName   string
 		newVersion    string
-		releaseType   release.ReleaseType
-		set           Set
+		releaseType   ReleaseType
+		set           VersionSet
 		expectedError string
 		setupMocks    func(testMocks)
 	}{
@@ -77,7 +72,7 @@ func TestSnapshot_UpdateChartVersionIfDefined(t *testing.T) {
 			name:        "should set agora version in versions/app/dev.yaml",
 			releaseName: "agora",
 			newVersion:  "1.2.3",
-			releaseType: release.AppType,
+			releaseType: AppReleaseType,
 			set:         Dev,
 			setupMocks: func(tm testMocks) {
 				tm.runner.ExpectCmd(shell.Command{
@@ -89,7 +84,7 @@ func TestSnapshot_UpdateChartVersionIfDefined(t *testing.T) {
 						path.Join(tm.thelmaHome, "versions/app/dev.yaml"),
 					},
 				}).Run(func(args mock.Arguments) {
-					if err := writeFakeAppDevVersionsFile(tm.thelmaHome, appDevSnapshotUpdatedContent); err != nil {
+					if err := writeFakeVersionsFile(tm.thelmaHome, AppReleaseType, Dev, updateContent1); err != nil {
 						t.Fatal(err)
 					}
 				})
@@ -99,7 +94,7 @@ func TestSnapshot_UpdateChartVersionIfDefined(t *testing.T) {
 			name:        "should set prometheus version in versions/cluster/alpha.yaml",
 			releaseName: "prometheus",
 			newVersion:  "4.5.6",
-			releaseType: release.ClusterType,
+			releaseType: ClusterReleaseType,
 			set:         Alpha,
 			setupMocks: func(tm testMocks) {
 				tm.runner.ExpectCmd(shell.Command{
@@ -111,7 +106,7 @@ func TestSnapshot_UpdateChartVersionIfDefined(t *testing.T) {
 						path.Join(tm.thelmaHome, "versions/cluster/alpha.yaml"),
 					},
 				}).Run(func(args mock.Arguments) {
-					if err := writeFakeClusterAlphaVersionsFile(tm.thelmaHome, clusterAlphaSnapshotUpdatedContent); err != nil {
+					if err := writeFakeVersionsFile(tm.thelmaHome, ClusterReleaseType, Alpha, updateContent2); err != nil {
 						t.Fatal(err)
 					}
 				})
@@ -121,7 +116,7 @@ func TestSnapshot_UpdateChartVersionIfDefined(t *testing.T) {
 			name:        "should NOT version for undefined release",
 			releaseName: "fakechart",
 			newVersion:  "1.2.3",
-			releaseType: release.AppType,
+			releaseType: AppReleaseType,
 			set:         Dev,
 		},
 	}
@@ -131,9 +126,12 @@ func TestSnapshot_UpdateChartVersionIfDefined(t *testing.T) {
 			thelmaHome: t.TempDir(),
 			runner:     shellmock.DefaultMockRunner(),
 		}
-		_versions := NewVersions(mocks.thelmaHome, mocks.runner)
-
 		err := initializeFakeVersionsDir(mocks.thelmaHome)
+		if !assert.NoError(t, err) {
+			t.FailNow()
+		}
+
+		_versions, err := NewVersions(mocks.thelmaHome, mocks.runner)
 		if !assert.NoError(t, err) {
 			t.FailNow()
 		}
@@ -142,7 +140,7 @@ func TestSnapshot_UpdateChartVersionIfDefined(t *testing.T) {
 			tc.setupMocks(mocks)
 		}
 
-		_snapshot, err := _versions.LoadSnapshot(tc.releaseType, tc.set)
+		_snapshot := _versions.GetSnapshot(tc.releaseType, tc.set)
 		assert.NoError(t, err)
 		err = _snapshot.UpdateChartVersionIfDefined(tc.releaseName, tc.newVersion)
 
@@ -156,21 +154,21 @@ func TestSnapshot_UpdateChartVersionIfDefined(t *testing.T) {
 }
 
 func TestReleaseType_String(t *testing.T) {
-	assert.Equal(t, "app", release.AppType.String())
-	assert.Equal(t, "cluster", release.ClusterType.String())
+	assert.Equal(t, "app", AppReleaseType.String())
+	assert.Equal(t, "cluster", ClusterReleaseType.String())
 }
 
 func TestReleaseType_UnmarshalYAML(t *testing.T) {
 	var err error
-	var r release.ReleaseType
+	var r ReleaseType
 
 	err = yaml.Unmarshal([]byte("app"), &r)
 	assert.NoError(t, err)
-	assert.Equal(t, release.AppType, r)
+	assert.Equal(t, AppReleaseType, r)
 
 	err = yaml.Unmarshal([]byte("cluster"), &r)
 	assert.NoError(t, err)
-	assert.Equal(t, release.ClusterType, r)
+	assert.Equal(t, ClusterReleaseType, r)
 
 	err = yaml.Unmarshal([]byte("invalid"), &r)
 	assert.Error(t, err)
@@ -183,36 +181,19 @@ func TestMocks_MatchInterface(t *testing.T) {
 
 	// make sure interfaces match -- compilation will fail if they don't
 	var _ Versions = v
-	var _ Snapshot = s
+	var _ VersionSnapshot = s
 }
 
 func initializeFakeVersionsDir(thelmaHome string) error {
-	if err := writeFakeAppDevVersionsFile(thelmaHome, appDevSnapshotInitialContent); err != nil {
-		return err
+	runner := shell.NewDefaultRunner()
+	cmd := shell.Command{
+		Prog: "cp",
+		Args: []string{"-r", "testdata/versions", path.Join(thelmaHome, "versions")},
 	}
-	if err := writeFakeClusterAlphaVersionsFile(thelmaHome, clusterAlphaSnapshotInitialContent); err != nil {
-		return err
-	}
-
-	return nil
+	return runner.Run(cmd)
 }
 
-func writeFakeAppDevVersionsFile(thelmaHome string, content string) error {
-	file := path.Join(thelmaHome, versionsDir, "app", "dev.yaml")
-	return writeFakeVersionsFile(file, content)
-}
-
-func writeFakeClusterAlphaVersionsFile(thelmaHome string, content string) error {
-	file := path.Join(thelmaHome, versionsDir, "cluster", "alpha.yaml")
-	return writeFakeVersionsFile(file, content)
-}
-
-func writeFakeVersionsFile(fileName string, content string) error {
-	if err := os.MkdirAll(path.Dir(fileName), 0755); err != nil {
-		return err
-	}
-	if err := os.WriteFile(fileName, []byte(content), 0644); err != nil {
-		return err
-	}
-	return nil
+func writeFakeVersionsFile(thelmaHome string, releaseType ReleaseType, set VersionSet, content string) error {
+	file := path.Join(thelmaHome, "versions", releaseType.String(), fmt.Sprintf("%s%s", set.String(), ".yaml"))
+	return os.WriteFile(file, []byte(content), 0666)
 }

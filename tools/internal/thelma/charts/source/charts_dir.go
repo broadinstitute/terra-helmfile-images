@@ -5,7 +5,7 @@ import (
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/dependency"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/publish"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/gitops/versions"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/gitops"
 	"github.com/rs/zerolog/log"
 	"path"
 	"path/filepath"
@@ -29,7 +29,7 @@ type ChartsDir interface {
 func NewChartsDir(
 	sourceDir string,
 	publisher publish.Publisher,
-	versions versions.Versions,
+	versions gitops.Versions,
 	shellRunner shell.Runner,
 ) (ChartsDir, error) {
 

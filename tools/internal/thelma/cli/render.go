@@ -182,6 +182,11 @@ func (cli *renderCLI) fillRenderOptions() error {
 		renderOptions.Cluster = &flagVals.cluster
 	}
 
+	// release name
+	if flags.Changed(renderFlagNames.release) {
+		renderOptions.Release = &flagVals.release
+	}
+
 	// output dir
 	if flags.Changed(renderFlagNames.outputDir) {
 		dir, err := filepath.Abs(flagVals.outputDir)
@@ -208,11 +213,6 @@ func (cli *renderCLI) fillHelmfileArgs() error {
 	flags := cli.cobraCommand.Flags()
 	flagVals := cli.flagVals
 	helmfileArgs := cli.helmfileArgs
-
-	// release name
-	if flags.Changed(renderFlagNames.release) {
-		helmfileArgs.ReleaseName = &flagVals.release
-	}
 
 	// chart version
 	if flags.Changed(renderFlagNames.chartVersion) {
@@ -274,11 +274,6 @@ func (cli *renderCLI) checkIncompatibleFlags() error {
 
 	if flags.Changed(renderFlagNames.env) && flags.Changed(renderFlagNames.cluster) {
 		return fmt.Errorf("only one of --%s or --%s may be specified", renderFlagNames.env, renderFlagNames.cluster)
-	}
-
-	if flags.Changed(renderFlagNames.release) && !(flags.Changed(renderFlagNames.env) || flags.Changed(renderFlagNames.cluster)) {
-		// Not all targets include all charts, so require users to specify target env or cluster when -r / -a is passed in
-		return fmt.Errorf("an environment (--%s) or cluster (--%s) must be specified when a release is specified with --%s", renderFlagNames.env, renderFlagNames.cluster, renderFlagNames.release)
 	}
 
 	if flags.Changed(renderFlagNames.chartDir) {

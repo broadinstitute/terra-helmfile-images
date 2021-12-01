@@ -1,0 +1,14 @@
+stringVal: file2
+
+onlyInFile2Bool: true
+
+nested:
+  levelOne:
+    levelTwo:
+      keyA: file2
+      keyB: file2
+      keyD: file2
+      keyE: file2
+
+map:
+  keyB: file2

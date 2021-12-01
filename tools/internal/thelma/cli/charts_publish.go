@@ -6,7 +6,7 @@ import (
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/cli/builders"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/cli/printing"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/cli/views"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/gitops/versions"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/gitops"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
@@ -107,7 +107,10 @@ func publishCharts(options *chartsPublishOptions, app *app.ThelmaApp) ([]views.C
 	defer pb.CloseWarn()
 	publisher := pb.Publisher()
 
-	_versions := versions.NewVersions(app.Config.Home(), app.ShellRunner)
+	_versions, err := gitops.NewVersions(app.Config.Home(), app.ShellRunner)
+	if err != nil {
+		return nil, err
+	}
 
 	chartsDir, err := source.NewChartsDir(options.chartDir, publisher, _versions, app.ShellRunner)
 	if err != nil {

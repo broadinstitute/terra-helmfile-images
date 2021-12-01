@@ -1,7 +1,6 @@
-package versions
+package gitops
 
 import (
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/gitops/release"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -13,9 +12,9 @@ func NewMockVersions() *MockVersions {
 	return &MockVersions{}
 }
 
-func (v *MockVersions) LoadSnapshot(releaseType release.ReleaseType, versionSet Set) (Snapshot, error) {
+func (v *MockVersions) GetSnapshot(releaseType ReleaseType, versionSet VersionSet) VersionSnapshot {
 	result := v.Called(releaseType, versionSet)
-	return result.Get(0).(Snapshot), result.Error(1)
+	return result.Get(0).(VersionSnapshot)
 }
 
 type MockSnapshot struct {
@@ -31,6 +30,10 @@ func (s *MockSnapshot) ReleaseDefined(releaseName string) bool {
 }
 
 func (s *MockSnapshot) ChartVersion(releaseName string) string {
+	return s.Called(releaseName).String(0)
+}
+
+func (s *MockSnapshot) AppVersion(releaseName string) string {
 	return s.Called(releaseName).String(0)
 }
 

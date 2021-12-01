@@ -3,7 +3,7 @@ package helmfile
 import (
 	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/gitops/target"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/gitops"
 	"github.com/rs/zerolog/log"
 	"io/ioutil"
 	"os"
@@ -39,7 +39,6 @@ const localChartVersion = "local"
 
 // Args arguments for a helmfile render
 type Args struct {
-	ReleaseName  *string  // ReleaseName optionally render for specific release only instead of all releases in target environment/cluster
 	ChartVersion *string  // ChartVersion optionally override chart version
 	AppVersion   *string  // AppVersion optionally override application version (container image)
 	ChartDir     *string  // ChartDir optionally render chart from the given directory instead of the given release
@@ -130,7 +129,6 @@ func (r *ConfigRepo) CleanOutputDirectoryIfEnabled() error {
 	return nil
 }
 
-
 // TODO: move to chart cache
 // HelmUpdate updates Helm repos
 func (r *ConfigRepo) HelmUpdate() error {
@@ -138,22 +136,44 @@ func (r *ConfigRepo) HelmUpdate() error {
 	return r.runHelmfile([]string{}, "--allow-no-matching-release", "repos")
 }
 
-// RenderToStdout renders to stdout
-func (r *ConfigRepo) Render(target target.ReleaseTarget, helmfileArgs *Args) error {
-	return r.renderSingleTarget(target, helmfileArgs)
-}
+// Render renders manifests for the given target
+func (r *ConfigRepo) RenderGlobalTargetResources(target gitops.Target, helmfileArgs *Args) error {
+	if !helmfileArgs.ArgocdMode {
+		// nothing to do -- ArgoCD projects are the only global resources
+		return nil
+	}
+	outputDir := path.Join(r.outputDir, target.Name(), "terra-argocd-project")
 
-// renderSingleTarget renders manifests for a single environment or cluster
-func (r *ConfigRepo) renderSingleTarget(target target.ReleaseTarget, args *Args) error {
-	log.Info().Msgf("Rendering manifests for %s %s", target.Type(), target.Name())
-
-	// Take given helmfileArgs and translate them to helmfile parameters (selectors, state values & env vars)
 	params := newHelmfileParams()
 	params.setTargetEnvVars(target)
 	params.setChartCacheDirEnvVar(r.chartCacheDir)
-	params.applySelectorSettings(args)
-	params.applyVersionSettings(args)
+	params.applyTargetScopeSelectors(helmfileArgs)
 
+	log.Info().Msgf("Rendering manifests for argo project in %s", target.Name())
+
+	return r.renderWithParams(params, helmfileArgs, outputDir)
+}
+
+// Render renders manifests for the given target
+func (r *ConfigRepo) RenderRelease(release gitops.Release, helmfileArgs *Args) error {
+	dir := release.Name()
+	if helmfileArgs.ArgocdMode {
+		dir = fmt.Sprintf("terra-argocd-app-%s", release.Name())
+	}
+	outputDir := path.Join(r.outputDir, release.Target().Name(), dir)
+
+	params := newHelmfileParams()
+	params.setTargetEnvVars(release.Target())
+	params.setChartCacheDirEnvVar(r.chartCacheDir)
+	params.applyReleaseScopeSelectors(release.Name(), helmfileArgs)
+	params.applyVersionSettings(release.Name(), helmfileArgs)
+
+	log.Info().Msgf("Rendering manifests for release %s in %s", release.Name(), release.Target().Name())
+
+	return r.renderWithParams(params, helmfileArgs, outputDir)
+}
+
+func (r *ConfigRepo) renderWithParams(params *helmfileParams, args *Args, outputDir string) error {
 	// Convert helmfile parameters into cli arguments
 	var cliArgs []string
 
@@ -180,12 +200,22 @@ func (r *ConfigRepo) renderSingleTarget(target target.ReleaseTarget, args *Args)
 	}
 
 	if !r.stdout {
-		outputDir := path.Join(r.outputDir, target.Name())
 		outputDirFlag := fmt.Sprintf("--output-dir=%s", outputDir)
 		cliArgs = append(cliArgs, outputDirFlag)
 	}
 
-	return r.runHelmfile(params.envVars, cliArgs...)
+	err := r.runHelmfile(params.envVars, cliArgs...)
+	if err != nil {
+		return err
+	}
+
+	if !r.stdout {
+		if err := normalizeOutputDir(outputDir); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (r *ConfigRepo) runHelmfile(envVars []string, args ...string) error {
@@ -210,8 +240,8 @@ func (r *ConfigRepo) runHelmfile(envVars []string, args ...string) error {
 // setTargetEnvVars sets environment variables for the given target of environment variables
 // Eg.
 // {"TARGET_TYPE=environment", "TARGET_BASE=live", "TARGET_NAME=dev"}
-func (params *helmfileParams) setTargetEnvVars(t target.ReleaseTarget) {
-	params.addEnvVar(TargetTypeEnvVar, t.Type())
+func (params *helmfileParams) setTargetEnvVars(t gitops.Target) {
+	params.addEnvVar(TargetTypeEnvVar, t.Type().String())
 	params.addEnvVar(TargetBaseEnvVar, t.Base())
 	params.addEnvVar(TargetNameEnvVar, t.Name())
 }
@@ -223,35 +253,42 @@ func (params *helmfileParams) setChartCacheDirEnvVar(chartCacheDir string) {
 
 // applyVersionSettings updates params with necessary state values & environment variables, based on
 // the configured chart version, chart dir, & app version
-func (params *helmfileParams) applyVersionSettings(helmfileArgs *Args) {
-	if helmfileArgs.ChartDir != nil && helmfileArgs.ReleaseName != nil {
+func (params *helmfileParams) applyVersionSettings(releaseName string, helmfileArgs *Args) {
+	if helmfileArgs.ChartDir != nil {
 		params.addEnvVar(ChartSrcDirEnvVar, *helmfileArgs.ChartDir)
 
-		key := fmt.Sprintf("releases.%s.chartVersion", *helmfileArgs.ReleaseName)
+		key := fmt.Sprintf("releases.%s.chartVersion", releaseName)
 		params.stateValues[key] = localChartVersion
-	} else if helmfileArgs.ChartVersion != nil && helmfileArgs.ReleaseName != nil {
-		key := fmt.Sprintf("releases.%s.chartVersion", *helmfileArgs.ReleaseName)
+	} else if helmfileArgs.ChartVersion != nil {
+		key := fmt.Sprintf("releases.%s.chartVersion", releaseName)
 		params.stateValues[key] = *helmfileArgs.ChartVersion
 	}
 
-	if helmfileArgs.AppVersion != nil && helmfileArgs.ReleaseName != nil {
-		key := fmt.Sprintf("releases.%s.appVersion", *helmfileArgs.ReleaseName)
+	if helmfileArgs.AppVersion != nil  {
+		key := fmt.Sprintf("releases.%s.appVersion", releaseName)
 		params.stateValues[key] = *helmfileArgs.AppVersion
 	}
 }
 
-// applySelectorSettings populates selectors with correct values based on the ArgocdMode and Release arguments.
-func (params *helmfileParams) applySelectorSettings(helmfileArgs *Args) {
+// populates selectors with correct values based on the ArgocdMode and Release arguments.
+func (params *helmfileParams) applyReleaseScopeSelectors(releaseName string, helmfileArgs *Args) {
 	params.selectors["mode"] = "release"
 	if helmfileArgs.ArgocdMode {
 		// Render ArgoCD manifests instead of application manifests
 		params.selectors["mode"] = "argocd"
 	}
+	params.selectors["release"] = releaseName
+	params.selectors["scope"] = "release"
+}
 
-	if helmfileArgs.ReleaseName != nil {
-		// Render manifests for the given app only
-		params.selectors["release"] = *helmfileArgs.ReleaseName
+// populates selectors with correct values based on the ArgocdMode and Release arguments.
+func (params *helmfileParams) applyTargetScopeSelectors(helmfileArgs *Args) {
+	params.selectors["mode"] = "release"
+	if helmfileArgs.ArgocdMode {
+		// Render ArgoCD manifests instead of application manifests
+		params.selectors["mode"] = "argocd"
 	}
+	params.selectors["scope"] = "target"
 }
 
 // addEnvVar adds an env var key/value pair to the given params instance
@@ -259,6 +296,42 @@ func (params *helmfileParams) addEnvVar(name string, value string) {
 	params.envVars = append(params.envVars, fmt.Sprintf("%s=%s", name, value))
 }
 
+// Normalize output directories so they match what was produced by earlier iterations of the render tool.
+//
+// Old behavior
+// ------------
+// For regular releases:
+//  output/dev/helmfile-b47efc70-leonardo/leonardo
+//  ->
+//  output/dev/leonardo/leonardo
+//
+// For ArgoCD:
+//
+//  output/dev/helmfile-b47efc70-terra-argocd-app-leonardo/terra-argocd-app
+//  ->
+//  output/dev/terra-argocd-app-leonardo/terra-argocd-app
+//
+//  output/dev/helmfile-b47efc70-terra-argocd-project/terra-argocd-project
+//  ->
+//  output/dev/terra-argocd-project/terra-argocd-project
+//
+// New behavior
+// ------------
+// For regular releases:
+//  output/dev/leonardo/helmfile-b47efc70-leonardo/leonardo
+//  ->
+//  output/dev/leonardo/leonardo
+//
+// For ArgoCD:
+//
+//  output/dev/terra-argocd-app-leonardo/helmfile-b47efc70-terra-argocd-app-leonardo/terra-argocd-app
+//  ->
+//  output/dev/terra-argocd-app-leonardo/terra-argocd-app
+//
+//  output/dev/terra-argocd-project/helmfile-b47efc70-terra-argocd-project/terra-argocd-project
+//  ->
+//  output/dev/terra-argocd-project/terra-argocd-project
+//
 // normalizeOutputDir removes "helmfile-.*" directories from helmfile output paths.
 // this makes it possible to easily run diff -r on render outputs from different branches
 func normalizeOutputDir(outputDir string) error {
@@ -266,20 +339,19 @@ func normalizeOutputDir(outputDir string) error {
 		return err
 	}
 
-	glob := path.Join(outputDir, "helmfile-*")
+	glob := path.Join(outputDir, "helmfile-*", "*")
 	matches, err := filepath.Glob(glob)
 	if err != nil {
 		return fmt.Errorf("error globbing rendered templates %s: %v", glob, err)
 	}
 
 	for _, match := range matches {
-		releaseName, err := extractReleaseName(match)
-		if err != nil {
-			return err
-		}
-		dest := path.Join(outputDir, releaseName)
+		dest := path.Join(outputDir, path.Base(match))
 		log.Debug().Msgf("Renaming %s to %s", match, dest)
 		if err := os.Rename(match, dest); err != nil {
+			return err
+		}
+		if err := os.Remove(path.Dir(match)); err != nil {
 			return err
 		}
 	}
@@ -299,15 +371,4 @@ func joinKeyValuePairs(pairs map[string]string) string {
 	sort.Strings(tokens)
 
 	return strings.Join(tokens, ",")
-}
-
-// extractReleaseName given a path to helmfile output dir, return release name component
-// eg. extractReleaseName("helmfile-b47efc70-cromiam") -> "cromiam"
-func extractReleaseName(helmfileOutputDir string) (string, error) {
-	base := path.Base(helmfileOutputDir)
-	tokens := strings.SplitN(base, "-", 3)
-	if len(tokens) != 3 {
-		return "", fmt.Errorf("expected helmfile output dir in form helmfile-<id>-<releasename>, got %s", base)
-	}
-	return tokens[2], nil
 }

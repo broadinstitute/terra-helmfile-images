@@ -47,16 +47,6 @@ func TestRenderArgParsing(t *testing.T) {
 			expectedError: regexp.MustCompile("one or the other but not both"),
 		},
 		{
-			description:   "-a should require -e or -c",
-			arguments:     Args("render -a foo"),
-			expectedError: regexp.MustCompile(`an environment \(--env\) or cluster \(--cluster\) must be specified when a release is specified with --release`),
-		},
-		{
-			description:   "-r should require -e or -c",
-			arguments:     Args("render -r foo"),
-			expectedError: regexp.MustCompile(`an environment \(--env\) or cluster \(--cluster\) must be specified when a release is specified with --release`),
-		},
-		{
 			description:   "-e and -c incompatible",
 			arguments:     Args("render -c terra-perf -e dev"),
 			expectedError: regexp.MustCompile("only one of --env or --cluster may be specified"),
@@ -199,11 +189,20 @@ func TestRenderArgParsing(t *testing.T) {
 		},
 		{
 			description: "--release should set release name",
+			arguments:   Args("render --release leonardo"),
+			setupFn: func(tc *testConfig) error {
+				release := "leonardo"
+				tc.expected.renderOptions.Release = &release
+				return nil
+			},
+		},
+		{
+			description: "--release with env should set release name",
 			arguments:   Args("render -e dev --release leonardo"),
 			setupFn: func(tc *testConfig) error {
 				env, release := "dev", "leonardo"
 				tc.expected.renderOptions.Env = &env
-				tc.expected.helmfileArgs.ReleaseName = &release
+				tc.expected.renderOptions.Release = &release
 				return nil
 			},
 		},
@@ -213,7 +212,7 @@ func TestRenderArgParsing(t *testing.T) {
 			setupFn: func(tc *testConfig) error {
 				env, release, version := "dev", "leonardo", "1.2.3"
 				tc.expected.renderOptions.Env = &env
-				tc.expected.helmfileArgs.ReleaseName = &release
+				tc.expected.renderOptions.Release = &release
 				tc.expected.helmfileArgs.AppVersion = &version
 				return nil
 			},
@@ -224,7 +223,7 @@ func TestRenderArgParsing(t *testing.T) {
 			setupFn: func(tc *testConfig) error {
 				env, release, version := "dev", "leonardo", "4.5.6"
 				tc.expected.renderOptions.Env = &env
-				tc.expected.helmfileArgs.ReleaseName = &release
+				tc.expected.renderOptions.Release = &release
 				tc.expected.helmfileArgs.ChartVersion = &version
 				return nil
 			},
@@ -235,7 +234,7 @@ func TestRenderArgParsing(t *testing.T) {
 				chartDir := tc.t.TempDir()
 				env, release := "dev", "leonardo"
 				tc.expected.renderOptions.Env = &env
-				tc.expected.helmfileArgs.ReleaseName = &release
+				tc.expected.renderOptions.Release = &release
 				tc.expected.helmfileArgs.ChartDir = &chartDir
 				tc.thelmaCLI.setArgs(Args("render -e dev -r leonardo --chart-dir %s", chartDir))
 				return nil
@@ -253,7 +252,7 @@ func TestRenderArgParsing(t *testing.T) {
 				}
 
 				tc.expected.renderOptions.Env = &env
-				tc.expected.helmfileArgs.ReleaseName = &release
+				tc.expected.renderOptions.Release = &release
 				tc.expected.helmfileArgs.ValuesFiles = []string{valuesFile}
 
 				tc.thelmaCLI.setArgs(Args("render -e dev -r leonardo --values-file %s", valuesFile))
@@ -279,7 +278,7 @@ func TestRenderArgParsing(t *testing.T) {
 				}
 
 				tc.expected.renderOptions.Env = &env
-				tc.expected.helmfileArgs.ReleaseName = &release
+				tc.expected.renderOptions.Release = &release
 				tc.expected.helmfileArgs.ValuesFiles = valuesFiles
 
 				tc.thelmaCLI.setArgs(Args("render -e dev -r leonardo --values-file %s --values-file %s --values-file %s", valuesFiles[0], valuesFiles[1], valuesFiles[2]))

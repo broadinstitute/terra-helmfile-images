@@ -68,7 +68,7 @@ func (u *updater) UpdateIfNeeded(chartName string) (string, error) {
 
 	lock, alreadyUpdated := u.getUpdateLock(chartName)
 	if alreadyUpdated {
-		log.Debug().Msgf("source copy of chart %s was already updated, won't update again")
+		log.Debug().Msgf("source copy of chart %s was already updated, won't update again", chartName)
 		return chart.Path(), nil
 	}
 

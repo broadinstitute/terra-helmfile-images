@@ -190,7 +190,7 @@ func (r *ConfigRepo) renderArgocdApplicationManifests(release gitops.Release) er
 func (r *ConfigRepo) renderApplicationManifests(release gitops.Release, args *Args) error {
 	chartVersion := release.ChartVersion()
 	if args.ChartVersion != nil {
-		log.Warn().Msgf("Overriding default chart version for %s with %s", chartVersion, args.ChartVersion)
+		log.Warn().Msgf("Overriding default chart version for %s with %s", chartVersion, *args.ChartVersion)
 		chartVersion = *args.ChartVersion
 	}
 
@@ -222,7 +222,7 @@ func (r *ConfigRepo) renderApplicationManifests(release gitops.Release, args *Ar
 	if release.Type() == gitops.AppReleaseType {
 		appVersion := release.(gitops.AppRelease).AppVersion()
 		if args.AppVersion != nil {
-			log.Warn().Msgf("Overriding default app version %s with %s", appVersion, args.AppVersion)
+			log.Warn().Msgf("Overriding default app version %s with %s", appVersion, *args.AppVersion)
 			appVersion = *args.AppVersion
 		}
 		cmd.setAppVersionEnvVar(appVersion)

@@ -11,15 +11,15 @@ const defaultFormat = "yaml"
 const stdoutFlagVal = "(stdout)"
 
 var flagNames = struct {
-	outputFile string
+	outputFile   string
 	outputFormat string
 }{
-	outputFile: "output-file",
+	outputFile:   "output-file",
 	outputFormat: "output-format",
 }
 
 type options struct {
-	outputFile string
+	outputFile   string
 	outputFormat string
 }
 
@@ -69,5 +69,5 @@ func printToStdout(data []byte, stdout io.Writer) error {
 }
 
 func printToFile(data []byte, filename string) error {
-	return os.WriteFile(filename, data,0666)
+	return os.WriteFile(filename, data, 0666)
 }

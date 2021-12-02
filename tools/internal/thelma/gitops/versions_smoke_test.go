@@ -1,7 +1,7 @@
 //go:build smoke
 // +build smoke
 
-package versions
+package gitops
 
 import (
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
@@ -12,9 +12,15 @@ import (
 func TestSnapshot_UpdateChartVersionIfDefined_Smoke(t *testing.T) {
 	thelmaHome := t.TempDir()
 	runner := shell.NewDefaultRunner()
-	_versions := NewVersions(thelmaHome, runner).(*versions)
 
 	var err error
+
+	v, err := NewVersions(thelmaHome, runner)
+	if !assert.NoError(t, err) {
+		t.Fail()
+	}
+
+	_versions := v.(*versions)
 
 	err = initializeFakeVersionsDir(thelmaHome)
 	if !assert.NoError(t, err) {
@@ -22,7 +28,7 @@ func TestSnapshot_UpdateChartVersionIfDefined_Smoke(t *testing.T) {
 	}
 
 	// load the snapshot
-	_snapshot, err := _versions.LoadSnapshot(AppRelease, Dev)
+	_snapshot := _versions.GetSnapshot(AppReleaseType, Dev)
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}

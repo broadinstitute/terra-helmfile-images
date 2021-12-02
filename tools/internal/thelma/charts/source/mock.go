@@ -42,3 +42,7 @@ func (c *MockChart) LocalDependencies() []string {
 func (c *MockChart) SetDependencyVersion(dependencyName string, newVersion string) error {
 	return c.Called(dependencyName, newVersion).Error(0)
 }
+
+func (c *MockChart) ManifestVersion() string {
+	return c.Called().String(0)
+}

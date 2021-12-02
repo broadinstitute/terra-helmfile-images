@@ -1,4 +1,4 @@
-package versions
+package gitops
 
 import (
 	"fmt"
@@ -10,11 +10,13 @@ import (
 	"os"
 )
 
-type Snapshot interface {
+type VersionSnapshot interface {
 	// ReleaseDefined returns true if the given release is defined in this snapshot
 	ReleaseDefined(releaseName string) bool
 	// ChartVersion returns the chartVersion for the given release in this snapshot. If the release is not defined, returns ""
 	ChartVersion(releaseName string) string
+	// AppVersion returns the chartVersion for the given release in this snapshot. If the release is not defined, returns ""
+	AppVersion(releaseName string) string
 	// UpdateChartVersionIfDefined sets the chartVersion for the given release to the given version.
 	// If the release is not defined, or if newVersion <= the current chart version, this function does nothing.
 	UpdateChartVersionIfDefined(releaseName string, newVersion string) error
@@ -35,7 +37,7 @@ type snapshotData struct {
 	} `yaml:"releases"`
 }
 
-func loadSnapshot(filePath string, shellRunner shell.Runner) (Snapshot, error) {
+func loadSnapshot(filePath string, shellRunner shell.Runner) (VersionSnapshot, error) {
 	data, err := readSnapshotFile(filePath)
 	if err != nil {
 		return nil, err
@@ -58,6 +60,13 @@ func (s *snapshot) ChartVersion(releaseName string) string {
 		return ""
 	}
 	return s.data.Releases[releaseName].ChartVersion
+}
+
+func (s *snapshot) AppVersion(releaseName string) string {
+	if !s.ReleaseDefined(releaseName) {
+		return ""
+	}
+	return s.data.Releases[releaseName].AppVersion
 }
 
 func (s *snapshot) UpdateChartVersionIfDefined(releaseName string, newVersion string) error {

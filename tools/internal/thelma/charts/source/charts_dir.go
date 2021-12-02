@@ -5,7 +5,7 @@ import (
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/dependency"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/publish"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/versions"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/gitops"
 	"github.com/rs/zerolog/log"
 	"path"
 	"path/filepath"
@@ -29,7 +29,7 @@ type ChartsDir interface {
 func NewChartsDir(
 	sourceDir string,
 	publisher publish.Publisher,
-	versions versions.Versions,
+	versions gitops.Versions,
 	shellRunner shell.Runner,
 ) (ChartsDir, error) {
 
@@ -164,7 +164,7 @@ func loadCharts(sourceDir string, shellRunner shell.Runner) (map[string]Chart, e
 
 	for _, manifestFile := range manifestFiles {
 		// Create node for this chart
-		_chart, err := NewChart(manifestFile, shellRunner)
+		_chart, err := NewChart(path.Dir(manifestFile), shellRunner)
 		if err != nil {
 			return nil, fmt.Errorf("error creating chart from %s: %v", manifestFile, err)
 		}

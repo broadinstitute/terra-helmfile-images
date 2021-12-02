@@ -1,0 +1,13 @@
+stringVal: file1
+
+onlyInFile1String: file1
+
+nested:
+  levelOne:
+    levelTwo:
+      keyA: file1
+      keyB: file1
+      keyC: file1
+
+map:
+  keyA: file1

@@ -1,0 +1,4 @@
+releases:
+  agora:
+    appVersion: v99
+    chartVersion: 0.9.0

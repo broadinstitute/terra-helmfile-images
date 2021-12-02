@@ -1,7 +1,7 @@
 package source
 
 import (
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/versions"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/gitops"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
 	"os"
@@ -9,7 +9,7 @@ import (
 )
 
 const configFile = ".autorelease.yaml"
-const targetVersionSet = versions.Dev
+const targetVersionSet = gitops.Dev
 
 // AutoReleaser bumps chart versions in versions/app/dev.yaml & friends when a new chart version is released
 type AutoReleaser interface {
@@ -21,17 +21,17 @@ type AutoReleaser interface {
 type config struct {
 	Enabled bool `yaml:"enabled"` // whether updates to this chart should be added to release train. defaults to true
 	Release struct {
-		Name string               `yaml:"name"` // name of the "release", defaults to chart name
-		Type versions.ReleaseType `yaml:"type"` // either "app" or "cluster", defaults to app
+		Name string             `yaml:"name"` // name of the "release", defaults to chart name
+		Type gitops.ReleaseType `yaml:"type"` // either "app" or "cluster", defaults to app
 	} `yaml:"release"`
 }
 
 // Implements the public AutoReleaser interface
 type autoReleaser struct {
-	versions versions.Versions
+	versions gitops.Versions
 }
 
-func NewAutoReleaser(versions versions.Versions) AutoReleaser {
+func NewAutoReleaser(versions gitops.Versions) AutoReleaser {
 	return &autoReleaser{
 		versions: versions,
 	}
@@ -43,10 +43,7 @@ func (a *autoReleaser) UpdateReleaseVersion(chart Chart, newVersion string) erro
 		return nil
 	}
 
-	snapshot, err := a.versions.LoadSnapshot(cfg.Release.Type, targetVersionSet)
-	if err != nil {
-		return err
-	}
+	snapshot := a.versions.GetSnapshot(cfg.Release.Type, targetVersionSet)
 	return snapshot.UpdateChartVersionIfDefined(cfg.Release.Name, newVersion)
 }
 
@@ -57,7 +54,7 @@ func loadConfig(chart Chart) config {
 	// Set defaults
 	cfg.Enabled = true
 	cfg.Release.Name = chart.Name()
-	cfg.Release.Type = versions.AppRelease
+	cfg.Release.Type = gitops.AppReleaseType
 
 	file := path.Join(chart.Path(), configFile)
 	_, err := os.Stat(file)

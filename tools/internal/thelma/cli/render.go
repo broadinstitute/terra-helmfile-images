@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render/helmfile"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render/resolver"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"path"
@@ -48,6 +49,9 @@ render -e alpha -a cromwell --argocd
 // defaultRenderOutputDir name of default output directory
 const defaultRenderOutputDir = "output"
 
+// defaultRenderChartSourceDir name of default chart source directory
+const defaultRenderChartSourceDir = "charts"
+
 // renderCLI contains state and configuration for executing a render from the command-line
 type renderCLI struct {
 	ctx           *ThelmaContext
@@ -71,6 +75,7 @@ var renderFlagNames = struct {
 	outputDir       string
 	stdout          string
 	parallelWorkers string
+	mode            string
 }{
 	env:             "env",
 	cluster:         "cluster",
@@ -84,6 +89,7 @@ var renderFlagNames = struct {
 	outputDir:       "output-dir",
 	stdout:          "stdout",
 	parallelWorkers: "parallel-workers",
+	mode:            "mode",
 }
 
 // renderFlagValues is a struct for capturing flag values that are parsed by Cobra.
@@ -100,6 +106,7 @@ type renderFlagValues struct {
 	outputDir       string
 	stdout          bool
 	parallelWorkers int
+	mode            string
 }
 
 // newRenderCLI constructs a new renderCLI
@@ -129,6 +136,7 @@ func newRenderCLI(ctx *ThelmaContext) *renderCLI {
 	cobraCommand.Flags().StringVarP(&flagVals.outputDir, renderFlagNames.outputDir, "d", "path/to/output/dir", "Render manifests to custom output directory")
 	cobraCommand.Flags().BoolVar(&flagVals.stdout, renderFlagNames.stdout, false, "Render manifests to stdout instead of output directory")
 	cobraCommand.Flags().IntVar(&flagVals.parallelWorkers, renderFlagNames.parallelWorkers, 1, "Number of parallel workers to launch when rendering")
+	cobraCommand.Flags().StringVar(&flagVals.mode, renderFlagNames.mode, "development", `Either "development" (render from chart source directory) or "deploy" (render using released chart versions). Defaults to "development"`)
 
 	cli := &renderCLI{
 		cobraCommand:  cobraCommand,
@@ -182,6 +190,11 @@ func (cli *renderCLI) fillRenderOptions() error {
 		renderOptions.Cluster = &flagVals.cluster
 	}
 
+	// release name
+	if flags.Changed(renderFlagNames.release) {
+		renderOptions.Release = &flagVals.release
+	}
+
 	// output dir
 	if flags.Changed(renderFlagNames.outputDir) {
 		dir, err := filepath.Abs(flagVals.outputDir)
@@ -200,6 +213,28 @@ func (cli *renderCLI) fillRenderOptions() error {
 	// parallelWorkers
 	renderOptions.ParallelWorkers = flagVals.parallelWorkers
 
+	// chart dir
+	if flags.Changed(renderFlagNames.chartDir) {
+		chartSourceDir, err := expandAndVerifyExists(flagVals.chartDir, "chart dir")
+		if err != nil {
+			return err
+		}
+		renderOptions.ChartSourceDir = chartSourceDir
+	} else {
+		renderOptions.ChartSourceDir = path.Join(cli.ctx.app.Config.Home(), defaultRenderChartSourceDir)
+		log.Debug().Msgf("Using default chart source dir %s", renderOptions.ChartSourceDir)
+	}
+
+	// resolve mode
+	switch flagVals.mode {
+	case "development":
+		renderOptions.ResolverMode = resolver.Development
+	case "deploy":
+		renderOptions.ResolverMode = resolver.Deploy
+	default:
+		return fmt.Errorf(`invalid value for --%s (must be "development" or "deploy"): %v`, renderFlagNames.mode, flagVals.mode)
+	}
+
 	return nil
 }
 
@@ -209,11 +244,6 @@ func (cli *renderCLI) fillHelmfileArgs() error {
 	flagVals := cli.flagVals
 	helmfileArgs := cli.helmfileArgs
 
-	// release name
-	if flags.Changed(renderFlagNames.release) {
-		helmfileArgs.ReleaseName = &flagVals.release
-	}
-
 	// chart version
 	if flags.Changed(renderFlagNames.chartVersion) {
 		helmfileArgs.ChartVersion = &flagVals.chartVersion
@@ -222,15 +252,6 @@ func (cli *renderCLI) fillHelmfileArgs() error {
 	// app version
 	if flags.Changed(renderFlagNames.appVersion) {
 		helmfileArgs.AppVersion = &flagVals.appVersion
-	}
-
-	// chart dir
-	if flags.Changed(renderFlagNames.chartDir) {
-		dir, err := expandAndVerifyExists(flagVals.chartDir, "chart dir")
-		if err != nil {
-			return err
-		}
-		helmfileArgs.ChartDir = &dir
 	}
 
 	// values file
@@ -274,11 +295,6 @@ func (cli *renderCLI) checkIncompatibleFlags() error {
 
 	if flags.Changed(renderFlagNames.env) && flags.Changed(renderFlagNames.cluster) {
 		return fmt.Errorf("only one of --%s or --%s may be specified", renderFlagNames.env, renderFlagNames.cluster)
-	}
-
-	if flags.Changed(renderFlagNames.release) && !(flags.Changed(renderFlagNames.env) || flags.Changed(renderFlagNames.cluster)) {
-		// Not all targets include all charts, so require users to specify target env or cluster when -r / -a is passed in
-		return fmt.Errorf("an environment (--%s) or cluster (--%s) must be specified when a release is specified with --%s", renderFlagNames.env, renderFlagNames.cluster, renderFlagNames.release)
 	}
 
 	if flags.Changed(renderFlagNames.chartDir) {

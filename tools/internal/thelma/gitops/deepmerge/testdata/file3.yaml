@@ -1,0 +1,13 @@
+nested:
+  levelOne:
+    levelTwo:
+      keyA: file3
+      keyE: file3
+      keyF: file3
+
+stringVal: file3
+
+onlyInFile3Int: 100
+
+map:
+  keyC: file3

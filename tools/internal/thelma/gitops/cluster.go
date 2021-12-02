@@ -10,7 +10,7 @@ const clusterConfigDir = "clusters"
 
 // Cluster represents a Terra cluster
 type cluster struct {
-	address string // Cluster API address. Eg "https://10.0.0.1/api"
+	address  string // Cluster API address. Eg "https://10.0.0.1/api"
 	releases map[string]ClusterRelease
 	target
 }
@@ -18,7 +18,7 @@ type cluster struct {
 // NewCluster constructs a new Cluster
 func NewCluster(name string, base string, address string, releases map[string]ClusterRelease) Cluster {
 	return &cluster{
-		address: address,
+		address:  address,
 		releases: releases,
 		target: target{
 			name:       name,

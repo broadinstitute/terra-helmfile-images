@@ -126,9 +126,9 @@ func publishCharts(options *chartsPublishOptions, app *app.ThelmaApp) ([]views.C
 	var view []views.ChartRelease
 	for chartName, chartVersion := range chartVersions {
 		view = append(view, views.ChartRelease{
-			Name: chartName,
+			Name:    chartName,
 			Version: chartVersion,
-			Repo: options.bucketName,
+			Repo:    options.bucketName,
 		})
 	}
 	views.SortChartReleases(view)

@@ -10,13 +10,13 @@ type Mode int
 
 const (
 	Development Mode = iota // Prefer source copies of charts
-	Deploy // Prefer released versions of charts (in versions/ directories)
+	Deploy                  // Prefer released versions of charts (in versions/ directories)
 )
 
 type Options struct {
-	Mode Mode // development / deploy
+	Mode      Mode   // development / deploy
 	SourceDir string // path to chart source directory
-	CacheDir string  // path where downloaded charts should be cached
+	CacheDir  string // path where downloaded charts should be cached
 }
 
 type ChartResolver interface {

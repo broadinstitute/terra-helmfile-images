@@ -34,7 +34,7 @@ func (f *filter) Matches(release Release) bool {
 
 func HasName(releaseName string) ReleaseFilter {
 	return &filter{
-		matcher: func(r  Release) bool {
+		matcher: func(r Release) bool {
 			return r.Name() == releaseName
 		},
 	}
@@ -42,7 +42,7 @@ func HasName(releaseName string) ReleaseFilter {
 
 func HasTarget(targetName string) ReleaseFilter {
 	return &filter{
-		matcher: func(r  Release) bool {
+		matcher: func(r Release) bool {
 			return r.Target().Name() == targetName
 		},
 	}
@@ -50,7 +50,7 @@ func HasTarget(targetName string) ReleaseFilter {
 
 func AnyRelease() ReleaseFilter {
 	return &filter{
-		matcher: func(_  Release) bool {
+		matcher: func(_ Release) bool {
 			return true
 		},
 	}
@@ -58,7 +58,7 @@ func AnyRelease() ReleaseFilter {
 
 func (f *filter) And(other ReleaseFilter) ReleaseFilter {
 	return &filter{
-		matcher: func(release  Release) bool {
+		matcher: func(release Release) bool {
 			return f.Matches(release) && other.Matches(release)
 		},
 	}
@@ -66,7 +66,7 @@ func (f *filter) And(other ReleaseFilter) ReleaseFilter {
 
 func (f *filter) Or(other ReleaseFilter) ReleaseFilter {
 	return &filter{
-		matcher: func(release  Release) bool {
+		matcher: func(release Release) bool {
 			return f.Matches(release) || other.Matches(release)
 		},
 	}
@@ -89,8 +89,8 @@ func Load(thelmaHome string, shellRunner shell.Runner) (Gitops, error) {
 	}
 
 	return &gitops{
-		versions: _versions,
-		clusters: clusters,
+		versions:     _versions,
+		clusters:     clusters,
 		environments: environments,
 	}, nil
 }

@@ -18,33 +18,33 @@ const multiRenderTimeout = 5 * time.Minute
 
 // Options encapsulates CLI options for a render
 type Options struct {
-	Env             *string  // Env If supplied, render for a single environment instead of all targets
-	Cluster         *string  // Cluster If supplied, render for a single cluster instead of all targets
-	Release         *string  // Release If supplied, render only the specified release
-	Stdout     		bool     // Stdout if true, render to stdout instead of output directory
-	OutputDir       string   // Output directory where manifests should be rendered
-	ChartSourceDir  string   // Path on filesystem where chart sources live
+	Env             *string       // Env If supplied, render for a single environment instead of all targets
+	Cluster         *string       // Cluster If supplied, render for a single cluster instead of all targets
+	Release         *string       // Release If supplied, render only the specified release
+	Stdout          bool          // Stdout if true, render to stdout instead of output directory
+	OutputDir       string        // Output directory where manifests should be rendered
+	ChartSourceDir  string        // Path on filesystem where chart sources live
 	ResolverMode    resolver.Mode // Resolver mode
-	ParallelWorkers int      // ParallelWorkers Number of parallel workers
+	ParallelWorkers int           // ParallelWorkers Number of parallel workers
 }
 
 // multiRender renders manifests for multiple environments and clusters
 type multiRender struct {
-	options           *Options                 // Options global render options
-	gitops            gitops.Gitops
-	configRepo        *helmfile.ConfigRepo     // configRepo refernce to use for executing `helmfile template`
+	options    *Options // Options global render options
+	gitops     gitops.Gitops
+	configRepo *helmfile.ConfigRepo // configRepo refernce to use for executing `helmfile template`
 }
 
 // renderError represents an error encountered while rendering for a particular target
 type renderError struct {
 	description string // description for the render job that generated in this error
-	err error     // error
+	err         error  // error
 }
 
 // renderJob represents a single helmfile invocation with parameters
 type renderJob struct {
 	description string
-	callback func() error
+	callback    func() error
 }
 
 // DoRender constructs a multiRender and invokes all functions in correct order to perform a complete
@@ -150,26 +150,26 @@ func (r *multiRender) renderAll(helmfileArgs *helmfile.Args) error {
 
 			for {
 				select {
-					case <- ctx.Done():
-						logger.Debug().Msg("short circuit triggered, returning")
+				case <-ctx.Done():
+					logger.Debug().Msg("short circuit triggered, returning")
+					return
+
+				case job, ok := <-queueCh:
+					if !ok {
+						logger.Debug().Msg("no jobs left, returning")
 						return
+					}
 
-					case job, ok := <-queueCh:
-						if !ok {
-							logger.Debug().Msg("no jobs left, returning")
-							return
+					logger.Debug().Msgf("rendering %s", job.description)
+					if err := job.callback(); err != nil {
+						logger.Error().Msgf("error rendering %s:\n%v", job.description, err)
+						errCh <- renderError{
+							description: job.description,
+							err:         err,
 						}
-
-						logger.Debug().Msgf("rendering %s", job.description)
-						if err := job.callback(); err != nil {
-							logger.Error().Msgf("error rendering %s:\n%v", job.description, err)
-							errCh <- renderError{
-								description: job.description,
-								err: err,
-							}
-							cancel()
-							return
-						}
+						cancel()
+						return
+					}
 				}
 			}
 		}()
@@ -209,23 +209,23 @@ func (r *multiRender) getJobs(helmfileArgs *helmfile.Args) ([]renderJob, error) 
 	releaseScoped := false
 
 	if r.options.Release != nil {
-		log.Debug().Msgf("Filtering for releases with name: %s" , *r.options.Release)
+		log.Debug().Msgf("Filtering for releases with name: %s", *r.options.Release)
 		filter = filter.And(gitops.HasName(*r.options.Release))
 		releaseScoped = true
 	}
 
 	if r.options.Env != nil {
 		envName := *r.options.Env
-		log.Debug().Msgf("Filtering for releases in env: %s" , envName)
+		log.Debug().Msgf("Filtering for releases in env: %s", envName)
 		filter = filter.And(gitops.HasTarget(envName))
-		targets = []gitops.Target{ r.gitops.GetTarget(envName) }
+		targets = []gitops.Target{r.gitops.GetTarget(envName)}
 	}
 
 	if r.options.Cluster != nil {
 		clusterName := *r.options.Cluster
-		log.Debug().Msgf("Filtering for releases in cluster: %s" , clusterName)
+		log.Debug().Msgf("Filtering for releases in cluster: %s", clusterName)
 		filter = filter.And(gitops.HasTarget(clusterName))
-		targets = []gitops.Target{ r.gitops.GetTarget(clusterName) }
+		targets = []gitops.Target{r.gitops.GetTarget(clusterName)}
 	}
 
 	releases := r.gitops.FilterReleases(filter)

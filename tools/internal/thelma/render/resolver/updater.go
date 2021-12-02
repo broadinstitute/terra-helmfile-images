@@ -21,17 +21,17 @@ type Updater interface {
 }
 
 type updater struct {
-	sourceDir string
-	globalLock sync.Mutex
+	sourceDir   string
+	globalLock  sync.Mutex
 	updateLocks map[string]*sync.Mutex
-	runner shell.Runner
+	runner      shell.Runner
 }
 
 func NewUpdater(sourceDir string, runner shell.Runner) Updater {
 	return &updater{
-		sourceDir: sourceDir,
+		sourceDir:   sourceDir,
 		updateLocks: make(map[string]*sync.Mutex),
-		runner: runner,
+		runner:      runner,
 	}
 }
 
@@ -58,7 +58,6 @@ func (u *updater) SourceVersion(chartName string) (string, error) {
 
 	return chart.ManifestVersion(), nil
 }
-
 
 func (u *updater) UpdateIfNeeded(chartName string) (string, error) {
 	chart, err := u.getChart(chartName)

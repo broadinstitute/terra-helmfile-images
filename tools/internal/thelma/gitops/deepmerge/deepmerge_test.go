@@ -6,10 +6,10 @@ import (
 )
 
 type fakeStruct struct {
-	StringVal string `yaml:"stringVal"`
+	StringVal         string `yaml:"stringVal"`
 	OnlyInFile1String string `yaml:"onlyInFile1String"`
-	OnlyInFile2Bool bool `yaml:"onlyInFile2Bool"`
-	OnlyInFile3Int int `yaml:"onlyInFile3Int"`
+	OnlyInFile2Bool   bool   `yaml:"onlyInFile2Bool"`
+	OnlyInFile3Int    int    `yaml:"onlyInFile3Int"`
 
 	Nested Nested `yaml:"nested"`
 
@@ -36,12 +36,12 @@ type LevelTwo struct {
 func TestUnmarshal(t *testing.T) {
 	var result fakeStruct
 
-	err := Unmarshal(&result,"testdata/file1.yaml", "testdata/missing.yaml", "testdata/file2.yaml", "testdata/file3.yaml", "testdata/empty.yaml")
+	err := Unmarshal(&result, "testdata/file1.yaml", "testdata/missing.yaml", "testdata/file2.yaml", "testdata/file3.yaml", "testdata/empty.yaml")
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
 
-	assert.Equal(t,"file3", result.StringVal)
+	assert.Equal(t, "file3", result.StringVal)
 	assert.Equal(t, "file1", result.OnlyInFile1String)
 	assert.Equal(t, true, result.OnlyInFile2Bool)
 	assert.Equal(t, 100, result.OnlyInFile3Int)

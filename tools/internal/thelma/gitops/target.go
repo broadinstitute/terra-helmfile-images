@@ -68,10 +68,9 @@ func (t *target) Compare(other Target) int {
 	if byBase != 0 {
 		return byBase
 	}
-	byName :=  strings.Compare(t.Name(), other.Name())
+	byName := strings.Compare(t.Name(), other.Name())
 	return byName
 }
-
 
 // SortReleaseTargets sorts release targets lexicographically by type, by base, and then by name
 func SortReleaseTargets(targets []Target) {
@@ -340,8 +339,8 @@ func versionSetFor(targetName string) VersionSet {
 }
 
 type targetDefinition struct {
-	name string
-	base string
+	name       string
+	base       string
 	mergedYaml []byte
 }
 
@@ -376,8 +375,8 @@ func loadTargetsFromDirectory(configDir string, targetType TargetType) (map[stri
 		}
 
 		targetDef := targetDefinition{
-			name: name,
-			base: base,
+			name:       name,
+			base:       base,
 			mergedYaml: mergedYaml,
 		}
 

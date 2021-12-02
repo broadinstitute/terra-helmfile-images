@@ -77,7 +77,7 @@ func (r *release) Target() Target {
 // Returns 0 if r == other, -1 if r < other, or +1 if r > other.
 // Compares by type, then by name, then by target
 func (r *release) Compare(other Release) int {
-	byType :=  r.Type().Compare(other.Type())
+	byType := r.Type().Compare(other.Type())
 	if byType != 0 {
 		return byType
 	}

@@ -19,7 +19,6 @@ releases:
     chartVersion: 1.2.3
 `
 
-
 const updateContent2 = `
 releases:
   prometheus:

@@ -9,34 +9,34 @@ import (
 func TestSortChartReleases(t *testing.T) {
 	sorted := []ChartRelease{
 		{
-			Name: "mongodb",
+			Name:    "mongodb",
 			Version: "0.1.2",
-			Repo: "bitnami",
+			Repo:    "bitnami",
 		},
 		{
-			Name: "agora",
+			Name:    "agora",
 			Version: "1.2.2",
-			Repo: "terra-helm",
+			Repo:    "terra-helm",
 		},
 		{
-			Name: "agora",
+			Name:    "agora",
 			Version: "1.2.3",
-			Repo: "terra-helm",
+			Repo:    "terra-helm",
 		},
 		{
-			Name: "buffer",
+			Name:    "buffer",
 			Version: "0.0.1",
-			Repo: "terra-helm",
+			Repo:    "terra-helm",
 		},
 		{
-			Name: "cromwell",
+			Name:    "cromwell",
 			Version: "0.4.0",
-			Repo: "terra-helm",
+			Repo:    "terra-helm",
 		},
 		{
-			Name: "cromwell",
+			Name:    "cromwell",
 			Version: "0.20.0",
-			Repo: "terra-helm",
+			Repo:    "terra-helm",
 		},
 	}
 

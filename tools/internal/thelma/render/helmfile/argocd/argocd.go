@@ -12,7 +12,7 @@ type Values struct {
 }
 
 type Destination struct {
-	Server string `yaml:"server"`
+	Server    string `yaml:"server"`
 	Namespace string `yaml:"namespace"`
 }
 
@@ -59,7 +59,7 @@ func destinationsForTarget(target gitops.Target) []Destination {
 func destinationsForCluster(cluster gitops.Cluster) []Destination {
 	return []Destination{
 		{
-			Server: cluster.Address(),
+			Server:    cluster.Address(),
 			Namespace: "*", // Cluster releases can deploy to any namespace
 		},
 	}
@@ -74,7 +74,7 @@ func destinationsForEnvironment(environment gitops.Environment) []Destination {
 	var destinations []Destination
 	for address := range clusterAddresses {
 		destinations = append(destinations, Destination{
-			Server: address,
+			Server:    address,
 			Namespace: environment.Namespace(),
 		})
 	}

@@ -68,5 +68,5 @@ func buildSupportedFormatsMsg(_formats map[string]formatter) string {
 		return quoted[i] < quoted[j]
 	})
 
-	return strings.Join(quoted,", ")
+	return strings.Join(quoted, ", ")
 }

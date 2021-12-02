@@ -17,16 +17,16 @@ type ChartCache interface {
 }
 
 type chartCache struct {
-	cacheDir string
-	runner shell.Runner
+	cacheDir   string
+	runner     shell.Runner
 	globalLock sync.Mutex
 	cacheLocks map[ChartRelease]*sync.Mutex
 }
 
 func NewChartCache(cacheDir string, runner shell.Runner) ChartCache {
 	return &chartCache{
-		cacheDir: cacheDir,
-		runner: runner,
+		cacheDir:   cacheDir,
+		runner:     runner,
 		cacheLocks: make(map[ChartRelease]*sync.Mutex),
 	}
 }
@@ -103,7 +103,6 @@ func (c *chartCache) getCacheLock(chart ChartRelease) (*sync.Mutex, bool) {
 func (c *chartCache) cachePath(chart ChartRelease) string {
 	return path.Join(c.cacheDir, chart.Repo, fmt.Sprintf("%s-%s", chart.Name, chart.Version))
 }
-
 
 // siblingPath is a path utility function. Given a directory path,
 // it returns a path in the same parent directory, with the same basename,

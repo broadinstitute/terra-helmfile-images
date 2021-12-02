@@ -8,7 +8,7 @@ import (
 )
 
 // Deep merge all given YAML files and unmarshal the result into the given struct
-func Unmarshal(result interface{}, filenames... string) error {
+func Unmarshal(result interface{}, filenames ...string) error {
 	merged, err := Merge(filenames...)
 
 	if err != nil {
@@ -24,7 +24,7 @@ func Unmarshal(result interface{}, filenames... string) error {
 }
 
 // Deep merge all given YAML files and return the resulting YAML as a byte array
-func Merge(filenames... string) ([]byte, error) {
+func Merge(filenames ...string) ([]byte, error) {
 	var toMerge []map[string]interface{}
 
 	for _, filename := range filenames {
@@ -48,7 +48,7 @@ func Merge(filenames... string) ([]byte, error) {
 	return marshaled, nil
 }
 
-func deepMergeAll(maps... map[string]interface{}) map[string]interface{} {
+func deepMergeAll(maps ...map[string]interface{}) map[string]interface{} {
 	merged := make(map[string]interface{})
 	for _, m := range maps {
 		merged = deepMerge(merged, m)

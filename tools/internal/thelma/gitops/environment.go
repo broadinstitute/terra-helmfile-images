@@ -19,8 +19,8 @@ type Environment interface {
 
 // Environment represents a Terra environment
 type environment struct {
-	defaultCluster string          // Name of the default cluster for this environment. eg "terra-dev"
-	releases map[string]AppRelease // Set of releases configured in this environment
+	defaultCluster string                // Name of the default cluster for this environment. eg "terra-dev"
+	releases       map[string]AppRelease // Set of releases configured in this environment
 	target
 }
 
@@ -28,7 +28,7 @@ type environment struct {
 func NewEnvironment(name string, base string, defaultCluster string, releases map[string]AppRelease) Environment {
 	return &environment{
 		defaultCluster: defaultCluster,
-		releases: releases,
+		releases:       releases,
 		target: target{
 			name:       name,
 			base:       base,

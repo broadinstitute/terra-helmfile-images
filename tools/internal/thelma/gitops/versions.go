@@ -18,7 +18,7 @@ type Versions interface {
 type versions struct {
 	thelmaHome  string
 	shellRunner shell.Runner
-	snapshots map[ReleaseType]map[VersionSet]VersionSnapshot
+	snapshots   map[ReleaseType]map[VersionSet]VersionSnapshot
 }
 
 // NewVersions returns a new Versions instance
@@ -31,7 +31,7 @@ func NewVersions(thelmaHome string, shellRunner shell.Runner) (Versions, error) 
 	return &versions{
 		thelmaHome:  thelmaHome,
 		shellRunner: shellRunner,
-		snapshots: snapshots,
+		snapshots:   snapshots,
 	}, nil
 }
 

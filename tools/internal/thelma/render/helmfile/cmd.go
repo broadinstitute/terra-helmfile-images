@@ -84,8 +84,8 @@ func (cmd *Cmd) toShellCommand() shell.Command {
 	shellCmd := shell.Command{
 		Prog: ProgName,
 		Args: cliArgs,
-		Dir: cmd.dir,
-		Env: cmd.envVars,
+		Dir:  cmd.dir,
+		Env:  cmd.envVars,
 	}
 
 	return shellCmd
@@ -135,7 +135,7 @@ func (cmd *Cmd) setStdout(stdout bool) {
 	cmd.stdout = stdout
 }
 
-func (cmd *Cmd) addValuesFiles(valuesFiles... string) {
+func (cmd *Cmd) addValuesFiles(valuesFiles ...string) {
 	cmd.valuesFiles = append(cmd.valuesFiles, valuesFiles...)
 }
 

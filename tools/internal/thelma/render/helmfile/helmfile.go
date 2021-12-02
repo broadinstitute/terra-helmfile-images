@@ -49,8 +49,8 @@ type ConfigRepo struct {
 // NewConfigRepo constructs a new ConfigRepo object
 func NewConfigRepo(options Options) *ConfigRepo {
 	chartResolver := resolver.NewChartResolver(options.ShellRunner, resolver.Options{
-		Mode: options.ResolverMode,
-		CacheDir: options.ChartCacheDir,
+		Mode:      options.ResolverMode,
+		CacheDir:  options.ChartCacheDir,
 		SourceDir: options.ChartSourceDir,
 	})
 
@@ -64,7 +64,6 @@ func NewConfigRepo(options Options) *ConfigRepo {
 		shellRunner:      options.ShellRunner,
 	}
 }
-
 
 // CleanOutputDirectory cleans the output directory before rendering
 func (r *ConfigRepo) CleanOutputDirectoryIfEnabled() error {
@@ -195,8 +194,8 @@ func (r *ConfigRepo) renderApplicationManifests(release gitops.Release, args *Ar
 	}
 
 	chartPath, err := r.chartResolver.Resolve(resolver.ChartRelease{
-		Name: release.ChartName(),
-		Repo: release.Repo(),
+		Name:    release.ChartName(),
+		Repo:    release.Repo(),
 		Version: chartVersion,
 	})
 	if err != nil {

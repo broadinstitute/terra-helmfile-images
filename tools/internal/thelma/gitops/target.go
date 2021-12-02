@@ -16,7 +16,6 @@ import (
 // Default settings file name for both types of targets
 const defaultsFileName = "defaults.yaml"
 const defaultChartRepo = "terra-helm"
-const envNamespacePrefix = "terra-"
 const yamlSuffix = ".yaml"
 
 // Target represents where a release is being deployed (environment or cluster)
@@ -27,6 +26,8 @@ type Target interface {
 	Name() string             // Name is the name of the environment or cluster
 	ReleaseType() ReleaseType // ReleaseType returns the types of releases that can be deployed to this target
 	Releases() []Release      // Releases returns the set of releases configured for this target
+	IsCluster() bool          // Returns true if this target is a cluster
+	IsEnvironment() bool      // Returns true if this target is an environment
 	Compare(other Target) int // Returns 0 if t == other, -1 if t < other, or +1 if t > other.
 }
 
@@ -46,6 +47,14 @@ func (t *target) Base() string {
 
 func (t *target) Type() TargetType {
 	return t.targetType
+}
+
+func (t *target) IsCluster() bool {
+	return t.targetType == ClusterTargetType
+}
+
+func (t *target) IsEnvironment() bool {
+	return t.targetType == EnvironmentTargetType
 }
 
 // Returns 0 if t == other, -1 if t < other, or +1 if t > other.
@@ -129,13 +138,12 @@ func loadEnvironment(targetDef targetDefinition, _versions Versions, clusters ma
 		}
 
 		_cluster := defaultCluster
-		// TODO
-		//if releaseDefn.Cluster != "" {
-		//	if _, exists := clusters[releaseDefn.Cluster]; !exists {
-		//		return nil, fmt.Errorf("environment %s: release %s: cluster %s is not defined in %s directory", envName, releaseName, releaseDefn.Cluster, clusterConfigDir)
-		//	}
-		//	_cluster = clusters[releaseDefn.Cluster]
-		//}
+		if releaseDefn.Cluster != "" {
+			if _, exists := clusters[releaseDefn.Cluster]; !exists {
+				return nil, fmt.Errorf("environment %s: release %s: cluster %s is not defined in %s directory", envName, releaseName, releaseDefn.Cluster, clusterConfigDir)
+			}
+			_cluster = clusters[releaseDefn.Cluster]
+		}
 		clusterName := _cluster.Name()
 		clusterAddress := _cluster.Address()
 
@@ -165,7 +173,7 @@ func loadEnvironment(targetDef targetDefinition, _versions Versions, clusters ma
 
 		// namespace
 		// eg. terra-dev
-		namespace := fmt.Sprintf("%s%s", envNamespacePrefix, envName)
+		namespace := environmentNamespace(envName)
 
 		// chartName
 		chartName := releaseDefn.ChartName
@@ -246,10 +254,9 @@ func loadCluster(targetDef targetDefinition, _versions Versions) (Cluster, error
 	}
 
 	clusterAddress := clusterDefn.Address
-	// TODO
-	//if clusterAddress == "" {
-	//	return nil, fmt.Errorf("cluster %s does not have a valid API address", clusterName)
-	//}
+	if clusterAddress == "" {
+		return nil, fmt.Errorf("cluster %s does not have a valid API address, please set `address` key in config file", clusterName)
+	}
 
 	releases := make(map[string]ClusterRelease)
 

@@ -54,6 +54,8 @@ type Chart interface {
 	LocalDependencies() []string
 	// SetDependencyVersion sets the version of a dependency in this chart's Chart.yaml
 	SetDependencyVersion(dependencyName string, newVersion string) error
+	// ManifestVersion returns the version of this chart in Chart.yaml
+	ManifestVersion() string
 }
 
 // Implements Chart interface
@@ -65,7 +67,8 @@ type chart struct {
 }
 
 // NewChart constructs a Chart
-func NewChart(manifestFile string, shellRunner shell.Runner) (Chart, error) {
+func NewChart(chartSourceDir string, shellRunner shell.Runner) (Chart, error) {
+	manifestFile := path.Join(chartSourceDir, chartManifestFile)
 	manifest, err := loadManifest(manifestFile)
 	if err != nil {
 		return nil, err
@@ -184,6 +187,10 @@ func (c *chart) SetDependencyVersion(dependencyName string, newVersion string) e
 	}
 
 	return fmt.Errorf("error setting dependency %s to version %s in %s: dependency not found", dependencyName, newVersion, manifestFile)
+}
+
+func (c *chart) ManifestVersion() string {
+	return c.manifest.Version
 }
 
 func (c *chart) nextVersion(latestPublishedVersion string) string {

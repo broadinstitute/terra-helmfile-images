@@ -164,7 +164,7 @@ func loadCharts(sourceDir string, shellRunner shell.Runner) (map[string]Chart, e
 
 	for _, manifestFile := range manifestFiles {
 		// Create node for this chart
-		_chart, err := NewChart(manifestFile, shellRunner)
+		_chart, err := NewChart(path.Dir(manifestFile), shellRunner)
 		if err != nil {
 			return nil, fmt.Errorf("error creating chart from %s: %v", manifestFile, err)
 		}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render/helmfile"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render/resolver"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"path"
@@ -48,6 +49,9 @@ render -e alpha -a cromwell --argocd
 // defaultRenderOutputDir name of default output directory
 const defaultRenderOutputDir = "output"
 
+// defaultRenderChartSourceDir name of default chart source directory
+const defaultRenderChartSourceDir = "charts"
+
 // renderCLI contains state and configuration for executing a render from the command-line
 type renderCLI struct {
 	ctx           *ThelmaContext
@@ -71,6 +75,7 @@ var renderFlagNames = struct {
 	outputDir       string
 	stdout          string
 	parallelWorkers string
+	mode            string
 }{
 	env:             "env",
 	cluster:         "cluster",
@@ -84,6 +89,7 @@ var renderFlagNames = struct {
 	outputDir:       "output-dir",
 	stdout:          "stdout",
 	parallelWorkers: "parallel-workers",
+	mode:            "mode",
 }
 
 // renderFlagValues is a struct for capturing flag values that are parsed by Cobra.
@@ -100,6 +106,7 @@ type renderFlagValues struct {
 	outputDir       string
 	stdout          bool
 	parallelWorkers int
+	mode            string
 }
 
 // newRenderCLI constructs a new renderCLI
@@ -129,6 +136,7 @@ func newRenderCLI(ctx *ThelmaContext) *renderCLI {
 	cobraCommand.Flags().StringVarP(&flagVals.outputDir, renderFlagNames.outputDir, "d", "path/to/output/dir", "Render manifests to custom output directory")
 	cobraCommand.Flags().BoolVar(&flagVals.stdout, renderFlagNames.stdout, false, "Render manifests to stdout instead of output directory")
 	cobraCommand.Flags().IntVar(&flagVals.parallelWorkers, renderFlagNames.parallelWorkers, 1, "Number of parallel workers to launch when rendering")
+	cobraCommand.Flags().StringVar(&flagVals.mode, renderFlagNames.mode, "development", `Either "development" (render from chart source directory) or "deploy" (render using released chart versions). Defaults to "development"`)
 
 	cli := &renderCLI{
 		cobraCommand:  cobraCommand,
@@ -205,6 +213,28 @@ func (cli *renderCLI) fillRenderOptions() error {
 	// parallelWorkers
 	renderOptions.ParallelWorkers = flagVals.parallelWorkers
 
+	// chart dir
+	if flags.Changed(renderFlagNames.chartDir) {
+		chartSourceDir, err := expandAndVerifyExists(flagVals.chartDir, "chart dir")
+		if err != nil {
+			return err
+		}
+		renderOptions.ChartSourceDir = chartSourceDir
+	} else {
+		renderOptions.ChartSourceDir = path.Join(cli.ctx.app.Config.Home(), defaultRenderChartSourceDir)
+		log.Debug().Msgf("Using default chart source dir %s", renderOptions.ChartSourceDir)
+	}
+
+	// resolve mode
+	switch flagVals.mode {
+	case "development":
+		renderOptions.ResolverMode = resolver.Development
+	case "deploy":
+		renderOptions.ResolverMode = resolver.Deploy
+	default:
+		return fmt.Errorf(`invalid value for --%s (must be "development" or "deploy"): %v`, renderFlagNames.mode, flagVals.mode)
+	}
+
 	return nil
 }
 
@@ -222,15 +252,6 @@ func (cli *renderCLI) fillHelmfileArgs() error {
 	// app version
 	if flags.Changed(renderFlagNames.appVersion) {
 		helmfileArgs.AppVersion = &flagVals.appVersion
-	}
-
-	// chart dir
-	if flags.Changed(renderFlagNames.chartDir) {
-		dir, err := expandAndVerifyExists(flagVals.chartDir, "chart dir")
-		if err != nil {
-			return err
-		}
-		helmfileArgs.ChartDir = &dir
 	}
 
 	// values file

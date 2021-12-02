@@ -6,6 +6,7 @@ import (
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/app"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/gitops"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render/helmfile"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render/resolver"
 	"github.com/rs/zerolog/log"
 	"strings"
 	"sync"
@@ -20,8 +21,10 @@ type Options struct {
 	Env             *string  // Env If supplied, render for a single environment instead of all targets
 	Cluster         *string  // Cluster If supplied, render for a single cluster instead of all targets
 	Release         *string  // Release If supplied, render only the specified release
-	Stdout     		 bool    // Stdout if true, render to stdout instead of output directory
-	OutputDir        string  // Output directory where manifests should be rendered
+	Stdout     		bool     // Stdout if true, render to stdout instead of output directory
+	OutputDir       string   // Output directory where manifests should be rendered
+	ChartSourceDir  string   // Path on filesystem where chart sources live
+	ResolverMode    resolver.Mode // Resolver mode
 	ParallelWorkers int      // ParallelWorkers Number of parallel workers
 }
 
@@ -79,12 +82,25 @@ func newRender(app *app.ThelmaApp, options *Options) (*multiRender, error) {
 		return nil, err
 	}
 
+	scratchDir, err := app.Paths.CreateScratchDir("helmfile-scratch")
+	if err != nil {
+		return nil, err
+	}
+
+	helmfileLogLevel := "info"
+	if app.Config.LogLevel() == "trace" {
+		helmfileLogLevel = "debug"
+	}
+
 	r.configRepo = helmfile.NewConfigRepo(helmfile.Options{
-		Path:             app.Config.Home(),
+		ThelmaHome:       app.Config.Home(),
 		ChartCacheDir:    chartCacheDir,
-		HelmfileLogLevel: app.Config.LogLevel(),
-		Stdout: options.Stdout,
-		OutputDir: options.OutputDir,
+		ChartSourceDir:   options.ChartSourceDir,
+		ResolverMode:     options.ResolverMode,
+		HelmfileLogLevel: helmfileLogLevel,
+		Stdout:           options.Stdout,
+		OutputDir:        options.OutputDir,
+		ScratchDir:       scratchDir,
 		ShellRunner:      app.ShellRunner,
 	})
 
@@ -222,7 +238,7 @@ func (r *multiRender) getJobs(helmfileArgs *helmfile.Args) ([]renderJob, error) 
 		jobs = append(jobs, renderJob{
 			description: fmt.Sprintf("release %s in %s %s", _r.Name(), _r.Target().Type(), _r.Target().Name()),
 			callback: func() error {
-				return r.configRepo.RenderRelease(_r, helmfileArgs)
+				return r.configRepo.RenderForRelease(_r, helmfileArgs)
 			},
 		})
 	}
@@ -233,7 +249,7 @@ func (r *multiRender) getJobs(helmfileArgs *helmfile.Args) ([]renderJob, error) 
 			jobs = append(jobs, renderJob{
 				description: fmt.Sprintf("global resources for %s %s", t.Type(), t.Name()),
 				callback: func() error {
-					return r.configRepo.RenderGlobalTargetResources(t, helmfileArgs)
+					return r.configRepo.RenderForTarget(t, helmfileArgs)
 				},
 			})
 		}

@@ -30,7 +30,7 @@ func TestHelmfileUpdate(t *testing.T) {
 						"--allow-no-matching-release",
 						"repos",
 					},
-					Dir: ts.configRepo.path,
+					Dir: ts.configRepo.thelmaHome,
 				})
 			},
 		},
@@ -45,7 +45,7 @@ func TestHelmfileUpdate(t *testing.T) {
 						"--allow-no-matching-release",
 						"repos",
 					},
-					Dir: ts.configRepo.path,
+					Dir: ts.configRepo.thelmaHome,
 				})
 			},
 		},
@@ -80,7 +80,7 @@ func TestRender(t *testing.T) {
 						"--allow-no-matching-release",
 						"repos",
 					},
-					Dir: ts.configRepo.path,
+					Dir: ts.configRepo.thelmaHome,
 				})
 			},
 		},
@@ -95,7 +95,7 @@ func TestRender(t *testing.T) {
 						"--allow-no-matching-release",
 						"repos",
 					},
-					Dir: ts.configRepo.path,
+					Dir: ts.configRepo.thelmaHome,
 				})
 			},
 		},
@@ -149,7 +149,7 @@ func setupTestState(t *testing.T) *testState {
 	mockRunner.Test(t)
 
 	configRepo := NewConfigRepo(Options{
-		Path:             t.TempDir(),
+		ThelmaHome:       t.TempDir(),
 		ChartCacheDir:    t.TempDir(),
 		HelmfileLogLevel: "info",
 		ShellRunner:      mockRunner,

@@ -1,15 +1,21 @@
 package gitops
 
-type Environment interface {
-	DefaultCluster() string
-	Target
-}
+import "fmt"
 
 // envConfigDir is the subdirectory in terra-helmfile to search for environment config files
 const envConfigDir = "environments"
 
-// envTypeName is the name of the environment target type, as referenced in the helmfile config repo
-const envTypeName = "environment"
+// envNamespacePrefix is the prefix that is added to all environment namespaces.
+// Eg. the namespace for the "alpha" environment is "terra-alpha"
+const envNamespacePrefix = "terra-"
+
+type Environment interface {
+	// Returns the name of the default cluster for this environment. Eg. "terra-qa"
+	DefaultCluster() string
+	// Returns the namespace for this environment. Eg. "terra-dev"
+	Namespace() string
+	Target
+}
 
 // Environment represents a Terra environment
 type environment struct {
@@ -60,4 +66,14 @@ func (e *environment) Name() string {
 // Base environment base, eg. "live"
 func (e *environment) Base() string {
 	return e.base
+}
+
+// Environment namespace. Eg "terra-dev", "terra-perf", etc.
+func (e *environment) Namespace() string {
+	return environmentNamespace(e.Name())
+}
+
+// return environment namespace for a given environment
+func environmentNamespace(envName string) string {
+	return fmt.Sprintf("%s%s", envNamespacePrefix, envName)
 }

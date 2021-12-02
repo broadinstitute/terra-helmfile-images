@@ -189,7 +189,7 @@ func TestRenderIntegration(t *testing.T) {
 			},
 			setupMocks: func(ts *TestState) error {
 				ts.expectHelmfileUpdateCmd()
-				envPair := fmt.Sprintf("%s=%s", helmfile.ChartSrcDirEnvVar, ts.mockChartSrcDir)
+				envPair := fmt.Sprintf("%s=%s", helmfile.ChartPathEnvVar, ts.mockChartSrcDir)
 				ts.expectHelmfileCmdWithEnv(devEnv, []string{envPair}, "--log-level=info --selector=mode=release,release=leonardo --state-values-set=releases.leonardo.chartVersion=local template --output-dir=%s/output/dev", ts.mockHome)
 				return nil
 			},

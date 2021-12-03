@@ -147,27 +147,6 @@ func (cmd *Cmd) setAppVersionEnvVar(appVersion string) {
 	cmd.addEnvVar(AppVersionEnvVar, appVersion)
 }
 
-// populates selectors with correct values based on the ArgocdMode and Release arguments.
-func (cmd *Cmd) applyReleaseScopeSelectors(releaseName string, helmfileArgs *Args) {
-	cmd.selectors["mode"] = "release"
-	if helmfileArgs.ArgocdMode {
-		// Render ArgoCD manifests instead of application manifests
-		cmd.selectors["mode"] = "argocd"
-	}
-	cmd.selectors["release"] = releaseName
-	cmd.selectors["scope"] = "release"
-}
-
-// populates selectors with correct values based on the ArgocdMode and Release arguments.
-func (cmd *Cmd) applyTargetScopeSelectors(helmfileArgs *Args) {
-	cmd.selectors["mode"] = "release"
-	if helmfileArgs.ArgocdMode {
-		// Render ArgoCD manifests instead of application manifests
-		cmd.selectors["mode"] = "argocd"
-	}
-	cmd.selectors["scope"] = "target"
-}
-
 // addEnvVar adds an env var key/value pair to the given cmd instance
 func (cmd *Cmd) addEnvVar(name string, value string) {
 	cmd.envVars = append(cmd.envVars, fmt.Sprintf("%s=%s", name, value))

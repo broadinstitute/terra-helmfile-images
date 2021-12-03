@@ -240,7 +240,7 @@ func (r *ConfigRepo) runHelmfile(cmd *Cmd) error {
 		return err
 	}
 
-	return r.normalizeOutputDir()
+	return normalizeOutputDir(cmd.outputDir)
 }
 
 // Normalize output directories so they match what was produced by earlier iterations of the render tool.
@@ -279,26 +279,26 @@ func (r *ConfigRepo) runHelmfile(cmd *Cmd) error {
 //
 // normalizeOutputDir removes "helmfile-.*" directories from helmfile output paths.
 // this makes it possible to easily run diff -r on render outputs from different branches
-func (r *ConfigRepo) normalizeOutputDir() error {
-	if err := os.MkdirAll(r.outputDir, 0755); err != nil {
-		return err
-	}
-
-	glob := path.Join(r.outputDir, "*", "*", "helmfile-*", "*")
+func normalizeOutputDir(outputDir string) error {
+	glob := path.Join(outputDir, "helmfile-*", "*")
 	matches, err := filepath.Glob(glob)
 	if err != nil {
 		return fmt.Errorf("error globbing rendered templates %s: %v", glob, err)
 	}
 
-	for _, match := range matches {
-		dest := path.Join(path.Dir(path.Dir(match)), path.Base(match))
-		log.Debug().Msgf("Renaming %s to %s", match, dest)
-		if err := os.Rename(match, dest); err != nil {
-			return err
-		}
-		if err := os.Remove(path.Dir(match)); err != nil {
-			return err
-		}
+	if len(matches) != 1 {
+		return fmt.Errorf("expected exactly one match for %s, got %d: %v", glob, len(matches), matches)
+	}
+
+	match := matches[0]
+	dest := path.Join(path.Dir(path.Dir(match)), path.Base(match))
+	log.Debug().Msgf("Renaming %s to %s", match, dest)
+
+	if err := os.Rename(match, dest); err != nil {
+		return err
+	}
+	if err := os.Remove(path.Dir(match)); err != nil {
+		return err
 	}
 
 	return nil

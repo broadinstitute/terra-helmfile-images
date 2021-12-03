@@ -123,10 +123,8 @@ jobs:
       matrix:
         image-name:
           - "argocd-custom-image"
-          - "env-diff-action"
           - "jenkins-gke-deploy"
           - "jenkins-helmfile-version-query"
-          - "render-action"
           - "thelma-action"
     env:
       ARGOCD_VERSION: "2.0.5"

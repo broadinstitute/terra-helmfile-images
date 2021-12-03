@@ -52,6 +52,7 @@ func (c *chartCache) Fetch(chart ChartRelease) (string, error) {
 
 	entry.cachePath = cachePath
 	entry.err = err
+	entry.alreadyFetched = true
 
 	return entry.cachePath, entry.err
 }

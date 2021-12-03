@@ -152,29 +152,29 @@ func newThelmaCLI() *ThelmaCLI {
 
 // loadConfig builds a new Thelma config
 func loadConfig(overrides map[string]interface{}) (*config.Config, error) {
-	viperCfg := viper.New()
+	_viper := viper.New()
 
 	// Set defaults
-	viperCfg.SetDefault(config.Keys.Home, "")
-	viperCfg.SetDefault(config.Keys.LogLevel, defaultLogLevel)
-	viperCfg.SetDefault(config.Keys.Tmpdir, os.TempDir())
+	_viper.SetDefault(config.Keys.Home, "")
+	_viper.SetDefault(config.Keys.LogLevel, defaultLogLevel)
+	_viper.SetDefault(config.Keys.Tmpdir, os.TempDir())
 
 	// Configure Viper:
 	// automatically interpret env vars prefixed with THELMA_ as config settings
-	viperCfg.SetEnvPrefix(envPrefix)
+	_viper.SetEnvPrefix(envPrefix)
 	// map dashes to underscores ("THELMA_LOG_LEVEL" is mapped to the key "log-level")
-	viperCfg.SetEnvKeyReplacer(configKeyReplacer())
+	_viper.SetEnvKeyReplacer(configKeyReplacer())
 	// automatically load config values from environment
-	viperCfg.AutomaticEnv()
+	_viper.AutomaticEnv()
 
 	// apply configuration overrides (these are used in tests)
 	for k, v := range overrides {
-		viperCfg.Set(k, v)
+		_viper.Set(k, v)
 	}
 
 	// Validation
 	// Make sure home dir is configured and exists
-	homePath := viperCfg.GetString(config.Keys.Home)
+	homePath := _viper.GetString(config.Keys.Home)
 	if homePath == "" {
 		return nil, fmt.Errorf("please specify path to %s clone via the environment variable %s", configRepoName, configKeyToEnvVar(config.Keys.Home))
 	}
@@ -182,18 +182,18 @@ func loadConfig(overrides map[string]interface{}) (*config.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	viper.Set(config.Keys.Home, fullPath)
+	_viper.Set(config.Keys.Home, fullPath)
 
 	// Make sure log level is valid
-	logLevel := viperCfg.GetString(config.Keys.LogLevel)
+	logLevel := _viper.GetString(config.Keys.LogLevel)
 	if _, err := zerolog.ParseLevel(logLevel); err != nil {
 		log.Warn().Msgf("Invalid log level %v, setting to %s", logLevel, defaultLogLevel)
-		viperCfg.Set(config.Keys.LogLevel, defaultLogLevel)
+		_viper.Set(config.Keys.LogLevel, defaultLogLevel)
 	}
 
 	// Convert viper config to a simple immutable config struct and return
 	cfg := config.Data{}
-	if err := viperCfg.Unmarshal(&cfg); err != nil {
+	if err := _viper.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("error loading configuration: %v", err)
 	}
 	return config.New(cfg), nil

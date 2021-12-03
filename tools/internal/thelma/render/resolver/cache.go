@@ -17,33 +17,50 @@ type ChartCache interface {
 }
 
 type chartCache struct {
-	cacheDir   string
-	runner     shell.Runner
-	globalLock sync.Mutex
-	cacheLocks map[ChartRelease]*sync.Mutex
+	cacheDir     string
+	runner       shell.Runner
+	globalLock   sync.Mutex
+	cacheEntries map[ChartRelease]*cacheEntry
+}
+
+type cacheEntry struct {
+	alreadyFetched bool
+	err            error
+	cachePath      string
+	mutex          *sync.Mutex
 }
 
 func NewChartCache(cacheDir string, runner shell.Runner) ChartCache {
 	return &chartCache{
-		cacheDir:   cacheDir,
-		runner:     runner,
-		cacheLocks: make(map[ChartRelease]*sync.Mutex),
+		cacheDir:     cacheDir,
+		runner:       runner,
+		cacheEntries: make(map[ChartRelease]*cacheEntry),
 	}
 }
 
 func (c *chartCache) Fetch(chart ChartRelease) (string, error) {
-	cachePath := c.cachePath(chart)
+	entry := c.getCacheEntry(chart)
+	entry.mutex.Lock()
+	defer entry.mutex.Unlock()
 
-	lock, exists := c.getCacheLock(chart)
-	if exists {
-		return cachePath, nil
+	if entry.alreadyFetched {
+		log.Debug().Msgf("Chart %s/%s version %s already fetched, returning cached result: [%s, %v]", chart.Repo, chart.Name, chart.Version, entry.cachePath, entry.err)
+		return entry.cachePath, entry.err
 	}
 
-	lock.Lock()
-	defer lock.Unlock()
+	cachePath, err := c.tryFetch(chart)
+
+	entry.cachePath = cachePath
+	entry.err = err
+
+	return entry.cachePath, entry.err
+}
+
+// Tries to fetch the chart (no locking / safety)
+func (c *chartCache) tryFetch(chart ChartRelease) (string, error) {
+	cachePath := c.cachePath(chart)
 
 	tmpDir := siblingPath(cachePath, ".tmp", true)
-	log.Info().Msgf("Downloading chart to tmp dir %s", tmpDir)
 
 	cmd := shell.Command{
 		Prog: helm.ProgName,
@@ -87,16 +104,18 @@ func (c *chartCache) Fetch(chart ChartRelease) (string, error) {
 }
 
 // Returns lock for the given chart name, and a boolean (true if a lock already existed, false otherwise)
-func (c *chartCache) getCacheLock(chart ChartRelease) (*sync.Mutex, bool) {
+func (c *chartCache) getCacheEntry(chart ChartRelease) *cacheEntry {
 	c.globalLock.Lock()
 	defer c.globalLock.Unlock()
 
-	_, exists := c.cacheLocks[chart]
+	_, exists := c.cacheEntries[chart]
 	if !exists {
-		c.cacheLocks[chart] = &sync.Mutex{}
+		c.cacheEntries[chart] = &cacheEntry{
+			mutex: &sync.Mutex{},
+		}
 	}
 
-	return c.cacheLocks[chart], exists
+	return c.cacheEntries[chart]
 }
 
 // eg. "terra-helm/agora-1.2.3"

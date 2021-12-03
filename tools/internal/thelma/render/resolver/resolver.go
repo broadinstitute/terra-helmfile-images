@@ -67,7 +67,7 @@ func (r *chartResolver) Resolve(chart ChartRelease) (string, error) {
 			return "", err
 		}
 		if sourceVersion == chart.Version {
-			log.Warn().Msgf("Failed to download chart %s/%s version %s from Helm repo, will fall back to source copy", chart.Repo, chart.Name, chart.Version, err)
+			log.Warn().Msgf("Failed to download chart %s/%s version %s from Helm repo, will fall back to source copy", chart.Repo, chart.Name, chart.Version)
 			return r.updater.UpdateIfNeeded(chart.Name)
 		}
 		return "", err

@@ -2,8 +2,8 @@ package resolver
 
 import (
 	"fmt"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/tools/helm"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/shell"
 	"github.com/rs/zerolog/log"
 	"io/ioutil"
 	"os"

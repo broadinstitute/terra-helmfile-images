@@ -2,7 +2,7 @@ package helmfile
 
 import (
 	"fmt"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/shell"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/gitops"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render/helmfile/argocd"
 	"sort"

@@ -1,7 +1,7 @@
 package repo
 
 import (
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/repo/bucket"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/gcp/bucket"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

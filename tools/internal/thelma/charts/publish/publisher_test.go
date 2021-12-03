@@ -2,8 +2,8 @@ package publish
 
 import (
 	"fmt"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell/shellmock"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/shell"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/shell/shellmock"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/repo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"

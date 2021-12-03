@@ -2,7 +2,7 @@ package source
 
 import (
 	"fmt"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/shell"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/dependency"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/publish"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/gitops"

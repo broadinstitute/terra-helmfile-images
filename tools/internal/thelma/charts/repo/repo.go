@@ -2,7 +2,7 @@ package repo
 
 import (
 	"fmt"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/repo/bucket"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/gcp/bucket"
 	"path"
 	"time"
 )

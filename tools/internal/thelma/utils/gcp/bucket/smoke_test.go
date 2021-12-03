@@ -18,7 +18,7 @@ type testHarness struct {
 	objectPrefix string
 }
 
-// This file contains a smoke test that talks to a real GCS bucket. By default it is ignored by Go test.
+// This file contains a smoke test that talks to a real GCS bucket. By default it is ignored by `go test`.
 // You can run it with:
 //   go test ./... -tags smoke
 

@@ -1,7 +1,7 @@
 package yq
 
 import (
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/shell"
 )
 
 const prog = "yq"

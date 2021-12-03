@@ -5,7 +5,7 @@ import (
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render/helmfile"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render/resolver"
-	. "github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/testutils"
+	. "github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/testutils"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"os"

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shellmock"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell/shellmock"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/gitops"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render/helmfile"
 	. "github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/testutils"

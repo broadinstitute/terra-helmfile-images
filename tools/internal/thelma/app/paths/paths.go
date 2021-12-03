@@ -1,7 +1,7 @@
 package paths
 
 import (
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/config"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/app/config"
 	"github.com/rs/zerolog/log"
 	"os"
 	"path"

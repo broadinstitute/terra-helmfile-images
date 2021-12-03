@@ -2,8 +2,8 @@ package app
 
 import (
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/config"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/paths"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/app/config"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/app/paths"
 )
 
 // Options for a ThelmaApp

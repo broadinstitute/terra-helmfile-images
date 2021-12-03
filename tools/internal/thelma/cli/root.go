@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/shell"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/app"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/config"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/app/config"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"

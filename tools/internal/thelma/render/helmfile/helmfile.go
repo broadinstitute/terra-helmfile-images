@@ -2,10 +2,11 @@ package helmfile
 
 import (
 	"fmt"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/shell"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/gitops"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render/helmfile/argocd"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render/resolver"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/shell"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
 	"io/ioutil"
@@ -13,6 +14,8 @@ import (
 	"path"
 	"path/filepath"
 )
+
+const cmdLogLevel = zerolog.DebugLevel
 
 // Args arguments for a helmfile render
 type Args struct {
@@ -38,7 +41,7 @@ type Options struct {
 // ConfigRepo can be used to `helmfile` render commands on a clone of the `terra-helmfile` repo
 type ConfigRepo struct {
 	thelmaHome       string
-	chartResolver    resolver.ChartResolver
+	chartResolver    resolver.Resolver
 	helmfileLogLevel string
 	stdout           bool
 	outputDir        string
@@ -48,10 +51,11 @@ type ConfigRepo struct {
 
 // NewConfigRepo constructs a new ConfigRepo object
 func NewConfigRepo(options Options) *ConfigRepo {
-	chartResolver := resolver.NewChartResolver(options.ShellRunner, resolver.Options{
+	chartResolver := resolver.NewResolver(options.ShellRunner, resolver.Options{
 		Mode:      options.ResolverMode,
 		CacheDir:  options.ChartCacheDir,
 		SourceDir: options.ChartSourceDir,
+		ScratchDir: path.Join(options.ScratchDir, "resolver"),
 	})
 
 	return &ConfigRepo{
@@ -60,7 +64,7 @@ func NewConfigRepo(options Options) *ConfigRepo {
 		helmfileLogLevel: options.HelmfileLogLevel,
 		stdout:           options.Stdout,
 		outputDir:        options.OutputDir,
-		scratchDir:       options.ScratchDir,
+		scratchDir:       path.Join(options.ScratchDir, "helmfile"),
 		shellRunner:      options.ShellRunner,
 	}
 }
@@ -82,7 +86,8 @@ func (r *ConfigRepo) CleanOutputDirectoryIfEnabled() error {
 
 	// This code would be simpler if we could just call os.RemoveAll() on the
 	// output directory itself, but in some cases the output directory is a volume
-	// mount, and trying to remove it throws an error.
+	// mount in a Docker container, and trying to remove it throws an error.
+	// So we remove all its contents instead.
 	dir, err := ioutil.ReadDir(r.outputDir)
 	if err != nil {
 		return err
@@ -101,8 +106,10 @@ func (r *ConfigRepo) CleanOutputDirectoryIfEnabled() error {
 	return nil
 }
 
-// HelmUpdate updates Helm repos
+// HelmUpdate updates Helm repo indexes.
 func (r *ConfigRepo) HelmUpdate() error {
+	log.Info().Msg("Updating Helm repo indexes")
+
 	cmd := shell.Command{
 		Prog: ProgName,
 		Args: []string{
@@ -112,9 +119,8 @@ func (r *ConfigRepo) HelmUpdate() error {
 		},
 		Dir: r.thelmaHome,
 	}
-	log.Debug().Msg("Updating Helm repos...")
 
-	return r.shellRunner.Run(cmd)
+	return r.runCmd(cmd)
 }
 
 func (r *ConfigRepo) RenderForTarget(target gitops.Target, args *Args) error {
@@ -157,7 +163,7 @@ func (r *ConfigRepo) renderArgocdProjectManifests(target gitops.Target) error {
 	cmd.setTargetEnvVars(target)
 	cmd.setArgocdProjectEnvVar(target)
 
-	log.Info().Msgf("Rendering ArgoCD project manifests for %s %s", target.Type(), target.Name())
+	log.Info().Msgf("Rendering ArgoCD manifests for %s %s", target.Name(), target.Type())
 
 	return r.runHelmfile(cmd)
 }
@@ -180,7 +186,7 @@ func (r *ConfigRepo) renderArgocdApplicationManifests(release gitops.Release) er
 	cmd.setNamespaceEnvVar(release)
 	cmd.setClusterEnvVars(release)
 
-	log.Info().Msgf("Rendering ArgoCD application manifests for %s in %s %s", release.Name(), release.Target().Type(), release.Target().Name())
+	log.Info().Msgf("Rendering ArgoCD manifests for %s in %s", release.Name(), release.Target().Name())
 
 	return r.runHelmfile(cmd)
 }
@@ -189,11 +195,11 @@ func (r *ConfigRepo) renderArgocdApplicationManifests(release gitops.Release) er
 func (r *ConfigRepo) renderApplicationManifests(release gitops.Release, args *Args) error {
 	chartVersion := release.ChartVersion()
 	if args.ChartVersion != nil {
-		log.Warn().Msgf("Overriding default chart version for %s with %s", chartVersion, *args.ChartVersion)
+		log.Debug().Msgf("Overriding default chart version for %s with %s", chartVersion, *args.ChartVersion)
 		chartVersion = *args.ChartVersion
 	}
 
-	chartPath, err := r.chartResolver.Resolve(resolver.ChartRelease{
+	resolvedChart, err := r.chartResolver.Resolve(resolver.ChartRelease{
 		Name:    release.ChartName(),
 		Repo:    release.Repo(),
 		Version: chartVersion,
@@ -210,37 +216,50 @@ func (r *ConfigRepo) renderApplicationManifests(release gitops.Release, args *Ar
 	cmd.setDir(r.thelmaHome)
 	cmd.setLogLevel(r.helmfileLogLevel)
 
-	cmd.setSkipDeps(true) // resolver runs `helm dependency update` on local charts, so enable --skip-deps
+	// resolver runs `helm dependency update` on local charts, so we always set --skip-deps to save time
+	cmd.setSkipDeps(true)
+
 	cmd.setReleaseEnvVars(release)
 	cmd.setTargetEnvVars(release.Target())
 	cmd.setNamespaceEnvVar(release)
 
 	cmd.addValuesFiles(args.ValuesFiles...)
-	cmd.setChartPathEnvVar(chartPath)
+	cmd.setChartPathEnvVar(resolvedChart.Path())
+
+	logEvent := log.Info().
+		Str("chartVersion", resolvedChart.Version()).
+		Str("chartSource", resolvedChart.SourceDescription())
 
 	if release.Type() == gitops.AppReleaseType {
 		appVersion := release.(gitops.AppRelease).AppVersion()
 		if args.AppVersion != nil {
-			log.Warn().Msgf("Overriding default app version %s with %s", appVersion, *args.AppVersion)
+			log.Debug().Msgf("Overriding default app version %s with %s", appVersion, *args.AppVersion)
 			appVersion = *args.AppVersion
 		}
+		logEvent = logEvent.Str("appVersion", appVersion)
 		cmd.setAppVersionEnvVar(appVersion)
+
 	} else if args.AppVersion != nil {
 		log.Warn().Msgf("Ignoring --app-version %s; --app-version is not supported for cluster releases", *args.AppVersion)
 	}
 
-	log.Info().Msgf("Rendering application manifests for %s in %s %s", release.Name(), release.Target().Type(), release.Target().Name())
+	logEvent.Msgf("Rendering %s in %s", release.Name(), release.Target().Name())
 
 	return r.runHelmfile(cmd)
 }
 
 func (r *ConfigRepo) runHelmfile(cmd *Cmd) error {
-	err := r.shellRunner.Run(cmd.toShellCommand())
+	err := r.runCmd(cmd.toShellCommand())
 	if err != nil {
 		return err
 	}
 
 	return normalizeOutputDir(cmd.outputDir)
+}
+
+func (r *ConfigRepo) runCmd(cmd shell.Command) error {
+	level := cmdLogLevel
+	return r.shellRunner.RunWith(cmd, shell.RunOptions{LogLevel: &level})
 }
 
 // Normalize output directories so they match what was produced by earlier iterations of the render tool.

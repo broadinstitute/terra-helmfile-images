@@ -3,10 +3,9 @@ package cli
 import (
 	"errors"
 	"fmt"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/shell"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/shell/shellmock"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/gitops"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/render/helmfile"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/shell"
 	. "github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/testutils"
 	"github.com/stretchr/testify/assert"
 	"os"
@@ -38,11 +37,11 @@ var fakeReleaseTargets = []gitops.Target{
 
 // Struct for tracking global state that is mocked when a test executes and restored/cleaned up after
 type TestState struct {
-	mockRunner      *shellmock.MockRunner // mock shell.Runner, used for mocking shell commands
-	mockHome        string                // mock terra-helmfile clone, created once before all test cases
-	mockChartSrcDir string                // mock chart source directory, created once before all test cases
-	scratchDir      string                // scratch directory, cleaned out before each test case
-	thelmaCLI       *ThelmaCLI            // thelmaCLI wired with the above
+	mockRunner      *shell.MockRunner // mock shell.Runner, used for mocking shell commands
+	mockHome        string            // mock terra-helmfile clone, created once before all test cases
+	mockChartSrcDir string            // mock chart source directory, created once before all test cases
+	scratchDir      string            // scratch directory, cleaned out before each test case
+	thelmaCLI       *ThelmaCLI        // thelmaCLI wired with the above
 }
 
 // A table-driven integration test for the render tool.
@@ -375,18 +374,18 @@ func args(format string, a ...interface{}) []string {
 }
 
 // Convenience function for setting up an expectation for a helmfile update command
-func (ts *TestState) expectHelmfileUpdateCmd() *shellmock.Call {
+func (ts *TestState) expectHelmfileUpdateCmd() *shell.Call {
 	return ts.expectCmd("helmfile --log-level=info --allow-no-matching-release repos")
 }
 
 // Convenience function for setting up an expectation for a helmfile template command
-func (ts *TestState) expectHelmfileCmd(target gitops.Target, format string, a ...interface{}) *shellmock.Call {
+func (ts *TestState) expectHelmfileCmd(target gitops.Target, format string, a ...interface{}) *shell.Call {
 	cmd := ts.buildHelmfileCmd(target, format, a...)
 	return ts.mockRunner.ExpectCmd(cmd)
 }
 
 // Convenience function for setting up an expectation for a helmfile template command
-func (ts *TestState) expectHelmfileCmdWithEnv(target gitops.Target, env []string, format string, a ...interface{}) *shellmock.Call {
+func (ts *TestState) expectHelmfileCmdWithEnv(target gitops.Target, env []string, format string, a ...interface{}) *shell.Call {
 	cmd := ts.buildHelmfileCmd(target, format, a...)
 	cmd.Env = append(cmd.Env, env...)
 	return ts.mockRunner.ExpectCmd(cmd)
@@ -407,13 +406,13 @@ func (ts *TestState) buildHelmfileCmd(target gitops.Target, format string, a ...
 	}
 }
 
-func (ts *TestState) expectCmd(format string, a ...interface{}) *shellmock.Call {
+func (ts *TestState) expectCmd(format string, a ...interface{}) *shell.Call {
 	cmd := ts.buildCmd(format, a...)
 	return ts.mockRunner.ExpectCmd(cmd)
 }
 
 func (ts *TestState) buildCmd(format string, a ...interface{}) shell.Command {
-	cmd := shellmock.CmdFromFmt(format, a...)
+	cmd := shell.CmdFromFmt(format, a...)
 	cmd.Dir = ts.mockHome
 	return cmd
 }
@@ -445,11 +444,11 @@ func setup(t *testing.T) (*TestState, error) {
 	scratchDir := path.Join(tmpDir, "scratch")
 
 	// Create a mock runner for executing shell commands
-	mockRunnerOpts := shellmock.Options{
+	mockRunnerOpts := shell.MockOptions{
 		IgnoreEnvVars: []string{"THF_CHART_CACHE_DIR"}, // ignore chart cache dir (created randomly at runtime)
 		VerifyOrder:   false,                           // disable order verification because commands run in parallel
 	}
-	mockRunner := shellmock.NewMockRunner(mockRunnerOpts)
+	mockRunner := shell.NewMockRunner(mockRunnerOpts)
 	mockRunner.Test(t)
 
 	thelmaCLI := newThelmaCLI()

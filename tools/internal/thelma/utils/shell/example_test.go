@@ -1,8 +1,8 @@
-package shellmock
+package shell
 
 import (
 	"bytes"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/shell"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
@@ -13,23 +13,23 @@ import (
 // The code we're testing:
 
 // SayHello simply echos hello world
-func SayHello(runner shell.Runner) error {
-	return runner.Run(shell.Command{
+func SayHello(runner Runner) error {
+	return runner.Run(Command{
 		Prog: "echo",
 		Args: []string{"hello", "world"},
 	})
 }
 
 // ListTmpFiles returns a list of files in the /tmp directory
-func ListTmpFiles(runner shell.Runner) ([]string, error) {
-	cmd := shell.Command{
+func ListTmpFiles(runner Runner) ([]string, error) {
+	cmd := Command{
 		Prog: "ls",
 		Args: []string{"-1", "/tmp"},
 	}
 
 	buf := bytes.NewBuffer([]byte{})
 
-	err := runner.Capture(cmd, buf, nil)
+	err := runner.RunWith(cmd, RunOptions{Stdout: buf})
 	if err != nil {
 		return nil, err
 	}
@@ -37,6 +37,24 @@ func ListTmpFiles(runner shell.Runner) ([]string, error) {
 	stdout := buf.String()
 	stdout = strings.TrimSuffix(stdout, "\n")
 	return strings.Split(stdout, "\n"), nil
+}
+
+func ExitStatus42IsFine(runner Runner) error {
+	err := runner.Run(Command{
+		Prog: "flaky-cmd",
+	})
+	if err == nil {
+		return nil
+	}
+	exitErr, ok := err.(*ExitError)
+	if !ok {
+		return err // not an exit error
+	}
+	if exitErr.ExitCode == 42 {
+		log.Warn().Msgf("flaky-cmd exited 42, but that's ok")
+		return nil
+	}
+	return exitErr
 }
 
 // The tests:
@@ -49,7 +67,7 @@ func TestHello(t *testing.T) {
 	runner.Test(t)
 
 	// use ExpectCmd() to tell the mock that we expect a specific command to be run
-	runner.ExpectCmd(shell.Command{
+	runner.ExpectCmd(Command{
 		Prog: "echo",
 		Args: []string{"hello", "world"},
 	})
@@ -64,7 +82,7 @@ func TestHello(t *testing.T) {
 	runner.AssertExpectations(t)
 }
 
-func TestCaptureOutput(t *testing.T) {
+func TestListTmpFiles(t *testing.T) {
 	runner := DefaultMockRunner()
 	runner.Test(t)
 
@@ -78,6 +96,29 @@ func TestCaptureOutput(t *testing.T) {
 	files, err := ListTmpFiles(runner)
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"hello.txt", "zzzz.data"}, files)
+
+	runner.AssertExpectations(t)
+}
+
+func TestExitStatus42IsFine(t *testing.T) {
+	runner := DefaultMockRunner()
+	runner.Test(t)
+
+	// CmdFromArgs is convenience function quickly generating Command structs
+	// CmdFromFmt provides similar functionality, but using format string + args
+	runner.ExpectCmd(CmdFromArgs("flaky-cmd")).Exits(42)
+	runner.ExpectCmd(CmdFromArgs("flaky-cmd")).Exits(43)
+
+	var err error
+
+	// verify the first run returns no error
+	err = ExitStatus42IsFine(runner)
+	assert.NoError(t, err)
+
+	// verify the first run DOES return an error
+	err = ExitStatus42IsFine(runner)
+	assert.Error(t, err)
+	assert.IsType(t, &ExitError{}, err)
 
 	runner.AssertExpectations(t)
 }

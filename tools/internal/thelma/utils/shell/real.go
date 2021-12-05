@@ -16,6 +16,7 @@ const maxErrorBufLenBytes = 5 * 1024 // 5 kb
 const maxCmdId = 1<<24 - 1
 const cmdIdFormat = "%06x"
 const eol = '\n'
+const defaultLogLevel = zerolog.InfoLevel
 
 // Options for a shell runner
 type Options struct {
@@ -29,7 +30,6 @@ type RealRunner struct {
 }
 
 // NewDefaultRunner constructs a new RealRunner
-// TODO rename to NewDefaultRunner
 func NewDefaultRunner() Runner {
 	return NewRunner(Options{})
 }
@@ -48,22 +48,29 @@ func NewRunner(options Options) Runner {
 
 // Run runs a Command, returning an error if the command exits non-zero
 func (r *RealRunner) Run(cmd Command) error {
-	return r.Capture(cmd, nil, nil)
-}
-
-// Generates an id to uniquely identify commands in log messages
-func (r *RealRunner) generateCommandId() string {
-	return fmt.Sprintf(cmdIdFormat, rand.Intn(maxCmdId))
+	return r.RunWith(cmd, RunOptions{})
 }
 
 // Capture runs a Command, streaming stdout and stderr to the given writers.
 // An error is returned if the command exits non-zero.
-func (r *RealRunner) Capture(cmd Command, stdout io.Writer, stderr io.Writer) error {
-	// Generate an id to uniquely identify this command in log messages
-	id := r.generateCommandId()
-	logger := r.logger.With().Str("cmd", id).Logger()
+func (r *RealRunner) RunWith(cmd Command, opts RunOptions) error {
+	// Handle options into local variables
+	logger := r.logger
+	if opts.Logger != nil {
+		logger = *opts.Logger
+	}
+	level := defaultLogLevel
+	if opts.LogLevel != nil {
+		level = *opts.LogLevel
+	}
+	stderr := opts.Stderr
+	stdout := opts.Stdout
 
-	// Wrap user-supplied stderr writer in a new io.Writer that records stderr
+	// Generate an id to uniquely identify this command in log messages and add to Log context
+	id := r.generateCommandId()
+	logger = logger.With().Str("cmd", id).Logger()
+
+	// Wrap user-supplied stderr writer in a new io.Writer that records stderr output
 	errCapture := newCapturingWriter(maxErrorBufLenBytes, logger, stderr)
 
 	// Wrap user-supplied stdout and stderr in new io.Writers that log messages at debug level
@@ -80,19 +87,32 @@ func (r *RealRunner) Capture(cmd Command, stdout io.Writer, stderr io.Writer) er
 	execCmd.Stdout = stdout
 	execCmd.Stderr = stderr
 
-	logger.Info().Str("dir", cmd.Dir).Msgf("Executing: %q", cmd.PrettyFormat())
+	logger.WithLevel(level).Str("dir", cmd.Dir).Msgf("Executing: %q", cmd.PrettyFormat())
 
 	err := execCmd.Run()
 	if err != nil {
 		logger.Debug().Msgf("Command failed: %v\n", err)
-		return &Error{
-			Command: cmd,
-			Err:     err,
-			ErrOut:  errCapture.String(),
+
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return &ExitError{
+				Command: cmd,
+				ExitCode: exitErr.ExitCode(),
+				Stderr: errCapture.String(),
+			}
+		} else {
+			return &Error{
+				Command: cmd,
+				err: err,
+			}
 		}
 	}
 
 	return nil
+}
+
+// Generates an id to uniquely identify commands in log messages
+func (r *RealRunner) generateCommandId() string {
+	return fmt.Sprintf(cmdIdFormat, rand.Intn(maxCmdId))
 }
 
 // An io.Writer that captures data it receives with Write() into a buffer and optionally forwards to another writer

@@ -3,7 +3,6 @@ package gitops
 import (
 	"fmt"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/shell"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/shell/shellmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gopkg.in/yaml.v3"
@@ -27,7 +26,7 @@ releases:
 
 func TestSnapshot_ChartVersion(t *testing.T) {
 	thelmaHome := t.TempDir()
-	runner := shellmock.DefaultMockRunner()
+	runner := shell.DefaultMockRunner()
 
 	err := initializeFakeVersionsDir(thelmaHome)
 	if !assert.NoError(t, err) {
@@ -55,7 +54,7 @@ func TestSnapshot_ChartVersion(t *testing.T) {
 
 func TestSnapshot_UpdateChartVersionIfDefined(t *testing.T) {
 	type testMocks struct {
-		runner     *shellmock.MockRunner
+		runner     *shell.MockRunner
 		thelmaHome string
 	}
 	testCases := []struct {
@@ -123,7 +122,7 @@ func TestSnapshot_UpdateChartVersionIfDefined(t *testing.T) {
 	for _, tc := range testCases {
 		mocks := testMocks{
 			thelmaHome: t.TempDir(),
-			runner:     shellmock.DefaultMockRunner(),
+			runner:     shell.DefaultMockRunner(),
 		}
 		err := initializeFakeVersionsDir(mocks.thelmaHome)
 		if !assert.NoError(t, err) {

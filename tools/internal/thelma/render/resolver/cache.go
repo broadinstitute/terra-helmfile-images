@@ -1,151 +1,117 @@
 package resolver
 
 import (
-	"fmt"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/tools/helm"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/shell"
-	"github.com/rs/zerolog/log"
-	"io/ioutil"
-	"os"
-	"path"
+	"strings"
 	"sync"
 )
 
-// ChartCache caches unpacked charts on disk
-type ChartCache interface {
-	Fetch(chart ChartRelease) (string, error)
+// Separator use when joining elements of a ChartRelease into a string cache key
+const defaultCacheKeySeparator = " " // URLs can't have whitespace, so this won't show up
+                                     // in Helm repo and chart names, or in chart version strings
+
+// Synchronized cache is a concurrent-safe cache for ResolvedCharts.
+// It guarantees that the chart resolver function will only be called once for a given cache key.
+type syncCache interface {
+	get(chartRelease ChartRelease, resolver resolverFn) (ResolvedChart, error)
 }
 
-type chartCache struct {
-	cacheDir     string
-	runner       shell.Runner
-	globalLock   sync.Mutex
-	cacheEntries map[ChartRelease]*cacheEntry
-}
+// Maps chart releases to cache keys.
+// This is useful because the local chart resolver, for example, ignores chart versions
+// when resolving charts.
+type keyMapper func (chartRelease ChartRelease) string
 
-type cacheEntry struct {
-	alreadyFetched bool
-	err            error
-	cachePath      string
-	mutex          *sync.Mutex
-}
+// Function the cache should use for resolving a chart release.
+type resolverFn func (chartRelease ChartRelease) (ResolvedChart, error)
 
-func NewChartCache(cacheDir string, runner shell.Runner) ChartCache {
-	return &chartCache{
-		cacheDir:     cacheDir,
-		runner:       runner,
-		cacheEntries: make(map[ChartRelease]*cacheEntry),
-	}
-}
-
-func (c *chartCache) Fetch(chart ChartRelease) (string, error) {
-	entry := c.getCacheEntry(chart)
-	entry.mutex.Lock()
-	defer entry.mutex.Unlock()
-
-	if entry.alreadyFetched {
-		log.Debug().Msgf("Chart %s/%s version %s already fetched, returning cached result: [%s, %v]", chart.Repo, chart.Name, chart.Version, entry.cachePath, entry.err)
-		return entry.cachePath, entry.err
-	}
-
-	cachePath, err := c.tryFetch(chart)
-
-	entry.cachePath = cachePath
-	entry.err = err
-	entry.alreadyFetched = true
-
-	return entry.cachePath, entry.err
-}
-
-// Tries to fetch the chart (no locking / safety)
-func (c *chartCache) tryFetch(chart ChartRelease) (string, error) {
-	cachePath := c.cachePath(chart)
-
-	tmpDir := siblingPath(cachePath, ".tmp", true)
-
-	cmd := shell.Command{
-		Prog: helm.ProgName,
-		Args: []string{
-			"fetch",
-			path.Join(chart.Repo, chart.Name),
-			"--version",
-			chart.Version,
-			"--untar",
-			"-d",
-			tmpDir,
+// Default key mapper factors all fields of ChartRelease into a unique key
+func defaultCacheKeyMapper(chartRelease ChartRelease) string {
+	return strings.Join(
+		[]string{
+			chartRelease.Repo,
+			chartRelease.Name,
+			chartRelease.Version,
 		},
-	}
-
-	if err := c.runner.Run(cmd); err != nil {
-		return "", fmt.Errorf("error downloading chart %s/%s version %s to %s: %v", chart.Repo, chart.Name, chart.Version, tmpDir, err)
-	}
-
-	// helm fetch repo/chart --untar -d /mydir will nest the chart one level, so we'll end up
-	// with /mydir/<chart>/Chart.yaml, for example.
-	// But we _want_ /mydir/Chart.yaml, so we remove the extra level of nesting.
-	files, err := ioutil.ReadDir(tmpDir)
-	if err != nil {
-		return "", err
-	}
-	if len(files) != 1 {
-		return "", fmt.Errorf("expected exactly one file in %s, got: %v", tmpDir, files)
-	}
-
-	tmpChartPath := path.Join(tmpDir, files[0].Name())
-	log.Debug().Msgf("Rename %s to %s", tmpChartPath, cachePath)
-	if err = os.Rename(tmpChartPath, cachePath); err != nil {
-		return "", err
-	}
-
-	if err = os.RemoveAll(tmpDir); err != nil {
-		return "", err
-	}
-
-	return cachePath, nil
+		defaultCacheKeySeparator,
+	)
 }
 
-// Returns lock for the given chart name, and a boolean (true if a lock already existed, false otherwise)
-func (c *chartCache) getCacheEntry(chart ChartRelease) *cacheEntry {
-	c.globalLock.Lock()
-	defer c.globalLock.Unlock()
-
-	_, exists := c.cacheEntries[chart]
-	if !exists {
-		c.cacheEntries[chart] = &cacheEntry{
-			mutex: &sync.Mutex{},
-		}
-	}
-
-	return c.cacheEntries[chart]
+type syncCacheImpl struct {
+	globalMutex sync.RWMutex
+	keyMapper keyMapper
+	cache map[string]*entry
 }
 
-// eg. "terra-helm/agora-1.2.3"
-func (c *chartCache) cachePath(chart ChartRelease) string {
-	return path.Join(c.cacheDir, chart.Repo, fmt.Sprintf("%s-%s", chart.Name, chart.Version))
+// Returns a new syncCache instance
+func newSyncCache() syncCache {
+	return newSyncCacheWithMapper(defaultCacheKeyMapper)
 }
 
-// siblingPath is a path utility function. Given a directory path,
-// it returns a path in the same parent directory, with the same basename,
-// with a user-supplied suffix. The new path may optionally be hidden.
-//
-// Eg.
-//  siblingPath("/tmp/foo", ".lk", true)
-// ->
-// "/tmp/.foo.lk"
-//
-// siblingPath("/tmp/foo", "-scratch", false)
-// ->
-// "/tmp/foo-scratch"
-func siblingPath(relpath string, suffix string, hidden bool) string {
-	cleaned := path.Clean(relpath)
-	parent := path.Dir(cleaned)
-	base := path.Base(cleaned)
+func newSyncCacheWithMapper(keyMapper func (ChartRelease) string) syncCache {
+	return &syncCacheImpl{
+		globalMutex: sync.RWMutex{},
+		keyMapper: keyMapper,
+		cache: make(map[string]*entry),
+	}
+}
 
-	var prefix string
-	if hidden {
-		prefix = "."
+func (c *syncCacheImpl) get(chartRelease ChartRelease, resolver resolverFn) (ResolvedChart, error) {
+	key := c.keyMapper(chartRelease)
+	_entry := c.getEntry(key)
+
+	return _entry.getValue(chartRelease, resolver)
+}
+
+func (c *syncCacheImpl) getEntry(key string) *entry {
+	// get a read lock so we can safely read from the map
+	c.globalMutex.RLock()
+	_entry, exists := c.cache[key]
+	c.globalMutex.RUnlock()
+
+	if exists {
+		return _entry
 	}
 
-	siblingBase := fmt.Sprintf("%s%s%s", prefix, base, suffix)
-	return path.Join(parent, siblingBase)
+	// entry does not exist in map, so set a write lock and create one
+	c.globalMutex.Lock()
+	defer c.globalMutex.Unlock()
+
+	_entry = &entry{}
+	c.cache[key] = _entry
+
+	return _entry
+}
+
+// Represents an entry in the cache
+type entry struct {
+	initialized bool
+	mutex sync.RWMutex
+	resolvedChart ResolvedChart
+	err error
+}
+
+// Returns the cached value for a given entry
+func (e *entry) getValue(chartRelease ChartRelease, resolver resolverFn) (ResolvedChart, error) {
+	// Obtain a read lock
+	// if we've been initialized already, return the cached values
+	e.mutex.RLock()
+	if e.initialized {
+		defer e.mutex.RUnlock()
+		return e.resolvedChart, e.err
+	}
+
+	// Otherwise: release the read lock & obtain a write lock instead
+	e.mutex.RUnlock()
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+
+	// generate the values
+	rc, err := resolver(chartRelease)
+
+	// save them & mark this entry as initialized
+	e.resolvedChart = rc
+	e.err = err
+	e.initialized = true
+
+	// return result
+	return e.resolvedChart, e.err
 }

@@ -1,9 +1,8 @@
-package shellmock
+package shell
 
 import (
 	"bytes"
 	"fmt"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/shell"
 	"github.com/stretchr/testify/assert"
 	"regexp"
 	"testing"
@@ -16,7 +15,7 @@ func TestMockRunnerPassesSingleCommand(t *testing.T) {
 
 	m.ExpectCmd(CmdFromArgs("FOO=BAR", "echo", "hello", "world"))
 
-	err := m.Run(shell.Command{
+	err := m.Run(Command{
 		Prog: "echo",
 		Args: []string{"hello", "world"},
 		Env:  []string{"FOO=BAR"},
@@ -75,7 +74,7 @@ func TestMockRunnerFailsWhenOutOfOrder(t *testing.T) {
 
 // If we aren't verifying order, out-of-order commands should be fine!
 func TestMockRunnerOutOfOrderPassesWithNoVerify(t *testing.T) {
-	m := NewMockRunner(Options{VerifyOrder: false})
+	m := NewMockRunner(MockOptions{VerifyOrder: false})
 	m.Test(t)
 
 	m.ExpectCmd(CmdFromArgs("echo", "1"))
@@ -88,15 +87,45 @@ func TestMockRunnerOutOfOrderPassesWithNoVerify(t *testing.T) {
 }
 
 // Verify our mock runner can be used to mock cases where Run() returns an error
+func TestMockRunnerCanMockFailedCommands(t *testing.T) {
+	m := DefaultMockRunner()
+	m.Test(t)
+
+	m.ExpectCmd(CmdFromArgs("fail", "1")).Exits(1)
+
+	m.ExpectCmd(CmdFromArgs("fail", "2")).WithStderr("an\nerr\nmsg").Exits(2)
+
+	var e error
+	var exitErr *ExitError
+
+	e = m.Run(CmdFromArgs("fail", "1"))
+	assert.Error(t, e)
+	assert.IsType(t, &ExitError{}, e)
+	exitErr = e.(*ExitError)
+	assert.Equal(t, 1, exitErr.ExitCode)
+	assert.Equal(t, "", exitErr.Stderr)
+	assert.Equal(t, `Command "fail 1" exited with status 1`, e.Error())
+
+	e = m.Run(CmdFromArgs("fail", "2"))
+	assert.Error(t, e)
+	assert.IsType(t, &ExitError{}, e)
+	exitErr = e.(*ExitError)
+	assert.Equal(t, 2, exitErr.ExitCode)
+	assert.Equal(t, "an\nerr\nmsg", exitErr.Stderr)
+	assert.Equal(t, "Command \"fail 2\" exited with status 2:\nan\nerr\nmsg", e.Error())
+}
+
+// Verify our mock runner can be used to mock cases where Run() returns an error
 func TestMockRunnerCanMockErrors(t *testing.T) {
 	m := DefaultMockRunner()
 	m.Test(t)
 
-	m.ExpectCmd(CmdFromArgs("echo", "1")).Return(fmt.Errorf("my error"))
+	m.ExpectCmd(CmdFromArgs("echo", "1")).Fails(fmt.Errorf("my error"))
 
 	e := m.Run(CmdFromArgs("echo", "1"))
 	assert.Error(t, e, "error should not be nil")
-	assert.Errorf(t, e, "my error", "mock runner should return the mocked error")
+	assert.IsType(t, &Error{}, e)
+	assert.Equal(t, `Command "echo 1" failed to start: my error`, e.Error())
 }
 
 // Verify our mock runner can be used to set expectations on mocks with shell.Command
@@ -104,7 +133,7 @@ func TestMockRunnerCanMockRawCmds(t *testing.T) {
 	m := DefaultMockRunner()
 	m.Test(t)
 
-	m.ExpectCmd(shell.Command{Prog: "echo", Args: []string{"1"}})
+	m.ExpectCmd(Command{Prog: "echo", Args: []string{"1"}})
 
 	e := m.Run(CmdFromArgs("echo", "1"))
 	assert.Nil(t, e, "mock runner should not return an error")
@@ -112,17 +141,17 @@ func TestMockRunnerCanMockRawCmds(t *testing.T) {
 
 // Verify our mock runner can ignore environment variables
 func TestMockRunnerCanIgnoreSubsetOfEnvVars(t *testing.T) {
-	m := NewMockRunner(Options{
+	m := NewMockRunner(MockOptions{
 		IgnoreEnvVars: []string{"FOO"},
 	})
 	m.Test(t)
 
-	m.ExpectCmd(shell.Command{
+	m.ExpectCmd(Command{
 		Prog: "ls",
 		Env:  []string{"HOME=/home/jdoe", "FOO=BAR"},
 	})
 
-	e := m.Run(shell.Command{
+	e := m.Run(Command{
 		Prog: "ls",
 		Env:  []string{"HOME=/home/jdoe", "FOO=NOTBAR"},
 	})
@@ -132,17 +161,17 @@ func TestMockRunnerCanIgnoreSubsetOfEnvVars(t *testing.T) {
 
 // Verify our mock runner can ignore dir attribute on commands
 func TestMockRunnerCanIgnoreDir(t *testing.T) {
-	m := NewMockRunner(Options{
+	m := NewMockRunner(MockOptions{
 		IgnoreDir: true,
 	})
 	m.Test(t)
 
-	m.ExpectCmd(shell.Command{
+	m.ExpectCmd(Command{
 		Prog: "ls",
 		Dir:  "/tmp/foo",
 	})
 
-	e := m.Run(shell.Command{
+	e := m.Run(Command{
 		Prog: "ls",
 		Dir:  "/tmp/bar",
 	})
@@ -152,10 +181,10 @@ func TestMockRunnerCanIgnoreDir(t *testing.T) {
 
 // Check cmd dumps
 func TestMockRunnerCanDumpCmdsDefault(t *testing.T) {
-	m := NewMockRunner(Options{DumpStyle: Default})
+	m := NewMockRunner(MockOptions{DumpStyle: Default})
 
 	m.ExpectCmd(CmdFromArgs("echo", "foo"))
-	m.ExpectCmd(shell.Command{Prog: "echo", Args: []string{"bar"}})
+	m.ExpectCmd(Command{Prog: "echo", Args: []string{"bar"}})
 
 	w := bytes.NewBufferString("")
 	e := m.dumpExpectedCmds(w)
@@ -177,10 +206,10 @@ Expected commands:
 
 // Check cmd dumps
 func TestMockRunnerCanDumpCmdsPretty(t *testing.T) {
-	m := NewMockRunner(Options{DumpStyle: Pretty})
+	m := NewMockRunner(MockOptions{DumpStyle: Pretty})
 
 	m.ExpectCmd(CmdFromArgs("echo", "foo"))
-	m.ExpectCmd(shell.Command{Prog: "echo", Args: []string{"bar"}})
+	m.ExpectCmd(Command{Prog: "echo", Args: []string{"bar"}})
 
 	w := bytes.NewBufferString("")
 	e := m.dumpExpectedCmds(w)
@@ -200,10 +229,10 @@ Expected commands:
 
 // Check cmd dumps
 func TestMockRunnerCanDumpCmdsSpew(t *testing.T) {
-	m := NewMockRunner(Options{DumpStyle: Spew})
+	m := NewMockRunner(MockOptions{DumpStyle: Spew})
 
 	m.ExpectCmd(CmdFromArgs("echo", "foo"))
-	m.ExpectCmd(shell.Command{Prog: "echo", Args: []string{"bar"}})
+	m.ExpectCmd(Command{Prog: "echo", Args: []string{"bar"}})
 
 	w := bytes.NewBufferString("")
 	e := m.dumpExpectedCmds(w)
@@ -241,7 +270,7 @@ Expected commands:
 }
 
 func TestCmdFromFmt(t *testing.T) {
-	expected := shell.Command{
+	expected := Command{
 		Prog: "ls",
 		Args: []string{"-al", "/var"},
 		Env:  []string{"FOO=BAR", "HOME=/tmp"},

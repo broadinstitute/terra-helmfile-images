@@ -2,9 +2,8 @@ package publish
 
 import (
 	"fmt"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/shell"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/shell/shellmock"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/repo"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/shell"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"os"
@@ -15,7 +14,7 @@ import (
 type testState struct {
 	scratchDir string
 	mockRepo   *repo.MockRepo
-	mockRunner *shellmock.MockRunner
+	mockRunner *shell.MockRunner
 	publisher  *publisher
 }
 
@@ -100,7 +99,7 @@ func TestPublish(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			mockRepo := repo.NewMockRepo()
-			mockRunner := shellmock.DefaultMockRunner()
+			mockRunner := shell.DefaultMockRunner()
 
 			scratchDir := t.TempDir()
 			indexFile := path.Join(scratchDir, prevIndexFile)
@@ -133,7 +132,7 @@ func TestPublish(t *testing.T) {
 
 func TestConstructorCreatesEmptyIndexIfNoExist(t *testing.T) {
 	mockRepo := repo.NewMockRepo()
-	mockRunner := shellmock.DefaultMockRunner()
+	mockRunner := shell.DefaultMockRunner()
 
 	tmpDir := t.TempDir()
 

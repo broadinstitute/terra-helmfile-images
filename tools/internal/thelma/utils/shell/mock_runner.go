@@ -1,8 +1,7 @@
-package shellmock
+package shell
 
 import (
 	"fmt"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/shell"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/testutils"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/rs/zerolog/log"
@@ -36,8 +35,8 @@ const (
 	Spew
 )
 
-// Options for a MockRunner
-type Options struct {
+// options for a MockRunner
+type MockOptions struct {
 	VerifyOrder   bool         // VerifyOrder If true, verify commands are run in the order they were declared
 	DumpStyle     CmdDumpStyle // DumpStyle how to style the dump
 	IgnoreEnvVars []string     // Array of environment variable names to strip when matching shell.Command arguments
@@ -46,7 +45,7 @@ type Options struct {
 
 // MockRunner is an implementation of Runner interface for use with testify/mock.
 type MockRunner struct {
-	options          Options
+	options          MockOptions
 	ignoreEnvVars    map[string]struct{}
 	expectedCommands []*expectedCommand
 	runCounter       int
@@ -56,20 +55,20 @@ type MockRunner struct {
 }
 
 type expectedCommand struct {
-	cmd        shell.Command
+	cmd        Command
 	matchCount int
 }
 
 // DefaultMockRunner returns a new mock runner instance with default settings
 func DefaultMockRunner() *MockRunner {
-	options := Options{
+	options := MockOptions{
 		VerifyOrder: true,
 	}
 	return NewMockRunner(options)
 }
 
 // NewMockRunner constructor for MockRunner
-func NewMockRunner(options Options) *MockRunner {
+func NewMockRunner(options MockOptions) *MockRunner {
 	m := new(MockRunner)
 	m.options = options
 
@@ -92,7 +91,7 @@ func NewMockRunner(options Options) *MockRunner {
 //   Args: []string{"-al", "Documents},
 //   Dir: ""
 // }
-func CmdFromFmt(fmt string, args ...interface{}) shell.Command {
+func CmdFromFmt(fmt string, args ...interface{}) Command {
 	tokens := testutils.Args(fmt, args...)
 
 	return CmdFromArgs(tokens...)
@@ -108,7 +107,7 @@ func CmdFromFmt(fmt string, args ...interface{}) shell.Command {
 //   Args: []string{"-al", "."},
 //   Dir: ""
 // }
-func CmdFromArgs(args ...string) shell.Command {
+func CmdFromArgs(args ...string) Command {
 	// count number of leading NAME=VALUE environment var pairs preceding command
 	var i int
 	for i = 0; i < len(args); i++ {
@@ -122,7 +121,7 @@ func CmdFromArgs(args ...string) shell.Command {
 	progIndex := i
 	numArgs := len(args) - (numEnvVars + 1)
 
-	var cmd shell.Command
+	var cmd Command
 
 	if numEnvVars > 0 {
 		cmd.Env = args[0:numEnvVars]
@@ -138,12 +137,12 @@ func CmdFromArgs(args ...string) shell.Command {
 }
 
 // Run Instead of executing the command, logs an info message and registers the call with testify mock
-func (m *MockRunner) Run(cmd shell.Command) error {
-	return m.Capture(cmd, nil, nil)
+func (m *MockRunner) Run(cmd Command) error {
+	return m.RunWith(cmd, RunOptions{})
 }
 
 // Capture Instead of executing the command, log an info message and register the call with testify mock
-func (m *MockRunner) Capture(cmd shell.Command, stdout io.Writer, stderr io.Writer) error {
+func (m *MockRunner) RunWith(cmd Command, opts RunOptions) error {
 	log.Info().Msgf("[MockRunner] Command: %q\n", cmd.PrettyFormat())
 
 	// Remove ignored attributes
@@ -154,7 +153,7 @@ func (m *MockRunner) Capture(cmd shell.Command, stdout io.Writer, stderr io.Writ
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	args := m.Mock.Called(cmd, stdout, stderr)
+	args := m.Mock.Called(cmd, opts)
 	if len(args) > 0 {
 		return args.Error(0)
 	}
@@ -162,11 +161,14 @@ func (m *MockRunner) Capture(cmd shell.Command, stdout io.Writer, stderr io.Writ
 }
 
 // ExpectCmd sets an expectation for a command that should be run.
-func (m *MockRunner) ExpectCmd(cmd shell.Command) *Call {
+func (m *MockRunner) ExpectCmd(cmd Command) *Call {
 	cmd = m.applyIgnores(cmd)
 
-	mockCall := m.Mock.On("Capture", cmd, mock.Anything, mock.Anything)
-	callWrapper := &Call{Call: mockCall}
+	mockCall := m.Mock.On("RunWith", cmd, mock.AnythingOfType("RunOptions"))
+	callWrapper := &Call{
+		command: cmd,
+		Call: mockCall,
+	}
 
 	order := len(m.expectedCommands)
 	expected := &expectedCommand{cmd: cmd}
@@ -218,7 +220,7 @@ func (m *MockRunner) Test(t *testing.T) {
 	m.Mock.Test(t)
 }
 
-func (m *MockRunner) applyIgnores(cmd shell.Command) shell.Command {
+func (m *MockRunner) applyIgnores(cmd Command) Command {
 	if m.options.IgnoreDir {
 		cmd.Dir = ""
 	}

@@ -2,14 +2,13 @@ package helmfile
 
 import (
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/shell"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/shell/shellmock"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 type testState struct {
 	configRepo *ConfigRepo
-	mockRunner *shellmock.MockRunner
+	mockRunner *shell.MockRunner
 }
 
 func TestHelmfileUpdate(t *testing.T) {
@@ -117,7 +116,7 @@ func TestNormalizeOutputDir(t *testing.T) {
 }
 
 func setupTestState(t *testing.T) *testState {
-	mockRunner := shellmock.DefaultMockRunner()
+	mockRunner := shell.DefaultMockRunner()
 	mockRunner.Test(t)
 
 	configRepo := NewConfigRepo(Options{

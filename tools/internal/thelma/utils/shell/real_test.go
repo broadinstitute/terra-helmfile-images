@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"os"
 	"path"
-	"regexp"
 	"testing"
 )
 
@@ -39,20 +38,20 @@ func TestRunFailed(t *testing.T) {
 	runner := NewDefaultRunner()
 	cmd := Command{}
 	cmd.Prog = "sh"
-	cmd.Args = []string{"-c", "exit 42"}
+	cmd.Args = []string{"-c", "echo oops >&2 && exit 42"}
 	cmd.Dir = ""
 
 	err := runner.Run(cmd)
 	if err == nil {
 		t.Errorf("Expected error when running command: %v", cmd)
 	}
-	shellErr, ok := err.(*Error)
-	if !ok {
-		t.Errorf("Expected ShellError, got: %v", err)
+	exitErr, ok := err.(*ExitError)
+	if !assert.True(t, ok,"Expected shell.ExitError, got: %v", err) {
+		t.FailNow()
 	}
-	if !regexp.MustCompile("Command \"sh -c exit 42\" exited with status 42").MatchString(shellErr.Error()) {
-		t.Errorf("Unexpected error message: %v", err)
-	}
+	assert.Equal(t,"Command \"sh -c echo oops >&2 && exit 42\" exited with status 42:\noops\n", exitErr.Error())
+	assert.Equal(t, "oops\n", string(exitErr.Stderr))
+	assert.Equal(t, 42, exitErr.ExitCode)
 }
 
 func TestRunError(t *testing.T) {
@@ -66,33 +65,41 @@ func TestRunError(t *testing.T) {
 	if err == nil {
 		t.Errorf("Expected error when running command: %v", cmd)
 	}
-	shellErr, ok := err.(*Error)
-	if !ok {
-		t.Errorf("Expected ShellError, got: %v", err)
+	_err, ok := err.(*Error)
+	if !assert.True(t, ok,"Expected shell.Error, got: %v", err) {
+		t.FailNow()
 	}
-	if !regexp.MustCompile("Command \"echo a b\" failed to start").MatchString(shellErr.Error()) {
-		t.Errorf("Unexpected error message: %v", err)
-	}
+	assert.Regexp(t,"Command \"echo a b\" failed to start", _err.Error())
 }
 
-func TestCapture(t *testing.T) {
+func TestRunWith(t *testing.T) {
 	runner := NewDefaultRunner()
 	var err error
 
 	stdout := bytes.NewBuffer([]byte{})
-	err = runner.Capture(Command{
-		Prog: "echo",
-		Args: []string{"hello"},
-	}, stdout, nil)
+	err = runner.RunWith(
+		Command{
+			Prog: "echo",
+			Args: []string{"hello"},
+		},
+		RunOptions{
+			Stdout: stdout,
+		},
+	)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "hello\n", stdout.String())
 
 	stderr := bytes.NewBuffer([]byte{})
-	err = runner.Capture(Command{
-		Prog: "ls",
-		Args: []string{path.Join(t.TempDir(), "does-not-exist")},
-	}, nil, stderr)
+	err = runner.RunWith(
+		Command{
+			Prog: "ls",
+			Args: []string{path.Join(t.TempDir(), "does-not-exist")},
+		},
+		RunOptions{
+			Stderr: stderr,
+		},
+	)
 	assert.Error(t, err)
 	assert.Regexp(t, "does-not-exist.*No such file or directory", stderr.String())
 }

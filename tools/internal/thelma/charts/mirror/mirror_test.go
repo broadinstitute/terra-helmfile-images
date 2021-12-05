@@ -1,11 +1,10 @@
 package mirror
 
 import (
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/shell"
-	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/shell/shellmock"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/publish"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/charts/repo/index"
 	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/tools/helm"
+	"github.com/broadinstitute/terra-helmfile-images/tools/internal/thelma/utils/shell"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -15,7 +14,7 @@ func TestUploadToMirror(t *testing.T) {
 
 	publisher := publish.NewMockPublisher()
 	_index := index.NewMockIndex()
-	runner := shellmock.DefaultMockRunner()
+	runner := shell.DefaultMockRunner()
 
 	_index.On("HasVersion", "mongodb", "1.2.3").Return(false, nil)
 	_index.On("HasVersion", "mongodb", "0.1.0").Return(true, nil)

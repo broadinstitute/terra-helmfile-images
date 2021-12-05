@@ -117,8 +117,6 @@ func (r *multiRender) renderAll(helmfileArgs *helmfile.Args) error {
 		return fmt.Errorf("no matching releases found")
 	}
 
-	log.Info().Msgf("Rendering for %d releases...", len(jobs))
-
 	numWorkers := 1
 	if r.options.ParallelWorkers >= 1 {
 		numWorkers = r.options.ParallelWorkers
@@ -127,6 +125,8 @@ func (r *multiRender) renderAll(helmfileArgs *helmfile.Args) error {
 		// don't make more workers than we have items to process
 		numWorkers = len(jobs)
 	}
+
+	log.Info().Msgf("Rendering %d release(s) with %d worker(s)", len(jobs), numWorkers)
 
 	queueCh := make(chan renderJob, len(jobs))
 	for _, job := range jobs {

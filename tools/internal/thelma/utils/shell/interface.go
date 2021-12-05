@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/rs/zerolog"
 	"io"
-	"os/exec"
 	"strings"
 )
 
@@ -81,7 +80,6 @@ type ExitError struct {
 	Command Command // the command that generated this error
 	ExitCode int // exit code of command
 	Stderr string // stderr output
-	err *exec.ExitError // underlyung error returned by exec package
 }
 
 // Error generates a user-friendly error message for failed shell commands

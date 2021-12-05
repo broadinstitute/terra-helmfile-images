@@ -23,6 +23,8 @@ FROM alpine:${ALPINE_VERSION} as runtime-deps
 
 ARG HELM_VERSION=3.2.4
 ARG HELMFILE_VERSION=0.114.0
+ARG YQ_VERSION=4.11.2
+ARG HELM_DOCS_VERSION=1.5.0
 ARG OS=linux
 ARG ARCH=amd64
 
@@ -40,6 +42,20 @@ RUN wget --timeout=15 -q -O helmfile "https://github.com/roboll/helmfile/release
     chmod +x helmfile && \
     mv helmfile /tools/bin && \
     /tools/bin/helmfile --version
+
+# Install yq
+RUN wget https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_${OS}_${ARCH}.tar.gz -O - |\
+  tar xz && \
+  mv yq_${OS}_${ARCH} /tools/bin/yq && \
+  /tools/bin/yq --version
+
+# Install helm-docs
+# amd64 is only made available as an rpm or deb package and not a tarball, so we install RPM to s
+RUN apk add rpm && \
+    wget https://github.com/norwoodj/helm-docs/releases/download/v${HELM_DOCS_VERSION}/helm-docs_${HELM_DOCS_VERSION}_${OS}_${ARCH}.rpm -O helm-docs.rpm && \
+    rpm -i helm-docs.rpm --ignoresize && \
+    mv /usr/local/bin/helm-docs /tools/bin && \
+    /tools/bin/helm-docs --version
 
 #
 # Copy tools into runtime image

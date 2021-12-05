@@ -31,10 +31,15 @@ if [[ -z "${TERRA_RELEASE}" ]]; then
   TERRA_RELEASE="${TERRA_APP}"
 fi
 
+if [[ -z "${THELMA_RENDER_MODE}" ]]; then
+  echo "Usage: Please specify THELMA_RENDER_MODE as an environment variable" >&2
+  exit 1
+fi
+
 if [[ "$1" == 'init' ]]; then
   : # Nothing to do
 elif [[ "$1" == 'generate' ]]; then
-  # Delegate to render script
+  # Delegate to `thelma render`
   args=()
   if [[ -n "${TERRA_APP_VERSION}" ]]; then
     args+=( --app-version "${TERRA_APP_VERSION}" )
@@ -44,8 +49,10 @@ elif [[ "$1" == 'generate' ]]; then
     args+=( --chart-version "${TERRA_CHART_VERSION}" )
   fi
 
-  export TERRA_HELMFILE_PATH=$( pwd )
-  render --stdout $target -r "${TERRA_RELEASE}" "${args[@]}"
+  THELMA_HOME=$( pwd )
+  export THELMA_HOME
+
+  thelma render --stdout $target -r "${TERRA_RELEASE}" --mode "${THELMA_RENDER_MODE}" "${args[@]}"
 else
   echo "Usage: ${0} (init|generate)" >&2
   exit 1

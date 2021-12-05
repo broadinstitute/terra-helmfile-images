@@ -21,9 +21,9 @@ type localResolver interface {
 }
 
 type localResolverImpl struct {
-	sourceDir   string
-	cache		syncCache
-	runner      shell.Runner
+	sourceDir string
+	cache     syncCache
+	runner    shell.Runner
 }
 
 func newLocalResolver(sourceDir string, runner shell.Runner) localResolver {
@@ -35,9 +35,9 @@ func newLocalResolver(sourceDir string, runner shell.Runner) localResolver {
 	})
 
 	return &localResolverImpl{
-		sourceDir:   sourceDir,
-		cache:       cache,
-		runner:      runner,
+		sourceDir: sourceDir,
+		cache:     cache,
+		runner:    runner,
 	}
 }
 

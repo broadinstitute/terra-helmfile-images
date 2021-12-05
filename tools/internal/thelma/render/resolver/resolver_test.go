@@ -16,26 +16,26 @@ const fakeChartVersion = "0.10.0"
 const fakeChartRepo = "terra-helm"
 
 type testCfg struct {
-	srcDir string
-	cacheDir string
+	srcDir     string
+	cacheDir   string
 	scratchDir string
 	mockRunner *shell.MockRunner
-	input *ChartRelease
+	input      *ChartRelease
 }
 
 func TestResolver(t *testing.T) {
 	type expect struct {
-		path string
-		version string
+		path       string
+		version    string
 		sourceDesc string
 	}
 
-	testCases := []struct{
-		name string
-		mode Mode
+	testCases := []struct {
+		name       string
+		mode       Mode
 		errMatcher string
 		setupMocks func(*testCfg)
-		expect func(*expect, *testCfg)
+		expect     func(*expect, *testCfg)
 	}{
 		{
 			name: "development mode should successfully resolve chart from source directory",
@@ -119,8 +119,8 @@ func TestResolver(t *testing.T) {
 				scratchDir: t.TempDir(),
 				mockRunner: shell.DefaultMockRunner(),
 				input: &ChartRelease{
-					Repo: fakeChartRepo,
-					Name: fakeChartName,
+					Repo:    fakeChartRepo,
+					Name:    fakeChartName,
 					Version: fakeChartVersion,
 				},
 			}
@@ -130,8 +130,8 @@ func TestResolver(t *testing.T) {
 			}
 
 			expected := expect{
-				path: "TODO - set in test case",
-				version: "TODO - set in test case",
+				path:       "TODO - set in test case",
+				version:    "TODO - set in test case",
 				sourceDesc: "TODO - set in test case",
 			}
 

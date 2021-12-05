@@ -7,7 +7,7 @@ import (
 
 // Separator use when joining elements of a ChartRelease into a string cache key
 const defaultCacheKeySeparator = " " // URLs can't have whitespace, so this won't show up
-                                     // in Helm repo and chart names, or in chart version strings
+// in Helm repo and chart names, or in chart version strings
 
 // Synchronized cache is a concurrent-safe cache for ResolvedCharts.
 // It guarantees that the chart resolver function will only be called once for a given cache key.
@@ -18,10 +18,10 @@ type syncCache interface {
 // Maps chart releases to cache keys.
 // This is useful because the local chart resolver, for example, ignores chart versions
 // when resolving charts.
-type keyMapper func (chartRelease ChartRelease) string
+type keyMapper func(chartRelease ChartRelease) string
 
 // Function the cache should use for resolving a chart release.
-type resolverFn func (chartRelease ChartRelease) (ResolvedChart, error)
+type resolverFn func(chartRelease ChartRelease) (ResolvedChart, error)
 
 // Default key mapper factors all fields of ChartRelease into a unique key
 func defaultCacheKeyMapper(chartRelease ChartRelease) string {
@@ -37,8 +37,8 @@ func defaultCacheKeyMapper(chartRelease ChartRelease) string {
 
 type syncCacheImpl struct {
 	globalMutex sync.RWMutex
-	keyMapper keyMapper
-	cache map[string]*entry
+	keyMapper   keyMapper
+	cache       map[string]*entry
 }
 
 // Returns a new syncCache instance
@@ -46,11 +46,11 @@ func newSyncCache() syncCache {
 	return newSyncCacheWithMapper(defaultCacheKeyMapper)
 }
 
-func newSyncCacheWithMapper(keyMapper func (ChartRelease) string) syncCache {
+func newSyncCacheWithMapper(keyMapper func(ChartRelease) string) syncCache {
 	return &syncCacheImpl{
 		globalMutex: sync.RWMutex{},
-		keyMapper: keyMapper,
-		cache: make(map[string]*entry),
+		keyMapper:   keyMapper,
+		cache:       make(map[string]*entry),
 	}
 }
 
@@ -83,10 +83,10 @@ func (c *syncCacheImpl) getEntry(key string) *entry {
 
 // Represents an entry in the cache
 type entry struct {
-	initialized bool
-	mutex sync.RWMutex
+	initialized   bool
+	mutex         sync.RWMutex
 	resolvedChart ResolvedChart
-	err error
+	err           error
 }
 
 // Returns the cached value for a given entry

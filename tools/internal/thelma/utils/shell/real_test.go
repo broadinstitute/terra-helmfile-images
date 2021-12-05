@@ -46,10 +46,10 @@ func TestRunFailed(t *testing.T) {
 		t.Errorf("Expected error when running command: %v", cmd)
 	}
 	exitErr, ok := err.(*ExitError)
-	if !assert.True(t, ok,"Expected shell.ExitError, got: %v", err) {
+	if !assert.True(t, ok, "Expected shell.ExitError, got: %v", err) {
 		t.FailNow()
 	}
-	assert.Equal(t,"Command \"sh -c echo oops >&2 && exit 42\" exited with status 42:\noops\n", exitErr.Error())
+	assert.Equal(t, "Command \"sh -c echo oops >&2 && exit 42\" exited with status 42:\noops\n", exitErr.Error())
 	assert.Equal(t, "oops\n", string(exitErr.Stderr))
 	assert.Equal(t, 42, exitErr.ExitCode)
 }
@@ -66,10 +66,10 @@ func TestRunError(t *testing.T) {
 		t.Errorf("Expected error when running command: %v", cmd)
 	}
 	_err, ok := err.(*Error)
-	if !assert.True(t, ok,"Expected shell.Error, got: %v", err) {
+	if !assert.True(t, ok, "Expected shell.Error, got: %v", err) {
 		t.FailNow()
 	}
-	assert.Regexp(t,"Command \"echo a b\" failed to start", _err.Error())
+	assert.Regexp(t, "Command \"echo a b\" failed to start", _err.Error())
 }
 
 func TestRunWith(t *testing.T) {

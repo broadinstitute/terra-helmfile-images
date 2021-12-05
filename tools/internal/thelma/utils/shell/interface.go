@@ -77,9 +77,9 @@ func (e *Error) Error() string {
 
 // ExitError is returned when a command fails
 type ExitError struct {
-	Command Command // the command that generated this error
-	ExitCode int // exit code of command
-	Stderr string // stderr output
+	Command  Command // the command that generated this error
+	ExitCode int     // exit code of command
+	Stderr   string  // stderr output
 }
 
 // Error generates a user-friendly error message for failed shell commands

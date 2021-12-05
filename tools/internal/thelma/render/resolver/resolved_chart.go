@@ -11,8 +11,8 @@ import (
 type ResolutionType int
 
 const (
-	Local ResolutionType = iota // Indicates matching chart was found on local filesystem
-	Remote                      // Indicates matching chart was found in Helm repo
+	Local  ResolutionType = iota // Indicates matching chart was found on local filesystem
+	Remote                       // Indicates matching chart was found in Helm repo
 )
 
 func (t ResolutionType) String() string {
@@ -48,18 +48,18 @@ type ResolvedChart interface {
 
 func NewResolvedChart(path string, chartVersion string, _type ResolutionType, release ChartRelease) ResolvedChart {
 	return &resolvedChart{
-		path: path,
-		chartVersion: chartVersion,
+		path:           path,
+		chartVersion:   chartVersion,
 		resolutionType: _type,
-		chartRelease: release,
+		chartRelease:   release,
 	}
 }
 
 type resolvedChart struct {
-	path string
-	chartVersion string
+	path           string
+	chartVersion   string
 	resolutionType ResolutionType
-	chartRelease ChartRelease
+	chartRelease   ChartRelease
 }
 
 func (r *resolvedChart) Path() string {

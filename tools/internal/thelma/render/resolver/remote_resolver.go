@@ -16,18 +16,18 @@ type remoteResolver interface {
 }
 
 type remoteResolverImpl struct {
-	cacheDir     string
-	scratchDir   string
-	cache		 syncCache
-	runner       shell.Runner
+	cacheDir   string
+	scratchDir string
+	cache      syncCache
+	runner     shell.Runner
 }
 
 func newRemoteResolver(cacheDir string, scratchDir string, runner shell.Runner) remoteResolver {
 	return &remoteResolverImpl{
-		cacheDir:     cacheDir,
-		scratchDir:   scratchDir,
-		cache: 		  newSyncCache(),
-		runner:       runner,
+		cacheDir:   cacheDir,
+		scratchDir: scratchDir,
+		cache:      newSyncCache(),
+		runner:     runner,
 	}
 }
 

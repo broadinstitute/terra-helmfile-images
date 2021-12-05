@@ -52,9 +52,9 @@ type ConfigRepo struct {
 // NewConfigRepo constructs a new ConfigRepo object
 func NewConfigRepo(options Options) *ConfigRepo {
 	chartResolver := resolver.NewResolver(options.ShellRunner, resolver.Options{
-		Mode:      options.ResolverMode,
-		CacheDir:  options.ChartCacheDir,
-		SourceDir: options.ChartSourceDir,
+		Mode:       options.ResolverMode,
+		CacheDir:   options.ChartCacheDir,
+		SourceDir:  options.ChartSourceDir,
 		ScratchDir: path.Join(options.ScratchDir, "resolver"),
 	})
 

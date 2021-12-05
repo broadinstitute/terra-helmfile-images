@@ -14,9 +14,9 @@ const (
 )
 
 type Options struct {
-	Mode      Mode    // development / deploy
-	SourceDir string  // path to chart source directory
-	CacheDir  string  // path where downloaded charts should be cached
+	Mode       Mode   // development / deploy
+	SourceDir  string // path to chart source directory
+	CacheDir   string // path where downloaded charts should be cached
 	ScratchDir string // scratch directory where temporary files should be created
 }
 
@@ -29,7 +29,7 @@ type Resolver interface {
 
 type chartResolver struct {
 	options        Options
-	cache syncCache
+	cache          syncCache
 	localResolver  localResolver
 	remoteResolver remoteResolver
 }
@@ -40,7 +40,7 @@ func NewResolver(runner shell.Runner, options Options) Resolver {
 	cache := newSyncCache()
 	return &chartResolver{
 		options:        options,
-		cache: cache,
+		cache:          cache,
 		localResolver:  local,
 		remoteResolver: remote,
 	}

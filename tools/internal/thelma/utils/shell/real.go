@@ -95,14 +95,14 @@ func (r *RealRunner) RunWith(cmd Command, opts RunOptions) error {
 
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			return &ExitError{
-				Command: cmd,
+				Command:  cmd,
 				ExitCode: exitErr.ExitCode(),
-				Stderr: errCapture.String(),
+				Stderr:   errCapture.String(),
 			}
 		} else {
 			return &Error{
 				Command: cmd,
-				err: err,
+				err:     err,
 			}
 		}
 	}

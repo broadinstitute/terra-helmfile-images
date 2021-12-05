@@ -14,7 +14,6 @@ type Call struct {
 	*mock.Call
 }
 
-
 // Configures the mock command to exit with a non-zero exit code
 func (c *Call) ExitsNonZero() *Call {
 	return c.Exits(1)
@@ -24,9 +23,9 @@ func (c *Call) ExitsNonZero() *Call {
 func (c *Call) Exits(exitCode int) *Call {
 	if exitCode != 0 {
 		err := &ExitError{
-			Command: c.command,
+			Command:  c.command,
 			ExitCode: exitCode,
-			Stderr: c.mockStderr,
+			Stderr:   c.mockStderr,
 		}
 		c.Return(err)
 	}
@@ -37,7 +36,7 @@ func (c *Call) Exits(exitCode int) *Call {
 func (c *Call) Fails(err error) *Call {
 	c.Return(&Error{
 		Command: c.command,
-		err: err,
+		err:     err,
 	})
 	return c
 }

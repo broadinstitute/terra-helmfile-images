@@ -167,7 +167,7 @@ func (m *MockRunner) ExpectCmd(cmd Command) *Call {
 	mockCall := m.Mock.On("RunWith", cmd, mock.AnythingOfType("RunOptions"))
 	callWrapper := &Call{
 		command: cmd,
-		Call: mockCall,
+		Call:    mockCall,
 	}
 
 	order := len(m.expectedCommands)

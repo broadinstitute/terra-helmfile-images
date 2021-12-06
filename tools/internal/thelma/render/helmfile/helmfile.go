@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -254,12 +255,24 @@ func (r *ConfigRepo) runHelmfile(cmd *Cmd) error {
 		return err
 	}
 
-	return normalizeOutputDir(cmd.outputDir)
+	if !r.stdout {
+		return normalizeOutputDir(cmd.outputDir)
+	}
+
+	return nil
 }
 
 func (r *ConfigRepo) runCmd(cmd shell.Command) error {
 	level := cmdLogLevel
-	return r.shellRunner.RunWith(cmd, shell.RunOptions{LogLevel: &level})
+
+	var stdoutWriter io.Writer
+	if r.stdout {
+		stdoutWriter = os.Stdout
+	}
+	return r.shellRunner.RunWith(cmd, shell.RunOptions{
+		LogLevel: &level,
+		Stdout: stdoutWriter,
+	})
 }
 
 // Normalize output directories so they match what was produced by earlier iterations of the render tool.

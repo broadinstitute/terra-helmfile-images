@@ -254,6 +254,10 @@ func (r *ConfigRepo) runHelmfile(cmd *Cmd) error {
 		return err
 	}
 
+	if r.stdout {
+		return nil
+	}
+	
 	return normalizeOutputDir(cmd.outputDir)
 }
 

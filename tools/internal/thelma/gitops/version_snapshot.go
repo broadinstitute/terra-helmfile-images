@@ -103,7 +103,7 @@ func (s *snapshot) UpdateChartVersionIfDefined(releaseName string, newVersion st
 		return fmt.Errorf("error updating version snapshot %s: chart version incorrect after updating %s chart version (should be %q, is %q)", s.filePath, releaseName, newVersion, updatedVersion)
 	}
 
-	log.Info().Msgf("Set chart version for release %s to %s (was %q)", releaseName, newVersion, oldVersion)
+	log.Info().Msgf("Set chart version for release %s to %s in %s (was %q)", releaseName, newVersion, s.filePath, oldVersion)
 	return nil
 }
 

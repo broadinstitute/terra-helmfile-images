@@ -76,13 +76,14 @@ func (s *snapshot) UpdateChartVersionIfDefined(releaseName string, newVersion st
 		return nil
 	}
 
-	chartVersion := s.ChartVersion(releaseName)
-	if semver.IsValid(chartVersion) {
-		if semver.Compare(chartVersion, newVersion) <= 0 {
-			log.Warn().Msgf("Won't update chart version for release %s in %s (Current chart version %q  <= new chart version %q)", releaseName, s.filePath, chartVersion, newVersion)
+	currentVersion := s.ChartVersion(releaseName)
+	if semver.IsValid(currentVersion) {
+		if semver.Compare(newVersion, currentVersion) <= 0 {
+			log.Warn().Msgf("Won't update chart version for release %s in %s (new chart version %q <= current version %q)", releaseName, s.filePath, newVersion, currentVersion)
+			return nil
 		}
 	} else {
-		log.Warn().Msgf("Current chart version %q for release %s in %s is invalid", chartVersion, releaseName, s.filePath)
+		log.Warn().Msgf("Current chart version %q for release %s in %s is invalid", currentVersion, releaseName, s.filePath)
 	}
 
 	if err := s.setReleaseVersion(releaseName, newVersion); err != nil {
@@ -96,13 +97,13 @@ func (s *snapshot) UpdateChartVersionIfDefined(releaseName string, newVersion st
 		return fmt.Errorf("error updating version snapshot %s: malformed after updating %s chart version", s.filePath, releaseName)
 	}
 
-	oldVersion := chartVersion
+	oldVersion := currentVersion
 	updatedVersion := s.ChartVersion(releaseName)
 	if updatedVersion != newVersion {
 		return fmt.Errorf("error updating version snapshot %s: chart version incorrect after updating %s chart version (should be %q, is %q)", s.filePath, releaseName, newVersion, updatedVersion)
 	}
 
-	log.Info().Msgf("Set chart version for release %s to %s (was %q)", releaseName, newVersion, oldVersion)
+	log.Info().Msgf("Set chart version for release %s to %s in %s (was %q)", releaseName, newVersion, s.filePath, oldVersion)
 	return nil
 }
 

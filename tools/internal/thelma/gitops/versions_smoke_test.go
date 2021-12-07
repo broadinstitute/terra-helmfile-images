@@ -15,6 +15,11 @@ func TestSnapshot_UpdateChartVersionIfDefined_Smoke(t *testing.T) {
 
 	var err error
 
+	err = initializeFakeVersionsDir(thelmaHome)
+	if !assert.NoError(t, err) {
+		t.FailNow()
+	}
+
 	v, err := NewVersions(thelmaHome, runner)
 	if !assert.NoError(t, err) {
 		t.Fail()
@@ -22,18 +27,13 @@ func TestSnapshot_UpdateChartVersionIfDefined_Smoke(t *testing.T) {
 
 	_versions := v.(*versions)
 
-	err = initializeFakeVersionsDir(thelmaHome)
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
-
 	// load the snapshot
 	_snapshot := _versions.GetSnapshot(AppReleaseType, Dev)
 	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
 	assert.True(t, _snapshot.ReleaseDefined("agora"))
-	assert.Equal(t, "0.0.0", _snapshot.ChartVersion("agora"))
+	assert.Equal(t, "0.10.0", _snapshot.ChartVersion("agora"))
 
 	// set the chart version
 	err = _snapshot.UpdateChartVersionIfDefined("agora", "7.8.9")

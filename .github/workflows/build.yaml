@@ -118,7 +118,6 @@ jobs:
             "${{ steps.image-name.outputs.name }}:${{ steps.tags.outputs.branch }}"
   images:
     runs-on: ubuntu-latest
-    needs: tools # These images use compiled code from the tools image
     strategy:
       matrix:
         image-name:
@@ -133,16 +132,46 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
+      - name: Set variables
+        id:   vars
+        run:  |
+          set -eo pipefail
+
+          # Identify Git branch
+          # https://docs.github.com/en/actions/reference/environment-variables#default-environment-variables
+          BRANCH_NAME=
+          if [[ $GITHUB_EVENT_NAME == "pull_request" ]]; then
+            BRANCH_NAME=$GITHUB_HEAD_REF
+          elif [[ -n "${GITHUB_REF}" ]]; then
+            BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          else
+            echo "Could not identify branch name!" >&2
+            exit 1
+          fi
+
+          echo "::set-output name=branch::${BRANCH_NAME}"
+          echo "::set-output name=long-sha::$( git rev-parse HEAD )"
+          echo "::set-output name=short-sha::$( git rev-parse --short HEAD )"
+          echo "::set-output name=image-base-url::${GOOGLE_DOCKER_REPOSITORY}/${GOOGLE_PROJECT}/${IMAGE_REPOSITORY_NAME}"
+
+      - name: Set image tags
+        id:   tags
+        run:  |
+          set -eo pipefail
+          echo "::set-output name=branch::${{ steps.vars.outputs.branch }}"
+          echo "::set-output name=short::${{ steps.vars.outputs.branch }}-${{ steps.vars.outputs.short-sha }}"
+          echo "::set-output name=long::${{ steps.vars.outputs.branch }}-${{ steps.vars.outputs.long-sha }}"
+
       - name: Set image name
         id:   image-name
         run:  |
           set -eo pipefail
 
-          NAME="${{ needs.tools.outputs.image-base-url }}/${{ matrix.image-name }}"
+          NAME="${{ steps.vars.outputs.image-base-url }}/${{ matrix.image-name }}"
           echo "::set-output name=name::${NAME}"
 
           # Fully qualified image name + sha.
-          echo "::set-output name=tagged::${NAME}:${{ needs.tools.outputs.tag-long }}"
+          echo "::set-output name=tagged::${NAME}:${{ steps.tags.outputs.long }}"
 
       - name: Auth to GCP
         uses: google-github-actions/setup-gcloud@master
@@ -157,7 +186,6 @@ jobs:
       - name: Build image
         run: |
           docker build \
-            --build-arg tools_image="${{ needs.tools.outputs.image }}" \
             --build-arg argocd_version="${ARGOCD_VERSION}" \
             --build-arg vault_version="${VAULT_VERSION}" \
             -t "${{ steps.image-name.outputs.tagged }}" \
@@ -180,9 +208,9 @@ jobs:
           # Add short-sha tag. Eg. "my-pr-branch-294fa23"
           gcloud artifacts docker tags add \
             "${{ steps.image-name.outputs.tagged }}" \
-            "${{ steps.image-name.outputs.name }}:${{ needs.tools.outputs.tag-short }}"
+            "${{ steps.image-name.outputs.name }}:${{ steps.tags.outputs.short }}"
 
           # Add branch tag. Eg. "my-pr-branch"
           gcloud artifacts docker tags add \
             "${{ steps.image-name.outputs.tagged }}" \
-            "${{ steps.image-name.outputs.name }}:${{ needs.tools.outputs.tag-branch }}"
+            "${{ steps.image-name.outputs.name }}:${{ steps.tags.outputs.branch }}"

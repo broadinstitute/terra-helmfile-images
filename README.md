@@ -13,7 +13,6 @@ Looking for Thelma? It's been moved to a [separate repo](https://github.com/broa
 
 ### Docker Images
 
-* **`env-diff-action`**: [Used by terra-helmfile's env-diff GitHub Action](https://github.com/broadinstitute/terra-helmfile/blob/master/.github/actions/env-diff/action.yml) to comment on PRs with a diff of environment changes
 * **`jenkins-gke-deploy`**: [Used by Jenkins](https://github.com/broadinstitute/dsp-jenkins/search?q=jenkins-terra-gke-deploy) to trigger ArgoCD syncs during the Terra monolith release process
 * **`jenkins-helmfile-version-query`**: [Used by Jenkins](https://fc-jenkins.dsp-techops.broadinstitute.org/job/gke-service-update/) to verify that a version update has successfully merged.
 * **`argocd-custom-image`**: [Used by ArgoCD](https://github.com/broadinstitute/terra-helm-definitions/search?q=argocd-custom) to render Kubernetes manifests during ArgoCD deploys

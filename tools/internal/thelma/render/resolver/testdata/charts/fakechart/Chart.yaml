@@ -1,5 +1,0 @@
-apiVersion: v2
-name: fakechart
-version: 0.10.0
-description: Fake chart for testing resolver
-type: application

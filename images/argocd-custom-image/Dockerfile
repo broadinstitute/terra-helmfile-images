@@ -1,15 +1,9 @@
 # Specified in cloudbuild.yaml
 ARG argocd_version
-ARG tools_image
-
-# Add tools image as empty build stage so we can refer
-# to it laster in a COPY command
-FROM ${tools_image} AS tools
 
 FROM argoproj/argocd:v${argocd_version}
 
 # Specified in .github/workflows/build.yaml
-ARG tools_image
 ARG argocd_version
 ARG vault_version
 
@@ -36,9 +30,6 @@ RUN apt-get update && \
 
 # Create tools directory
 RUN mkdir -p /custom-tools/bin && chown -R argocd:argocd /custom-tools
-
-## Copy Go tools such as `render`, `helm`, and `helmfile` into the /custom-tools/bin directory
-COPY --from=tools /tools/bin /custom-tools/bin
 
 ENV PATH="/custom-tools/bin:${PATH}"
 

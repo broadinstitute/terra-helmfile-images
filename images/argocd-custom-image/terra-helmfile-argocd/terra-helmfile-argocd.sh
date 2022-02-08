@@ -8,6 +8,9 @@
 set -eo pipefail
 set -x
 
+PATH="/thelma/bin:${PATH}"
+export PATH
+
 if [[ "$1" == 'init' ]]; then
   : # Nothing to do
 elif [[ "$1" == 'generate' ]]; then

@@ -22,16 +22,17 @@ env:
   # Region-specific Google Docker repository where GOOGLE_PROJECT/REPOSITORY_NAME can be found
   GOOGLE_DOCKER_REPOSITORY: us-central1-docker.pkg.dev
 jobs:
-  tools:
+  images:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image-name:
+          - "argocd-custom-image"
+          - "jenkins-gke-deploy"
+          - "jenkins-helmfile-version-query"
     env:
-      IMAGE_NAME: tools
-    outputs:
-      tag-branch:     ${{ steps.tags.outputs.branch }}
-      tag-short:      ${{ steps.tags.outputs.short }}
-      tag-long:       ${{ steps.tags.outputs.long }}
-      image-base-url: ${{ steps.vars.outputs.image-base-url }}
-      image:          ${{ steps.image-name.outputs.tagged }}
+      ARGOCD_VERSION: "2.2.5"
+      VAULT_VERSION: "1.1.0"
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -62,7 +63,6 @@ jobs:
         id:   tags
         run:  |
           set -eo pipefail
-
           echo "::set-output name=branch::${{ steps.vars.outputs.branch }}"
           echo "::set-output name=short::${{ steps.vars.outputs.branch }}-${{ steps.vars.outputs.short-sha }}"
           echo "::set-output name=long::${{ steps.vars.outputs.branch }}-${{ steps.vars.outputs.long-sha }}"
@@ -72,7 +72,7 @@ jobs:
         run:  |
           set -eo pipefail
 
-          NAME="${{ steps.vars.outputs.image-base-url }}/${IMAGE_NAME}"
+          NAME="${{ steps.vars.outputs.image-base-url }}/${{ matrix.image-name }}"
           echo "::set-output name=name::${NAME}"
 
           # Fully qualified image name + sha.
@@ -91,73 +91,6 @@ jobs:
       - name: Build image
         run: |
           docker build \
-            -t "${{ steps.image-name.outputs.tagged }}" \
-            tools/
-
-
-      - name: Run Trivy vulnerability scanner
-        # From https://github.com/broadinstitute/dsp-appsec-trivy-action
-        uses: broadinstitute/dsp-appsec-trivy-action@v1
-        with:
-          image: "${{ steps.image-name.outputs.tagged }}"
-
-      - name: Push image
-        run: |
-          set -eo pipefail
-
-          docker push "${{ steps.image-name.outputs.tagged }}"
-
-          # Add short-sha tag. Eg. "my-pr-branch-294fa23"
-          gcloud artifacts docker tags add \
-            "${{ steps.image-name.outputs.tagged }}" \
-            "${{ steps.image-name.outputs.name }}:${{ steps.tags.outputs.short }}"
-
-          # Add branch tag. Eg. "my-pr-branch"
-          gcloud artifacts docker tags add \
-            "${{ steps.image-name.outputs.tagged }}" \
-            "${{ steps.image-name.outputs.name }}:${{ steps.tags.outputs.branch }}"
-  images:
-    runs-on: ubuntu-latest
-    needs: tools # These images use compiled code from the tools image
-    strategy:
-      matrix:
-        image-name:
-          - "argocd-custom-image"
-          - "jenkins-gke-deploy"
-          - "jenkins-helmfile-version-query"
-          - "thelma-action"
-    env:
-      ARGOCD_VERSION: "2.0.5"
-      VAULT_VERSION: "1.1.0"
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Set image name
-        id:   image-name
-        run:  |
-          set -eo pipefail
-
-          NAME="${{ needs.tools.outputs.image-base-url }}/${{ matrix.image-name }}"
-          echo "::set-output name=name::${NAME}"
-
-          # Fully qualified image name + sha.
-          echo "::set-output name=tagged::${NAME}:${{ needs.tools.outputs.tag-long }}"
-
-      - name: Auth to GCP
-        uses: google-github-actions/setup-gcloud@master
-        with:
-          version: '345.0.0'
-          service_account_email: ${{ secrets.GCP_PUBLISH_EMAIL }}
-          service_account_key:   ${{ secrets.GCP_PUBLISH_KEY_B64 }}
-
-      - name: Explicitly auth Docker for Artifact Registry
-        run: gcloud auth configure-docker $GOOGLE_DOCKER_REPOSITORY --quiet
-
-      - name: Build image
-        run: |
-          docker build \
-            --build-arg tools_image="${{ needs.tools.outputs.image }}" \
             --build-arg argocd_version="${ARGOCD_VERSION}" \
             --build-arg vault_version="${VAULT_VERSION}" \
             -t "${{ steps.image-name.outputs.tagged }}" \
@@ -180,9 +113,9 @@ jobs:
           # Add short-sha tag. Eg. "my-pr-branch-294fa23"
           gcloud artifacts docker tags add \
             "${{ steps.image-name.outputs.tagged }}" \
-            "${{ steps.image-name.outputs.name }}:${{ needs.tools.outputs.tag-short }}"
+            "${{ steps.image-name.outputs.name }}:${{ steps.tags.outputs.short }}"
 
           # Add branch tag. Eg. "my-pr-branch"
           gcloud artifacts docker tags add \
             "${{ steps.image-name.outputs.tagged }}" \
-            "${{ steps.image-name.outputs.name }}:${{ needs.tools.outputs.tag-branch }}"
+            "${{ steps.image-name.outputs.name }}:${{ steps.tags.outputs.branch }}"

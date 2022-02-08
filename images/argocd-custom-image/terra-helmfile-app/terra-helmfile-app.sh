@@ -11,6 +11,9 @@
 set -eo pipefail
 set -x
 
+PATH="/thelma/bin:${PATH}"
+export PATH
+
 target=
 if [[ -n "${TERRA_ENV}" ]]; then
   target="--env ${TERRA_ENV}"

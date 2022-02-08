@@ -124,7 +124,6 @@ jobs:
           - "argocd-custom-image"
           - "jenkins-gke-deploy"
           - "jenkins-helmfile-version-query"
-          - "thelma-action"
     env:
       ARGOCD_VERSION: "2.0.5"
       VAULT_VERSION: "1.1.0"

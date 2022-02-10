@@ -5,10 +5,6 @@
 
 This repository contains Dockerfiles for images that interact with the [terra-helmfile repo](https://github.com/broadinstitute/terra-helmfile).
 
-### Thelma
-
-Looking for Thelma? It's been moved to a [separate repo](https://github.com/broadinstitute/thelma)
-
 ### Docker Images
 
 * **`jenkins-gke-deploy`**: [Used by Jenkins](https://github.com/broadinstitute/dsp-jenkins/search?q=jenkins-terra-gke-deploy) to trigger ArgoCD syncs during the Terra monolith release process
@@ -16,3 +12,7 @@ Looking for Thelma? It's been moved to a [separate repo](https://github.com/broa
 * **`argocd-custom-image`**: [Used by ArgoCD](https://github.com/broadinstitute/terra-helm-definitions/search?q=argocd-custom) to render Kubernetes manifests during ArgoCD deploys
 
 To update an image, open a PR and make any necessary changes. Everything except ArgoCD is pinned to the `main` tag, so the changes will be picked up automatically.
+
+### Thelma
+
+Looking for Thelma? It's been moved to a [separate repo](https://github.com/broadinstitute/thelma)

@@ -3,9 +3,7 @@
 [![codecov](https://codecov.io/gh/broadinstitute/terra-helmfile-images/branch/main/graph/badge.svg?token=QYQHL6UE6Y)](https://codecov.io/gh/broadinstitute/terra-helmfile-images)
 [![Go Report Card](https://goreportcard.com/badge/github.com/broadinstitute/terra-helmfile-images/tools)](https://goreportcard.com/report/github.com/broadinstitute/terra-helmfile-images/tools)
 
-This repository contains accessory tooling for the [terra-helmfile repo](https://github.com/broadinstitute/terra-helmfile). It includes:
-* Golang source code for various utilities for rendering manifests and publishing charts (see `tools/` subdirectory)
-* Dockerfiles for images that interact with terra-helmfile (see `images/` subdirectory).
+This repository contains Dockerfiles for images that interact with the [terra-helmfile repo](https://github.com/broadinstitute/terra-helmfile).
 
 ### Thelma
 

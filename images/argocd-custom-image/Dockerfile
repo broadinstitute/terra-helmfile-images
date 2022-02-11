@@ -68,20 +68,5 @@ ENV PATH="/home/argocd/google-cloud-sdk/bin/:${PATH}"
 COPY legacy-configs /custom-tools/legacy-configs
 ENV PATH="/custom-tools/legacy-configs:${PATH}"
 
-## `helm-values` plugin
-# Wrapper script for `helm template -f path/to/values.yml`
-COPY helm-values /custom-tools/helm-values
-ENV PATH="/custom-tools/helm-values:${PATH}"
-
-## `terra-helmfile-app` plugin
-# Wrapper script for rendering application manifests from terra-helmfile repo
-COPY terra-helmfile-app /custom-tools/terra-helmfile-app
-ENV PATH="/custom-tools/terra-helmfile-app:${PATH}"
-
-## `terra-helmfile-argocd` plugin
-# Wrapper script for generating ArgoCD resources from terra-helmfile repo
-COPY terra-helmfile-argocd /custom-tools/terra-helmfile-argocd
-ENV PATH="/custom-tools/terra-helmfile-argocd:${PATH}"
-
 # Copy various config files
 COPY etc /etc

@@ -15,7 +15,8 @@ ARGOCD_ADDR="${ARGOCD_ADDR:-ap-argocd.dsp-devops.broadinstitute.org:443}"
 # How long to wait before timing out a sync operation
 ARGOCD_SYNC_TIMEOUT="${ARGOCD_SYNC_TIMEOUT:-600}"
 
-# Number of retries to attempt for failed syncs
+# Number of retries to attempt for failed syncs.
+# (exponential backoff with a base interval of 5 seconds and multiplication factor of 2)
 ARGOCD_SYNC_RETRIES="${ARGOCD_SYNC_RETRIES:-4}"
 
 # How long to wait for an in-progress sync operation to complete before attempting a new sync

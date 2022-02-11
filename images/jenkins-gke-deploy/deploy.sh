@@ -12,8 +12,17 @@ TMP_DIR="/tmp/deploy.sh-$$-tmp"
 
 ARGOCD_ADDR="${ARGOCD_ADDR:-ap-argocd.dsp-devops.broadinstitute.org:443}"
 
+# How long to wait before timing out a sync operation
 ARGOCD_SYNC_TIMEOUT="${ARGOCD_SYNC_TIMEOUT:-600}"
 
+# Number of retries to attempt for failed syncs
+ARGOCD_SYNC_RETRIES="${ARGOCD_SYNC_RETRIES:-4}"
+
+# How long to wait for an in-progress sync operation to complete before attempting a new sync
+# https://github.com/argoproj/argo-cd/issues/4505#issuecomment-705810174
+ARGOCD_SYNC_OPERATION_WAIT_TIMEOUT="${ARGOCD_SYNC_OPERATION_WAIT_TIMEOUT:-300}"
+
+# How long to wait for an application to become healthy after a successful sync
 ARGOCD_WAIT_TIMEOUT="${ARGOCD_WAIT_TIMEOUT:-600}"
 
 COLORIZE=${COLORIZE:-true}
@@ -175,12 +184,14 @@ diff() {
 sync() {
   local app="$1"
 
-  info "Preparing to sync ArgoCD app: ${app}"
+  # https://github.com/argoproj/argo-cd/issues/4505#issuecomment-705810174
+  info "Waiting up to ${ARGOCD_SYNC_OPERATION_WAIT_TIMEOUT}s for in-progress operations on ${app} to complete"
+  argo_cli app wait "${app}" --operation --timeout="${ARGOCD_SYNC_OPERATION_WAIT_TIMEOUT}"  || return 1
 
-  argo_cli app sync "${app}" --prune --timeout "${ARGOCD_SYNC_TIMEOUT}" || return 1
+  info "Syncing ArgoCD app: ${app}"
+  argo_cli app sync "${app}" --retry-limit="${ARGOCD_SYNC_RETRIES}" --prune --timeout "${ARGOCD_SYNC_TIMEOUT}" || return 1
 
   info "Waiting up to ${ARGOCD_WAIT_TIMEOUT}s for ${app} to become healthy"
-
   argo_cli app wait "${app}" --timeout="${ARGOCD_WAIT_TIMEOUT}"
 }
 

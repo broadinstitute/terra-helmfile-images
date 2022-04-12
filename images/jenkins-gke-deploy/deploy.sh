@@ -28,6 +28,12 @@ ARGOCD_WAIT_TIMEOUT="${ARGOCD_WAIT_TIMEOUT:-600}"
 
 COLORIZE=${COLORIZE:-true}
 
+# The GCP SA available on the instance's metadata server to use to generate an OIDC JWT for ArgoCD IAP access
+IAP_INSTANCE_SA="${IAP_INSTANCE_SA:-default}"
+
+# The OAuth Client ID of the IAP around ArgoCD
+IAP_CLIENT="${IAP_CLIENT:-1038484894585-k8qvf7l876733laev0lm8kenfa2lj6bn.apps.googleusercontent.com}"
+
 export VAULT_ADDR=${VAULT_ADDR:-https://clotho.broadinstitute.org:8200}
 
 fetch_argocd_token_from_vault(){
@@ -45,6 +51,14 @@ fetch_argocd_token_from_vault(){
 
   token=$( vault read -format=json "${path}" | jq -r '.data.token' )
   export ARGOCD_TOKEN="${token}"
+}
+
+fetch_oidc_jwt_from_instance(){
+  # We let IAP care about the JWT here, and don't eagerly try to validate it client-side.
+  # OIDC JWTs don't require special permissions to create. IAP will be the only reader (if it's enabled),
+  # and it will return good error messages if it shoots down any requests.
+  export IAP_JWT=$(curl -fsS -H 'Metadata-Flavor: Google' \
+  "http://metadata/computeMetadata/v1/instance/service-accounts/${IAP_INSTANCE_SA}/identity?audience=${IAP_CLIENT}&format=full")
 }
 
 # Echo a message formatted in ANSI color, with vertical spacing
@@ -104,6 +118,11 @@ This script supports two actions:
 
   Note: The VAULT_TOKEN environment variable is required.
 
+        It is also required that this script run on GCE with an SA
+        capable of accessing ArgoCD's IAP. A full OIDC JWT from the
+        instance metadata will be sent as Proxy-Authorization for
+        this purpose.
+
 HELP
 }
 
@@ -118,6 +137,7 @@ argo_cli() {
   --grpc-web \
   --server "${ARGOCD_ADDR}" \
   --auth-token "${ARGOCD_TOKEN}" \
+  --header "Proxy-Authorization: Bearer ${IAP_JWT}" \
   "$@"
 }
 
@@ -320,6 +340,8 @@ if [[ -z "${environment}" ]]; then
 fi
 
 fetch_argocd_token_from_vault "${environment}"
+
+fetch_oidc_jwt_from_instance
 
 if [[ "$action" == "properties" ]] && [[ $# -eq 2 ]]; then
   generate_properties "${environment}"

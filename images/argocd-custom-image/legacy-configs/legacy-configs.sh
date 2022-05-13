@@ -58,7 +58,9 @@ export RUN_CONTEXT
 export INPUT_DIR="${CHECKOUT_DIR}"
 export GKE_DEPLOY=true
 export USE_DOCKER_CONSUL_TEMPLATE=false
-export HOST_TAG="${APP_NAME}-${ENV}" # required for tcell
+# HOST_TAG manually set for FiaBs/BEEs, we want to respect that value
+# live environments don't set it but do need it for tcell
+export HOST_TAG="${HOST_TAG:-${APP_NAME}-${ENV}}"
 
 for type in $INSTANCE_TYPES; do
   # Default - no instance type

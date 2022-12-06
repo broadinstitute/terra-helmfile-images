@@ -18,8 +18,10 @@ RUN echo "ArgoCD version: ${argocd_version}"
 USER root
 
 # Ruby and curl are needed for configure.rb / `legacy-configs` plugin
+# Python3 is needed for Google Cloud SDK
 RUN apt-get update && \
     apt-get install -y \
+        python3 \
         wget \
         curl \
         jq \
@@ -34,7 +36,11 @@ RUN mkdir -p /custom-tools/bin && chown -R argocd:argocd /custom-tools
 ENV PATH="/custom-tools/bin:${PATH}"
 
 # Switch back to non-root user
-USER argocd
+# (this is set in the ArgoCD Dockerfile https://github.com/argoproj/argo-cd/blob/d2699888d125f73848b102f4addbd99c0253702d/Dockerfile#LL78)
+# We use the numeric id to sidestep
+# "Error: container has runAsNonRoot and image has non-numeric user (argocd), cannot verify user is non-root"
+# on Kubernetes
+USER $ARGOCD_USER_ID
 
 ## Install dependencies for the `legacy-configs` plugin
 # (aka the firecloud-develop ctmpl rendering process)

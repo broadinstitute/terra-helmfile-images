@@ -3,6 +3,15 @@
 # An ArgoCD application for rendering application configs from firecloud-develop.
 set -eo pipefail
 
+#
+# Fix for https://argocd-vault-plugin.readthedocs.io/en/stable/config/#argocd-240-environment-variable-prefix
+# Rewrite all environment variables prefixed with ARGOCD_ENV_<NAME> as <NAME>
+#
+tmpfile="/tmp/.legacy-configs.env.$$"
+trap "rm -f ${tmpfile}" EXIT
+printenv | grep "^ARGOCD_ENV_" | sed 's/^ARGOCD_ENV_/export /g' > "${tmpfile}"
+. "${tmpfile}"
+
 ## Required arguments
 : "${ENV?Env variable ENV is missing but required. Eg. \"dev\"}"
 : "${APP_NAME?Env variable APP_NAME is missing but required. Eg. \"cromwell\"}"

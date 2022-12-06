@@ -36,7 +36,8 @@ RUN mkdir -p /custom-tools/bin && chown -R argocd:argocd /custom-tools
 ENV PATH="/custom-tools/bin:${PATH}"
 
 # Switch back to non-root user
-USER argocd
+# (this is set in the ArgoCD Dockerfile https://github.com/argoproj/argo-cd/blob/d2699888d125f73848b102f4addbd99c0253702d/Dockerfile#LL78)
+USER $ARGOCD_USER_ID
 
 ## Install dependencies for the `legacy-configs` plugin
 # (aka the firecloud-develop ctmpl rendering process)

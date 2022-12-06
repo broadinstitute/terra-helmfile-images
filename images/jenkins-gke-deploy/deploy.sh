@@ -12,6 +12,9 @@ TMP_DIR="/tmp/deploy.sh-$$-tmp"
 
 ARGOCD_ADDR="${ARGOCD_ADDR:-ap-argocd.dsp-devops.broadinstitute.org:443}"
 
+# Default namespace where all ArgoCD applications live
+ARGOCD_DEFAULT_APPLICATION_NAMESPACE="ap-argocd"
+
 # How long to wait before timing out a sync operation
 ARGOCD_SYNC_TIMEOUT="${ARGOCD_SYNC_TIMEOUT:-600}"
 
@@ -155,7 +158,7 @@ list_selector(){
 # Check whether an app exists
 app_exists(){
   local app="$1"
-  list_all | grep -Fx "${app}"
+  list_all | grep -Fx "${ARGOCD_DEFAULT_APPLICATION_NAMESPACE}/${app}"
 }
 
 # Diff an app, returning 0 if no differences and 1 if there are differences
@@ -300,7 +303,8 @@ generate_properties(){
   info "Looking for projects in ${env}..."
   local selector="env=${env},type=app,jenkins-sync-enabled=true"
 
-  list_selector "${selector}" | while read app; do
+  list_selector "${selector}" | while read qualified_app; do
+    local app=$( echo "${qualified_app}" | cut -d/ -f2 )
     local project=$( echo "${app}" | cut -d- -f1 )
 
     info "--------------------------------------------------"

@@ -20,6 +20,7 @@ USER root
 # Ruby and curl are needed for configure.rb / `legacy-configs` plugin
 RUN apt-get update && \
     apt-get install -y \
+        python3 \
         wget \
         curl \
         jq \

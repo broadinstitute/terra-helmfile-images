@@ -37,6 +37,9 @@ ENV PATH="/custom-tools/bin:${PATH}"
 
 # Switch back to non-root user
 # (this is set in the ArgoCD Dockerfile https://github.com/argoproj/argo-cd/blob/d2699888d125f73848b102f4addbd99c0253702d/Dockerfile#LL78)
+# We use the numeric id to sidestep
+# "Error: container has runAsNonRoot and image has non-numeric user (argocd), cannot verify user is non-root"
+# on Kubernetes
 USER $ARGOCD_USER_ID
 
 ## Install dependencies for the `legacy-configs` plugin

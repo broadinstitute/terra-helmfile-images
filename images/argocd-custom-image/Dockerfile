@@ -18,6 +18,7 @@ RUN echo "ArgoCD version: ${argocd_version}"
 USER root
 
 # Ruby and curl are needed for configure.rb / `legacy-configs` plugin
+# Python3 is needed for Google Cloud SDK
 RUN apt-get update && \
     apt-get install -y \
         python3 \
